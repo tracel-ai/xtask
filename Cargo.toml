@@ -1,0 +1,33 @@
+[workspace]
+# Try
+# require version 2 to avoid "feature" additiveness for dev-dependencies
+# https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
+resolver = "2"
+
+members = [
+    "crates/*",
+    "xtask",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[workspace.dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.9", features = ["derive"] }
+derive_more = { version = "0.99.18", features = ["display"], default-features = false }
+dotenv = "0.15.0"
+env_logger = "0.11.3"
+log = { default-features = false, version = "0.4.22" }
+rand = { version = "0.8.5" }
+serde = { version = "1.0.200", features = ["derive"] }
+serde_json = "1.0.116"
+strum = {version = "0.26.3", features = ["derive"]}
+tracing = { version = "0.1.40", features = ["log"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry"] }
+
+[profile.dev]
+debug = 0 # Speed up compilation time and not necessary.
