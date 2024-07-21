@@ -35,7 +35,7 @@ fn bump(command: &BumpCommand) -> anyhow::Result<()> {
         .status()
         .map_err(|e| anyhow!("Failed to execute cargo set-version: {}", e))?;
     if !status.success() {
-        return Err(anyhow!("Cannot set new {command} version"));
+        return Err(anyhow!("Error trying to bump {command} version"));
     }
     endgroup!();
     Ok(())

@@ -1,6 +1,7 @@
 pub mod bump;
 pub mod check;
 pub mod ci;
+pub mod dependencies;
 pub mod publish;
 pub mod pull_request_checks;
 pub mod test;
