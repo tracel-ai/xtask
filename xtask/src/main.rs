@@ -4,7 +4,13 @@ mod commands;
 extern crate log;
 
 use std::time::Instant;
-use xtask_common::{anyhow, clap::{self, Parser}, commands::*, init_xtask, utils::time::format_duration};
+use xtask_common::{
+    anyhow,
+    clap::{self, Parser},
+    commands::*,
+    init_xtask,
+    utils::time::format_duration,
+};
 
 #[derive(clap::Parser)]
 #[command(author, version, about, long_about = None)]
@@ -30,6 +36,8 @@ pub enum Command {
     PullRequestChecks,
     /// Runs tests.
     Test(test::TestCmdArgs),
+    /// Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'.
+    Vulnerabilities(vulnerabilities::VulnerabilitiesCmdArgs),
 
     // Additional commands specific to this repository
     /// Print a message
@@ -50,12 +58,13 @@ fn main() -> anyhow::Result<()> {
         Command::Publish(args) => publish::handle_command(args),
         Command::PullRequestChecks => pull_request_checks::handle_command(),
         Command::Test(args) => test::handle_command(args),
+        Command::Vulnerabilities(args) => vulnerabilities::handle_command(args),
 
         // Specific commands
         Command::Foo => {
             println!("Custom command foo");
             Ok(())
-        },
+        }
     }?;
 
     let duration = start.elapsed();

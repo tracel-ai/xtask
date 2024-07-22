@@ -3,6 +3,7 @@ use std::process::Command;
 pub mod cargo;
 pub mod process;
 pub mod prompt;
+pub mod rustup;
 pub mod time;
 pub mod workspace;
 
