@@ -47,6 +47,18 @@ pub fn run_cargo(
     run_process_command(&mut cargo, error)
 }
 
+/// Run a cargo command with path as current working directory
+pub fn run_cargo_with_path(
+    command: &str,
+    params: Params,
+    envs: HashMap<&str, &str>,
+    path: &Path,
+    error: &str,
+) -> anyhow::Result<()> {
+    let mut cargo = cargo_command_with_path(command, params.clone(), envs, Some(path));
+    run_process_command(&mut cargo, error)
+}
+
 /// Ensure that a cargo crate is installed
 pub fn ensure_cargo_crate_is_installed(
     crate_name: &str,
