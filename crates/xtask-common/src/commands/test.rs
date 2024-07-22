@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Ok, Result};
 use clap::{Args, Subcommand};
@@ -74,12 +74,28 @@ pub(crate) fn run_unit(target: &Target) -> Result<()> {
 fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     info!("Command line: cargo test --lib --bins -p {}", &member.name);
-    let status = Command::new("cargo")
+    let error_output = Command::new("cargo")
         .args(["test", "--lib", "--bins", "-p", &member.name])
-        .status()
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .output()
         .map_err(|e| anyhow!("Failed to execute unit test: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!("Failed to execute unit test for {}", &member.name));
+
+    let stderr = String::from_utf8_lossy(&error_output.stderr);
+    if !error_output.status.success() {
+        if stderr.contains("no library targets found") {
+            warn!(
+                "No library found to test for in the crate '{}'",
+                &member.name
+            );
+            endgroup!();
+            return Ok(());
+        }
+        return Err(anyhow!(
+            "Failed to execute unit test for {}: {}",
+            &member.name,
+            stderr
+        ));
     }
     endgroup!();
     Ok(())
@@ -110,14 +126,27 @@ pub(crate) fn run_documentation(target: &Target) -> Result<()> {
 fn run_doc_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Doc Tests: {}", member.name);
     info!("Command line: cargo test --doc -p {}", &member.name);
-    let status = Command::new("cargo")
+    let error_output = Command::new("cargo")
         .args(["test", "--doc", "-p", &member.name])
-        .status()
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .output()
         .map_err(|e| anyhow!("Failed to execute documentation test: {}", e))?;
-    if !status.success() {
+
+    let stderr = String::from_utf8_lossy(&error_output.stderr);
+    if !error_output.status.success() {
+        if stderr.contains("no library targets found") {
+            warn!(
+                "No library found to test documentation for in the crate '{}'",
+                &member.name
+            );
+            endgroup!();
+            return Ok(());
+        }
         return Err(anyhow!(
-            "Failed to execute documentation test for {}",
-            &member.name
+            "Failed to execute documentation test for {}: {}",
+            &member.name,
+            stderr
         ));
     }
     endgroup!();
