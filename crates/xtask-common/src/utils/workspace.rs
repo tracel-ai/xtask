@@ -7,16 +7,16 @@ const MEMBER_PATH_PREFIX: &str = if cfg!(target_os = "windows") {
     "path+file://"
 };
 
-pub(crate) enum WorkspaceMemberType {
+pub enum WorkspaceMemberType {
     Crate,
     Example,
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub(crate) struct WorkspaceMember {
-    pub(crate) name: String,
-    pub(crate) path: String,
+pub struct WorkspaceMember {
+    pub name: String,
+    pub path: String,
 }
 
 impl WorkspaceMember {
@@ -26,7 +26,7 @@ impl WorkspaceMember {
 }
 
 /// Get workspace crates
-pub(crate) fn get_workspace_members(w_type: WorkspaceMemberType) -> Vec<WorkspaceMember> {
+pub fn get_workspace_members(w_type: WorkspaceMemberType) -> Vec<WorkspaceMember> {
     // Run `cargo metadata` command to get project metadata
     let output = Command::new("cargo")
         .arg("metadata")
