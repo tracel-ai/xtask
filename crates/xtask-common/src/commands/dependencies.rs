@@ -4,7 +4,11 @@ use anyhow::{anyhow, Ok};
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{endgroup, group, utils::cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly}};
+use crate::{
+    commands::CARGO_NIGHTLY_MSG,
+    endgroup, group,
+    utils::cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly},
+};
 
 #[derive(Args)]
 pub struct DependenciesCmdArgs {
@@ -12,10 +16,11 @@ pub struct DependenciesCmdArgs {
     command: DependencyCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
+#[derive(EnumString, Default, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum DependencyCommand {
     /// Run all dependency checks.
+    #[default]
     All,
     /// Perform an audit of all dependencies using the cargo-audit crate `<https://crates.io/crates/cargo-audit>`
     Audit,
@@ -32,9 +37,7 @@ pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
         DependencyCommand::Unused => run_cargo_udeps(),
         DependencyCommand::All => DependencyCommand::iter()
             .filter(|c| *c != DependencyCommand::All)
-            .try_for_each(|c| {
-                handle_command(DependenciesCmdArgs { command: c })
-            }),
+            .try_for_each(|c| handle_command(DependenciesCmdArgs { command: c })),
     }
 }
 
@@ -85,10 +88,7 @@ fn run_cargo_udeps() -> anyhow::Result<()> {
         }
         endgroup!();
     } else {
-        error!(
-            "You must use 'cargo +nightly' to check for unused dependencies.
-Install a nightly toolchain with 'rustup toolchain install nightly'."
-        )
+        error!("{}", CARGO_NIGHTLY_MSG);
     }
     Ok(())
 }
