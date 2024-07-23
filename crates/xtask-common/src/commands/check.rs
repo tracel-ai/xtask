@@ -185,7 +185,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, mut answer: Option<bool>) -
                         continue;
                     }
                     info!(
-                        "Command line: cargo clippy --no-deps --fix --allow-dirty -p {}",
+                        "Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged -p {}",
                         &member.name
                     );
                     let status = Command::new("cargo")
@@ -194,6 +194,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, mut answer: Option<bool>) -
                             "--no-deps",
                             "--fix",
                             "--allow-dirty",
+                            "--allow-staged",
                             "-p",
                             &member.name,
                         ])
