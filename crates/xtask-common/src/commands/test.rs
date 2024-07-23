@@ -16,6 +16,9 @@ pub struct TestCmdArgs {
     /// Target to test for.
     #[arg(short, long, value_enum)]
     target: Target,
+    /// Comma-separated list of excluded crates.
+    #[arg(short = 'x', long, value_name = "CRATE,CRATE,...", value_delimiter = ',', required = false)]
+    pub exclude: Vec<String>,
     #[command(subcommand)]
     command: TestCommand,
 }
@@ -35,21 +38,22 @@ enum TestCommand {
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     match args.command {
-        TestCommand::Unit => run_unit(&args.target),
-        TestCommand::Integration => run_integration(&args.target),
-        TestCommand::Documentation => run_documentation(&args.target),
+        TestCommand::Unit => run_unit(&args.target, &args.exclude),
+        TestCommand::Integration => run_integration(&args.target, &args.exclude),
+        TestCommand::Documentation => run_documentation(&args.target, &args.exclude),
         TestCommand::All => TestCommand::iter()
             .filter(|c| *c != TestCommand::All)
             .try_for_each(|c| {
                 handle_command(TestCmdArgs {
                     command: c,
                     target: args.target.clone(),
+                    exclude: args.exclude.clone(),
                 })
             }),
     }
 }
 
-pub(crate) fn run_unit(target: &Target) -> Result<()> {
+pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>) -> Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -59,13 +63,17 @@ pub(crate) fn run_unit(target: &Target) -> Result<()> {
             };
 
             for member in members {
+                if excluded.contains(&member.name) {
+                    info!("Skip '{}' because it has been excluded!", &member.name);
+                    continue;
+                }
                 run_unit_test(&member)?;
             }
         }
         Target::All => {
             Target::iter()
                 .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_unit(&t))?;
+                .try_for_each(|t| run_unit(&t, excluded))?;
         }
     }
     Ok(())
@@ -101,7 +109,7 @@ fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub(crate) fn run_documentation(target: &Target) -> Result<()> {
+pub(crate) fn run_documentation(target: &Target, excluded: &Vec<String>) -> Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -111,13 +119,17 @@ pub(crate) fn run_documentation(target: &Target) -> Result<()> {
             };
 
             for member in members {
+                if excluded.contains(&member.name) {
+                    info!("Skip '{}' because it has been excluded!", &member.name);
+                    continue;
+                }
                 run_doc_test(&member)?;
             }
         }
         Target::All => {
             Target::iter()
                 .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_documentation(&t))?;
+                .try_for_each(|t| run_documentation(&t, excluded))?;
         }
     }
     Ok(())
@@ -153,7 +165,7 @@ fn run_doc_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub(crate) fn run_integration(target: &Target) -> anyhow::Result<()> {
+pub(crate) fn run_integration(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -163,13 +175,17 @@ pub(crate) fn run_integration(target: &Target) -> anyhow::Result<()> {
             };
 
             for member in members {
+                if excluded.contains(&member.name) {
+                    info!("Skip '{}' because it has been excluded!", &member.name);
+                    continue;
+                }
                 run_integration_test(&member)?;
             }
         }
         Target::All => {
             Target::iter()
                 .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_integration(&t))?;
+                .try_for_each(|t| run_integration(&t, excluded))?;
         }
     }
     Ok(())

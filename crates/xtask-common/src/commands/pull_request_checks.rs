@@ -10,6 +10,7 @@ pub fn handle_command() -> anyhow::Result<()> {
             ci::handle_command(CICmdArgs {
                 target: super::Target::All,
                 command: c.clone(),
+                exclude: vec![],
             })
         })
 }

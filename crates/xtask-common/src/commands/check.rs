@@ -20,6 +20,9 @@ pub struct CheckCmdArgs {
     /// Target to check for.
     #[arg(short, long, value_enum)]
     target: Target,
+    /// Comma-separated list of excluded crates.
+    #[arg(short = 'x', long, value_name = "CRATE,CRATE,...", value_delimiter = ',', required = false)]
+    pub exclude: Vec<String>,
     #[command(subcommand)]
     command: CheckCommand,
 }
@@ -40,8 +43,8 @@ enum CheckCommand {
 pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     match args.command {
         CheckCommand::Audit => run_audit(&args.target, answer),
-        CheckCommand::Format => run_format(&args.target, answer),
-        CheckCommand::Lint => run_lint(&args.target, answer),
+        CheckCommand::Format => run_format(&args.target, &args.exclude, answer),
+        CheckCommand::Lint => run_lint(&args.target, &args.exclude, answer),
         CheckCommand::All => {
             let answer = ask_once(
                 "This will run all the checks with autofix on all members of the workspace.",
@@ -53,6 +56,7 @@ pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Resul
                         CheckCmdArgs {
                             command: c,
                             target: args.target.clone(),
+                            exclude: args.exclude.clone(),
                         },
                         Some(answer),
                     )
@@ -95,7 +99,7 @@ pub(crate) fn run_audit(target: &Target, mut answer: Option<bool>) -> anyhow::Re
     Ok(())
 }
 
-fn run_format(target: &Target, mut answer: Option<bool>) -> Result<()> {
+fn run_format(target: &Target, excluded: &Vec<String>, mut answer: Option<bool>) -> Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -118,6 +122,10 @@ fn run_format(target: &Target, mut answer: Option<bool>) -> Result<()> {
             if answer.unwrap() {
                 for member in members {
                     group!("Format: {}", member.name);
+                    if excluded.contains(&member.name) {
+                        info!("Skip '{}' because it has been excluded!", &member.name);
+                        continue;
+                    }
                     info!("Command line: cargo fmt -p {}", &member.name);
                     let status = Command::new("cargo")
                         .args(["fmt", "-p", &member.name])
@@ -142,14 +150,14 @@ fn run_format(target: &Target, mut answer: Option<bool>) -> Result<()> {
             if answer.unwrap() {
                 Target::iter()
                     .filter(|t| *t != Target::All)
-                    .try_for_each(|t| run_format(&t, answer))?;
+                    .try_for_each(|t| run_format(&t, excluded, answer))?;
             }
         }
     }
     Ok(())
 }
 
-fn run_lint(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
+fn run_lint(target: &Target, excluded: &Vec<String>, mut answer: Option<bool>) -> anyhow::Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -172,6 +180,10 @@ fn run_lint(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
             if answer.unwrap() {
                 for member in members {
                     group!("Lint: {}", member.name);
+                    if excluded.contains(&member.name) {
+                        info!("Skip '{}' because it has been excluded!", &member.name);
+                        continue;
+                    }
                     info!(
                         "Command line: cargo clippy --no-deps --fix --allow-dirty -p {}",
                         &member.name
@@ -203,7 +215,7 @@ fn run_lint(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
             if answer.unwrap() {
                 Target::iter()
                     .filter(|t| *t != Target::All)
-                    .try_for_each(|t| run_lint(&t, answer))?;
+                    .try_for_each(|t| run_lint(&t, excluded, answer))?;
             }
         }
     }
