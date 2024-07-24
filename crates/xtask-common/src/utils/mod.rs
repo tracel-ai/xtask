@@ -8,7 +8,7 @@ pub mod rustup;
 pub mod time;
 pub mod workspace;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Params {
     pub params: Vec<String>,
 }

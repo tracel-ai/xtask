@@ -28,6 +28,8 @@ pub enum Command {
     Check(check::CheckCmdArgs),
     /// Runs checks for Continous Integration
     CI(ci::CICmdArgs),
+    /// Build documentation
+    Doc(doc::DocCmdArgs),
     /// Run the specified dependencies check locally
     Dependencies(dependencies::DependenciesCmdArgs),
     /// Publish a crate to crates.io
@@ -55,6 +57,7 @@ fn main() -> anyhow::Result<()> {
         Command::Check(args) => check::handle_command(args, None),
         Command::CI(args) => ci::handle_command(args),
         Command::Dependencies(args) => dependencies::handle_command(args),
+        Command::Doc(args) => doc::handle_command(args),
         Command::Publish(args) => publish::handle_command(args),
         Command::PullRequestChecks => pull_request_checks::handle_command(),
         Command::Test(args) => test::handle_command(args),
