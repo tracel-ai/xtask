@@ -9,15 +9,8 @@ use xtask_common::{
     clap::{self, Parser},
     commands::*,
     init_xtask,
-    utils::time::format_duration,
+    utils::time::format_duration, XtaskArgs,
 };
-
-#[derive(clap::Parser)]
-#[command(author, version, about, long_about = None)]
-struct XtaskArgs {
-    #[command(subcommand)]
-    command: Command,
-}
 
 #[derive(clap::Subcommand)]
 pub enum Command {
@@ -48,7 +41,7 @@ pub enum Command {
 
 fn main() -> anyhow::Result<()> {
     init_xtask();
-    let args = XtaskArgs::parse();
+    let args = XtaskArgs::<Command>::parse();
 
     let start = Instant::now();
     match args.command {
