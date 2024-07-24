@@ -49,6 +49,8 @@ pub struct CICmdArgs {
 pub enum CICommand {
     /// Run audit command.
     Audit,
+    /// Build the targets.
+    Build,
     /// Run format command.
     Format,
     /// Run lint command.
@@ -68,6 +70,7 @@ pub enum CICommand {
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::Audit => run_audit(&args.target),
+        CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
         CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
         CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude, &args.only),
@@ -108,6 +111,46 @@ fn run_audit(target: &Target) -> anyhow::Result<()> {
             Target::iter()
                 .filter(|t| *t != Target::All && *t != Target::Examples)
                 .try_for_each(|t| run_audit(&t))?;
+        }
+    }
+    Ok(())
+}
+
+fn run_build(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> std::prelude::v1::Result<(), anyhow::Error> {
+    match target {
+        Target::Crates | Target::Examples => {
+            let members = match target {
+                Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
+                Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
+                _ => unreachable!(),
+            };
+
+            for member in members {
+                group!("Build: {}", member.name);
+                if excluded.contains(&member.name)
+                    || (!only.is_empty() && !only.contains(&member.name))
+                {
+                    info!("Skip '{}' because it has been excluded!", &member.name);
+                    continue;
+                }
+                info!("Command line: cargo build -p {}", &member.name);
+                let status = Command::new("cargo")
+                    .args(["build", "-p", &member.name])
+                    .status()
+                    .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
+                if !status.success() {
+                    return Err(anyhow!(
+                        "Build failed for {}",
+                        &member.name
+                    ));
+                }
+                endgroup!();
+            }
+        }
+        Target::All => {
+            Target::iter()
+                .filter(|t| *t != Target::All)
+                .try_for_each(|t| run_build(&t, excluded, only))?;
         }
     }
     Ok(())
