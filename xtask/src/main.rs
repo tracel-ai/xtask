@@ -4,13 +4,7 @@ mod commands;
 extern crate log;
 
 use std::time::Instant;
-use xtask_common::{
-    anyhow,
-    clap::{self, Parser},
-    commands::*,
-    init_xtask,
-    utils::time::format_duration, XtaskArgs,
-};
+use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_duration};
 
 #[derive(clap::Subcommand)]
 pub enum Command {
@@ -40,10 +34,9 @@ pub enum Command {
 }
 
 fn main() -> anyhow::Result<()> {
-    init_xtask();
-    let args = XtaskArgs::<Command>::parse();
-
     let start = Instant::now();
+
+    let args = init_xtask::<Command>()?;
     match args.command {
         // From common_xtask
         Command::Bump(args) => bump::handle_command(args),
@@ -68,6 +61,5 @@ fn main() -> anyhow::Result<()> {
         "\x1B[32;1mTime elapsed for the current execution: {}\x1B[0m",
         format_duration(&duration)
     );
-
     Ok(())
 }
