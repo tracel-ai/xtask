@@ -35,12 +35,12 @@ pub struct DocCmdArgs {
     )]
     pub only: Vec<String>,
     #[command(subcommand)]
-    command: DocCommand,
+    pub command: DocCommand,
 }
 
 #[derive(Default, EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-enum DocCommand {
+pub enum DocCommand {
     #[default]
     /// Build documentation.
     Build,

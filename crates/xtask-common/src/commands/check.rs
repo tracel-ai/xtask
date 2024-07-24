@@ -39,12 +39,12 @@ pub struct CheckCmdArgs {
     )]
     pub only: Vec<String>,
     #[command(subcommand)]
-    command: CheckCommand,
+    pub command: CheckCommand,
 }
 
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-enum CheckCommand {
+pub enum CheckCommand {
     /// Run audit command.
     Audit,
     /// Run format command.

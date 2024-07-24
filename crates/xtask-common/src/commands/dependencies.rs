@@ -13,12 +13,12 @@ use crate::{
 #[derive(Args)]
 pub struct DependenciesCmdArgs {
     #[command(subcommand)]
-    command: DependencyCommand,
+    pub command: DependencyCommand,
 }
 
 #[derive(EnumString, Default, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-pub(crate) enum DependencyCommand {
+pub enum DependencyCommand {
     /// Run all dependency checks.
     #[default]
     All,

@@ -9,12 +9,12 @@ use crate::{endgroup, group, utils::cargo::ensure_cargo_crate_is_installed};
 #[derive(Args)]
 pub struct BumpCmdArgs {
     #[command(subcommand)]
-    command: BumpCommand,
+    pub command: BumpCommand,
 }
 
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-enum BumpCommand {
+pub enum BumpCommand {
     /// Run unit tests.
     Major,
     /// Run integration tests.

@@ -16,12 +16,12 @@ use crate::{
 #[derive(Args)]
 pub struct VulnerabilitiesCmdArgs {
     #[command(subcommand)]
-    command: VulnerabilitiesCommand,
+    pub command: VulnerabilitiesCommand,
 }
 
 #[derive(EnumString, Default, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-pub(crate) enum VulnerabilitiesCommand {
+pub enum VulnerabilitiesCommand {
     /// Run all most useful vulnerability checks.
     #[default]
     All,

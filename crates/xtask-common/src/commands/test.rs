@@ -35,12 +35,12 @@ pub struct TestCmdArgs {
     )]
     pub only: Vec<String>,
     #[command(subcommand)]
-    command: TestCommand,
+    pub command: TestCommand,
 }
 
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-enum TestCommand {
+pub enum TestCommand {
     /// Run unit tests.
     Unit,
     /// Run integration tests.
