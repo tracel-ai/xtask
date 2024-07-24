@@ -9,6 +9,9 @@ use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_du
 #[derive(clap::Subcommand)]
 pub enum Command {
     // From common_xtask
+    // For now they need to be manually declared in each repository using xtask-common
+    // You only need to declare the command that you are effectively using
+    // TODO see if a derive macro could generate this code
     /// Bump the version of all crates to be published
     Bump(bump::BumpCmdArgs),
     /// Runs checks and fix issues (used for development purposes)
@@ -28,7 +31,7 @@ pub enum Command {
     /// Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'.
     Vulnerabilities(vulnerabilities::VulnerabilitiesCmdArgs),
 
-    // Additional commands specific to this repository
+    // Example of how to add new commands specific to your repository
     /// Print a message
     Foo,
 }
@@ -39,6 +42,7 @@ fn main() -> anyhow::Result<()> {
     let args = init_xtask::<Command>()?;
     match args.command {
         // From common_xtask
+        // You can easily insert specific pre-processing for each command if required by your repository
         Command::Bump(args) => bump::handle_command(args),
         Command::Check(args) => check::handle_command(args, None),
         Command::CI(args) => ci::handle_command(args),
@@ -49,7 +53,7 @@ fn main() -> anyhow::Result<()> {
         Command::Test(args) => test::handle_command(args),
         Command::Vulnerabilities(args) => vulnerabilities::handle_command(args),
 
-        // Specific commands
+        // Implementation of new commands for your repository
         Command::Foo => {
             println!("Custom command foo");
             Ok(())
