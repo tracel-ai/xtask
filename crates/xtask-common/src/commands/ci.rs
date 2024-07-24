@@ -23,8 +23,23 @@ pub struct CICmdArgs {
     #[arg(short, long, value_enum)]
     pub target: Target,
     /// Comma-separated list of excluded crates.
-    #[arg(short = 'x', long, value_name = "CRATE,CRATE,...", value_delimiter = ',', required = false)]
+    #[arg(
+        short = 'x',
+        long,
+        value_name = "CRATE,CRATE,...",
+        value_delimiter = ',',
+        required = false
+    )]
     pub exclude: Vec<String>,
+    /// Comma-separated list of crates to include exclusively.
+    #[arg(
+        short = 'n',
+        long,
+        value_name = "CRATE,CRATE,...",
+        value_delimiter = ',',
+        required = false
+    )]
+    pub only: Vec<String>,
     #[command(subcommand)]
     pub command: CICommand,
 }
@@ -53,12 +68,14 @@ pub enum CICommand {
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::Audit => run_audit(&args.target),
-        CICommand::Format => run_format(&args.target, &args.exclude),
-        CICommand::Lint => run_lint(&args.target, &args.exclude),
-        CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude),
-        CICommand::IntegrationTests => run_integration_tests(&args.target, &args.exclude),
-        CICommand::DocTests => run_doc_tests(&args.target, &args.exclude),
-        CICommand::AllTests => run_all_tests(&args.target, &args.exclude),
+        CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
+        CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+        CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude, &args.only),
+        CICommand::IntegrationTests => {
+            run_integration_tests(&args.target, &args.exclude, &args.only)
+        }
+        CICommand::DocTests => run_doc_tests(&args.target, &args.exclude, &args.only),
+        CICommand::AllTests => run_all_tests(&args.target, &args.exclude, &args.only),
         CICommand::All => CICommand::iter()
             .filter(|c| *c != CICommand::All && *c != CICommand::AllTests)
             .try_for_each(|c| {
@@ -66,6 +83,7 @@ pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
                     command: c,
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
+                    only: args.only.clone(),
                 })
             }),
     }
@@ -95,7 +113,7 @@ fn run_audit(target: &Target) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_format(target: &Target, excluded: &Vec<String>) -> Result<()> {
+fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -106,7 +124,9 @@ fn run_format(target: &Target, excluded: &Vec<String>) -> Result<()> {
 
             for member in members {
                 group!("Format: {}", member.name);
-                if excluded.contains(&member.name) {
+                if excluded.contains(&member.name)
+                    || (!only.is_empty() && !only.contains(&member.name))
+                {
                     info!("Skip '{}' because it has been excluded!", &member.name);
                     continue;
                 }
@@ -127,13 +147,13 @@ fn run_format(target: &Target, excluded: &Vec<String>) -> Result<()> {
         Target::All => {
             Target::iter()
                 .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_format(&t, excluded))?;
+                .try_for_each(|t| run_format(&t, excluded, only))?;
         }
     }
     Ok(())
 }
 
-fn run_lint(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
+fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -144,7 +164,9 @@ fn run_lint(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
 
             for member in members {
                 group!("Lint: {}", member.name);
-                if excluded.contains(&member.name) {
+                if excluded.contains(&member.name)
+                    || (!only.is_empty() && !only.contains(&member.name))
+                {
                     info!("Skip '{}' because it has been excluded!", &member.name);
                     continue;
                 }
@@ -173,27 +195,43 @@ fn run_lint(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
         Target::All => {
             Target::iter()
                 .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_lint(&t, excluded))?;
+                .try_for_each(|t| run_lint(&t, excluded, only))?;
         }
     }
     Ok(())
 }
 
-fn run_unit_tests(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
-    run_unit(target, excluded)
+fn run_unit_tests(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> anyhow::Result<()> {
+    run_unit(target, excluded, only)
 }
 
-fn run_integration_tests(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
-    run_integration(target, excluded)
+fn run_integration_tests(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> anyhow::Result<()> {
+    run_integration(target, excluded, only)
 }
 
-fn run_doc_tests(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
-    run_documentation(target, excluded)
+fn run_doc_tests(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> anyhow::Result<()> {
+    run_documentation(target, excluded, only)
 }
 
-fn run_all_tests(target: &Target, excluded: &Vec<String>) -> anyhow::Result<()> {
-    run_unit_tests(target, excluded)?;
-    run_integration_tests(target, excluded)?;
-    run_doc_tests(target, excluded)?;
+fn run_all_tests(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> anyhow::Result<()> {
+    run_unit_tests(target, excluded, only)?;
+    run_integration_tests(target, excluded, only)?;
+    run_doc_tests(target, excluded, only)?;
     Ok(())
 }

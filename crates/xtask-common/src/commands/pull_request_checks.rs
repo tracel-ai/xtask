@@ -11,6 +11,7 @@ pub fn handle_command() -> anyhow::Result<()> {
                 target: super::Target::All,
                 command: c.clone(),
                 exclude: vec![],
+                only: vec![],
             })
         })
 }

@@ -18,7 +18,12 @@ pub fn run_process_command(command: &mut Command, error: &str) -> anyhow::Result
 }
 
 /// Run a command
-pub fn run_command(command: &str, args: &[&str], command_error: &str, child_error: &str) -> anyhow::Result<()> {
+pub fn run_command(
+    command: &str,
+    args: &[&str],
+    command_error: &str,
+    child_error: &str,
+) -> anyhow::Result<()> {
     // Format command
     info!("{command} {}\n\n", args.join(" "));
 
