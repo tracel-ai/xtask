@@ -1,6 +1,7 @@
 use std::process::Command;
 
 pub mod cargo;
+pub mod helpers;
 pub mod mdbook;
 pub mod process;
 pub mod prompt;
