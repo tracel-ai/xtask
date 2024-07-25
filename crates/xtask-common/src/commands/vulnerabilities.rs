@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct VulnerabilitiesCmdArgs {
     #[command(subcommand)]
     pub command: VulnerabilitiesCommand,

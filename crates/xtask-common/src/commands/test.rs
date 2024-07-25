@@ -11,7 +11,7 @@ use crate::{
 
 use super::Target;
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct TestCmdArgs {
     /// Target to test for.
     #[arg(short, long, value_enum)]

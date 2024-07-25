@@ -6,7 +6,7 @@ use strum::{Display, EnumIter, EnumString};
 
 use crate::{endgroup, group, utils::cargo::ensure_cargo_crate_is_installed};
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct BumpCmdArgs {
     #[command(subcommand)]
     pub command: BumpCommand,

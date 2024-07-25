@@ -11,7 +11,7 @@ use crate::{
 
 use super::Target;
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct DocCmdArgs {
     /// Target to check for.
     #[arg(short, long, value_enum)]

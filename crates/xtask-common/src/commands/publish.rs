@@ -8,7 +8,7 @@ use crate::{endgroup, group};
 // Crates.io API token
 const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct PublishCmdArgs {
     /// The name of the crate to publish on crates.io
     name: String,

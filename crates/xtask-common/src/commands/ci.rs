@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, Ok};
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
@@ -17,7 +17,7 @@ use super::{
     Target,
 };
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct CICmdArgs {
     /// Target to check for.
     #[arg(short, long, value_enum)]
@@ -157,7 +157,7 @@ fn run_build(
     Ok(())
 }
 
-fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
+fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {

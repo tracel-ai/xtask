@@ -11,7 +11,7 @@ use crate::{
 
 use super::Profile;
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct CoverageCmdArgs {
     #[command(subcommand)]
     pub command: CoverageCommand,

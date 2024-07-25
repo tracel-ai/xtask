@@ -10,7 +10,7 @@ use crate::{
     utils::cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly},
 };
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct DependenciesCmdArgs {
     #[command(subcommand)]
     pub command: DependencyCommand,
