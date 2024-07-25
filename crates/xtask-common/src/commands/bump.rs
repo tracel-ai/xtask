@@ -29,7 +29,7 @@ pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {
 
 fn bump(command: &BumpCommand) -> anyhow::Result<()> {
     group!("Bump version: {command}");
-    ensure_cargo_crate_is_installed("cargo-edit", None, false)?;
+    ensure_cargo_crate_is_installed("cargo-edit", None, None, false)?;
     let status = Command::new("cargo")
         .args(["set-version", "--bump", &command.to_string()])
         .status()

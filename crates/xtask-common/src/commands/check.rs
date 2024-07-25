@@ -90,7 +90,7 @@ pub(crate) fn run_audit(target: &Target, mut answer: Option<bool>) -> anyhow::Re
                 ));
             };
             if answer.unwrap() {
-                ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), false)?;
+                ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
                 group!("Audit: Crates and Examples");
                 info!("Command line: cargo audit fix");
                 let status = Command::new("cargo")

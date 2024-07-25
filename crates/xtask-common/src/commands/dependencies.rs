@@ -43,7 +43,7 @@ pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
 
 /// Run cargo-audit
 fn run_cargo_audit() -> anyhow::Result<()> {
-    ensure_cargo_crate_is_installed("cargo-audit", None, false)?;
+    ensure_cargo_crate_is_installed("cargo-audit", None, None, false)?;
     // Run cargo audit
     group!("Cargo: run audit checks");
     let status = Command::new("cargo")
@@ -59,7 +59,7 @@ fn run_cargo_audit() -> anyhow::Result<()> {
 
 /// Run cargo-deny
 fn run_cargo_deny() -> anyhow::Result<()> {
-    ensure_cargo_crate_is_installed("cargo-deny", None, false)?;
+    ensure_cargo_crate_is_installed("cargo-deny", None, None, false)?;
     // Run cargo deny
     group!("Cargo: run deny checks");
     let status = Command::new("cargo")
@@ -76,7 +76,7 @@ fn run_cargo_deny() -> anyhow::Result<()> {
 /// Run cargo-udeps
 fn run_cargo_udeps() -> anyhow::Result<()> {
     if is_current_toolchain_nightly() {
-        ensure_cargo_crate_is_installed("cargo-udeps", None, false)?;
+        ensure_cargo_crate_is_installed("cargo-udeps", None, None, false)?;
         // Run cargo udeps
         group!("Cargo: run unused dependencies checks");
         let status = Command::new("cargo")

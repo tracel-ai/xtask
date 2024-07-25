@@ -63,6 +63,7 @@ pub fn run_cargo_with_path(
 pub fn ensure_cargo_crate_is_installed(
     crate_name: &str,
     features: Option<&str>,
+    version: Option<&str>,
     locked: bool,
 ) -> anyhow::Result<()> {
     if !is_cargo_crate_installed(crate_name) {
@@ -73,9 +74,11 @@ pub fn ensure_cargo_crate_is_installed(
         }
         if let Some(features) = features {
             if !features.is_empty() {
-                args.push("--features");
-                args.push(features);
+                args.extend(vec!["features", features]);
             }
+        }
+        if let Some(version) = version {
+            args.extend(vec!["--version", version]);
         }
         run_cargo(
             "install",

@@ -96,7 +96,7 @@ fn run_audit(target: &Target) -> anyhow::Result<()> {
     match target {
         Target::Crates | Target::Examples => {
             group!("Audit: Crates and Examples");
-            ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), false)?;
+            ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
             info!("Command line: cargo audit");
             let status = Command::new("cargo")
                 .args(["audit", "-q", "--color", "always"])
@@ -116,7 +116,11 @@ fn run_audit(target: &Target) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_build(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> std::prelude::v1::Result<(), anyhow::Error> {
+fn run_build(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -139,10 +143,7 @@ fn run_build(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> std
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
                 if !status.success() {
-                    return Err(anyhow!(
-                        "Build failed for {}",
-                        &member.name
-                    ));
+                    return Err(anyhow!("Build failed for {}", &member.name));
                 }
                 endgroup!();
             }

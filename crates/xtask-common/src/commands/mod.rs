@@ -1,6 +1,7 @@
 pub mod bump;
 pub mod check;
 pub mod ci;
+pub mod coverage;
 pub mod dependencies;
 pub mod doc;
 pub mod publish;
@@ -20,4 +21,13 @@ pub enum Target {
     All,
     Crates,
     Examples,
+}
+
+#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
+#[strum(serialize_all = "lowercase")]
+pub enum Profile {
+    All,
+    #[default]
+    Debug,
+    Release,
 }

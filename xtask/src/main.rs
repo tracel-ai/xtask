@@ -18,6 +18,8 @@ pub enum Command {
     Check(check::CheckCmdArgs),
     /// Runs checks for Continous Integration
     CI(ci::CICmdArgs),
+    /// Install and run coverage tools
+    Coverage(coverage::CoverageCmdArgs),
     /// Build documentation
     Doc(doc::DocCmdArgs),
     /// Run the specified dependencies check locally
@@ -46,6 +48,7 @@ fn main() -> anyhow::Result<()> {
         Command::Bump(args) => bump::handle_command(args),
         Command::Check(args) => check::handle_command(args, None),
         Command::CI(args) => ci::handle_command(args),
+        Command::Coverage(args) => coverage::handle_command(args),
         Command::Dependencies(args) => dependencies::handle_command(args),
         Command::Doc(args) => doc::handle_command(args),
         Command::Publish(args) => publish::handle_command(args),

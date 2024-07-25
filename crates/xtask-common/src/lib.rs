@@ -14,7 +14,6 @@ pub use strum;
 pub use tracing_subscriber;
 
 use crate::logging::init_logger;
-use crate::utils::rustup::rustup_add_component;
 
 #[macro_use]
 extern crate log;
@@ -43,7 +42,6 @@ pub fn init_xtask<C: Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
 }
 
 fn setup_coverage() -> anyhow::Result<()> {
-    rustup_add_component("llvm-tools-preview")?;
     std::env::set_var("RUSTFLAGS", "-Cinstrument-coverage");
     std::env::set_var("LLVM_PROFILE_FILE", "burn-%p-%m.profraw");
     Ok(())

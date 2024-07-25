@@ -85,7 +85,7 @@ impl VulnerabilitiesCommand {
 /// Run cargo-careful
 fn run_cargo_careful() -> anyhow::Result<()> {
     if is_current_toolchain_nightly() {
-        ensure_cargo_crate_is_installed("cargo-careful", None, false)?;
+        ensure_cargo_crate_is_installed("cargo-careful", None, None, false)?;
         rustup_add_component("rust-src")?;
         // prepare careful sysroot
         group!("Cargo: careful setup");
