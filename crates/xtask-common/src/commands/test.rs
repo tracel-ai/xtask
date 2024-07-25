@@ -14,7 +14,7 @@ use super::Target;
 #[derive(Args, Clone)]
 pub struct TestCmdArgs {
     /// Target to test for.
-    #[arg(short, long, value_enum)]
+    #[arg(short, long, value_enum, default_value_t = Target::All)]
     target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(

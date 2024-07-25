@@ -20,7 +20,7 @@ use super::{
 #[derive(Args, Clone)]
 pub struct CICmdArgs {
     /// Target to check for.
-    #[arg(short, long, value_enum)]
+    #[arg(short, long, value_enum, default_value_t = Target::All)]
     pub target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(

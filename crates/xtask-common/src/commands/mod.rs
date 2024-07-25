@@ -15,9 +15,10 @@ use strum::{Display, EnumIter, EnumString};
 pub const CARGO_NIGHTLY_MSG: &str = "You must use 'cargo +nightly' to run nightly checks.
 Install a nightly toolchain with 'rustup toolchain install nightly'.";
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, ValueEnum)]
+#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Target {
+    #[default]
     All,
     Crates,
     Examples,
