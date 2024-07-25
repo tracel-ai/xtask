@@ -6,7 +6,7 @@ use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     endgroup, group,
-    utils::{cargo::ensure_cargo_crate_is_installed, rustup::rustup_add_component},
+    utils::{cargo::ensure_cargo_crate_is_installed, rustup::rustup_add_component}, versions::GRCOV_VERSION,
 };
 
 use super::Profile;
@@ -51,7 +51,7 @@ pub fn handle_command(args: CoverageCmdArgs) -> anyhow::Result<()> {
 
 fn install_grcov() -> anyhow::Result<()> {
     rustup_add_component("llvm-tools-preview")?;
-    ensure_cargo_crate_is_installed("grcov", None, Some("0.8.19"), false)?;
+    ensure_cargo_crate_is_installed("grcov", None, Some(GRCOV_VERSION), false)?;
     Ok(())
 }
 

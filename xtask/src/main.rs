@@ -16,7 +16,7 @@ pub enum Command {
     Bump(bump::BumpCmdArgs),
     /// Runs checks and fix issues (used for development purposes)
     Check(check::CheckCmdArgs),
-    /// Runs checks for Continous Integration
+    /// Runs checks for Continuous Integration
     CI(ci::CICmdArgs),
     /// Install and run coverage tools
     Coverage(coverage::CoverageCmdArgs),

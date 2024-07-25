@@ -10,7 +10,7 @@ use crate::{
         cargo::ensure_cargo_crate_is_installed,
         prompt::ask_once,
         workspace::{get_workspace_members, WorkspaceMemberType},
-    },
+    }, versions::TYPOS_VERSION,
 };
 
 use super::Target;
@@ -47,10 +47,12 @@ pub struct CheckCmdArgs {
 pub enum CheckCommand {
     /// Run audit command.
     Audit,
-    /// Run format command.
+    /// Run format command and fix formatting.
     Format,
-    /// Run ling command.
+    /// Run lint command and fix issues.
     Lint,
+    /// Find typos in source code and fix them.
+    Typos,
     /// Run all the checks.
     All,
 }
@@ -60,6 +62,7 @@ pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Resul
         CheckCommand::Audit => run_audit(&args.target, answer),
         CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
         CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
+        CheckCommand::Typos => run_typos(&args.target, answer),
         CheckCommand::All => {
             let answer = ask_once(
                 "This will run all the checks with autofix on all members of the workspace.",
@@ -248,6 +251,40 @@ fn run_lint(
                     .filter(|t| *t != Target::All)
                     .try_for_each(|t| run_lint(&t, excluded, only, answer))?;
             }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn run_typos(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
+    match target {
+        Target::Crates | Target::Examples => {
+            if answer.is_none() {
+                answer = Some(ask_once(
+                    "This will look for typos in the source code check and auto-fix them.",
+                ));
+            };
+            if answer.unwrap() {
+                ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+                group!("Typos: Crates and Examples");
+                info!("Command line: typos --write-changes");
+                let status = Command::new("typos")
+                    .args(["--write-changes"])
+                    .status()
+                    .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
+                if !status.success() {
+                    return Err(anyhow!("Some typos have been found and cannot be fixed."));
+                }
+                endgroup!();
+            }
+        }
+        Target::All => {
+            if answer.is_none() {
+                answer = Some(ask_once("This will look for typos on all targets."));
+            };
+            Target::iter()
+                .filter(|p| *p != Target::All && *p != Target::Examples)
+                .try_for_each(|p| run_typos(&p, answer))?;
         }
     }
     Ok(())

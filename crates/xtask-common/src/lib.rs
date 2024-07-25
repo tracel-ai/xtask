@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod logging;
 pub mod utils;
+mod versions;
 
 // re-exports
 pub use anyhow;
