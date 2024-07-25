@@ -9,7 +9,7 @@ use crate::{
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         workspace::{get_workspace_members, WorkspaceMemberType},
-    },
+    }, versions::TYPOS_VERSION,
 };
 
 use super::{
@@ -47,37 +47,40 @@ pub struct CICmdArgs {
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
 pub enum CICommand {
+    /// Run all the checks.
+    All,
+    /// Run all tests.
+    AllTests,
     /// Run audit command.
     Audit,
     /// Build the targets.
     Build,
-    /// Run format command.
-    Format,
-    /// Run lint command.
-    Lint,
-    /// Run unit tests.
-    UnitTests,
-    /// Run integration tests.
-    IntegrationTests,
     /// Run documentation tests.
     DocTests,
-    /// Run all tests.
-    AllTests,
-    /// Run all the checks.
-    All,
+    /// Run format command.
+    Format,
+    /// Run integration tests.
+    IntegrationTests,
+    /// Run lint command.
+    Lint,
+    /// Report typos in source code.
+    Typos,
+    /// Run unit tests.
+    UnitTests,
 }
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::Audit => run_audit(&args.target),
         CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
+        CICommand::DocTests => run_doc_tests(&args.target, &args.exclude, &args.only),
         CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
-        CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
-        CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude, &args.only),
         CICommand::IntegrationTests => {
             run_integration_tests(&args.target, &args.exclude, &args.only)
         }
-        CICommand::DocTests => run_doc_tests(&args.target, &args.exclude, &args.only),
+        CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+        CICommand::Typos => run_typos(&args.target),
+        CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude, &args.only),
         CICommand::AllTests => run_all_tests(&args.target, &args.exclude, &args.only),
         CICommand::All => CICommand::iter()
             .filter(|c| *c != CICommand::All && *c != CICommand::AllTests)
@@ -240,6 +243,30 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
             Target::iter()
                 .filter(|t| *t != Target::All)
                 .try_for_each(|t| run_lint(&t, excluded, only))?;
+        }
+    }
+    Ok(())
+}
+
+fn run_typos(target: &Target) -> anyhow::Result<()> {
+    match target {
+        Target::Crates | Target::Examples => {
+            group!("Typos: Crates and Examples");
+            ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+            info!("Command line: typos --diff");
+            let status = Command::new("typos")
+                .args(["--diff"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Typos check execution failed"));
+            }
+            endgroup!();
+        }
+        Target::All => {
+            Target::iter()
+                .filter(|t| *t != Target::All && *t != Target::Examples)
+                .try_for_each(|t| run_typos(&t))?;
         }
     }
     Ok(())
