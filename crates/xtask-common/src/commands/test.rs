@@ -161,9 +161,9 @@ pub(crate) fn run_documentation(
 
 fn run_doc_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Doc Tests: {}", member.name);
-    info!("Command line: cargo test --doc -p {}", &member.name);
+    info!("Command line: cargo test --doc -p {} -- --Dwarnings", &member.name);
     let error_output = Command::new("cargo")
-        .args(["test", "--doc", "-p", &member.name, "--", "-Dwarnings"])
+        .args(["test", "--doc", "-p", &member.name, "--", "--Dwarnings"])
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .output()
