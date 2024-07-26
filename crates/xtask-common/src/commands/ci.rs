@@ -177,9 +177,9 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
                     info!("Skip '{}' because it has been excluded!", &member.name);
                     continue;
                 }
-                info!("Command line: cargo fmt --check -p {}", &member.name);
+                info!("Command line: cargo fmt --check -p {} -- --color=always", &member.name);
                 let status = Command::new("cargo")
-                    .args(["fmt", "--check", "-p", &member.name])
+                    .args(["fmt", "--check", "-p", &member.name, "--", "--color=always"])
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                 if !status.success() {
@@ -218,13 +218,14 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                     continue;
                 }
                 info!(
-                    "Command line: cargo clippy --no-deps -p {} -- --deny warnings",
+                    "Command line: cargo clippy --no-deps --color=always -p {} -- --deny warnings",
                     &member.name
                 );
                 let status = Command::new("cargo")
                     .args([
                         "clippy",
                         "--no-deps",
+                        "--color=always",
                         "-p",
                         &member.name,
                         "--",

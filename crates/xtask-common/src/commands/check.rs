@@ -95,7 +95,7 @@ pub(crate) fn run_audit(target: &Target, mut answer: Option<bool>) -> anyhow::Re
             if answer.unwrap() {
                 ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
                 group!("Audit: Crates and Examples");
-                info!("Command line: cargo audit fix");
+                info!("Command line: cargo audit -q --color always fix");
                 let status = Command::new("cargo")
                     .args(["audit", "-q", "--color", "always", "fix"])
                     .status()
@@ -152,9 +152,9 @@ fn run_format(
                         info!("Skip '{}' because it has been excluded!", &member.name);
                         continue;
                     }
-                    info!("Command line: cargo fmt -p {}", &member.name);
+                    info!("Command line: cargo fmt -p {} -- --color=always", &member.name);
                     let status = Command::new("cargo")
-                        .args(["fmt", "-p", &member.name])
+                        .args(["fmt", "-p", &member.name, "--", "--color=always"])
                         .status()
                         .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                     if !status.success() {
@@ -218,7 +218,7 @@ fn run_lint(
                         continue;
                     }
                     info!(
-                        "Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged -p {}",
+                        "Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged --color=always -p {} -- --deny warnings",
                         &member.name
                     );
                     let status = Command::new("cargo")
@@ -228,8 +228,12 @@ fn run_lint(
                             "--fix",
                             "--allow-dirty",
                             "--allow-staged",
+                            "--color=always",
                             "-p",
                             &member.name,
+                            "--",
+                            "--deny",
+                            "warnings"
                         ])
                         .status()
                         .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;

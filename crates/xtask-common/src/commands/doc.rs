@@ -73,9 +73,9 @@ fn run_documentation_build(
                     info!("Skip '{}' because it has been excluded!", &member.name);
                     continue;
                 }
-                info!("Command line: cargo doc -p {}", &member.name);
+                info!("Command line: cargo doc -p {} --color=always", &member.name);
                 let status = Command::new("cargo")
-                    .args(["doc", "-p", &member.name])
+                    .args(["doc", "-p", &member.name, "--color=always"])
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                 if !status.success() {

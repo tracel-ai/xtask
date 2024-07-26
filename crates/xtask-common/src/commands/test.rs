@@ -101,7 +101,7 @@ fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     info!("Command line: cargo test --lib --bins -p {}", &member.name);
     let error_output = Command::new("cargo")
-        .args(["test", "--lib", "--bins", "-p", &member.name])
+        .args(["test", "--lib", "--bins", "-p", &member.name, "--color=always",  "--", "--color=always" ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .output()
@@ -161,9 +161,9 @@ pub(crate) fn run_documentation(
 
 fn run_doc_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Doc Tests: {}", member.name);
-    info!("Command line: cargo test --doc -p {} -- --Dwarnings", &member.name);
+    info!("Command line: cargo test --doc -p {}", &member.name);
     let error_output = Command::new("cargo")
-        .args(["test", "--doc", "-p", &member.name, "--", "--Dwarnings"])
+        .args(["test", "--doc", "-p", &member.name])
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .output()
