@@ -1,16 +1,9 @@
 [package]
 name = "xtask-common"
-version = "0.1.0"
-edition = "2021"
-
-[features]
-default = ["bump", "check",  "ci", "publish", "test", "pull_request_check"]
-bump = []
-check = []
-ci = []
-publish = []
-pull_request_check = []
-test = []
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }

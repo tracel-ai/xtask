@@ -4,7 +4,6 @@ use anyhow::{anyhow, Ok};
 
 use crate::{endgroup, group};
 
-
 /// Allow to build additional crates outside the common build commands
 pub fn additional_crates_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Result<()> {
     let params_display = params.join(", ");
