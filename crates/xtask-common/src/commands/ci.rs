@@ -254,9 +254,9 @@ fn run_typos(target: &Target) -> anyhow::Result<()> {
         Target::Crates | Target::Examples => {
             group!("Typos: Crates and Examples");
             ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
-            info!("Command line: typos --diff");
+            info!("Command line: typos --diff --color always");
             let status = Command::new("typos")
-                .args(["--diff"])
+                .args(["--diff", "--color", "always"])
                 .status()
                 .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
             if !status.success() {

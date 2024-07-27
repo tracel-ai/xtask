@@ -271,9 +271,9 @@ pub(crate) fn run_typos(target: &Target, mut answer: Option<bool>) -> anyhow::Re
             if answer.unwrap() {
                 ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
                 group!("Typos: Crates and Examples");
-                info!("Command line: typos --write-changes");
+                info!("Command line: typos --write-changes --color always");
                 let status = Command::new("typos")
-                    .args(["--write-changes"])
+                    .args(["--write-changes", "--color", "always"])
                     .status()
                     .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
                 if !status.success() {
