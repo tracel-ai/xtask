@@ -6,7 +6,8 @@ use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     endgroup, group,
-    utils::{cargo::ensure_cargo_crate_is_installed, rustup::rustup_add_component}, versions::GRCOV_VERSION,
+    utils::{cargo::ensure_cargo_crate_is_installed, rustup::rustup_add_component},
+    versions::GRCOV_VERSION,
 };
 
 use super::Profile;
@@ -68,7 +69,10 @@ fn run_grcov(generate_args: &GenerateCmdArgs) -> anyhow::Result<()> {
         "--branch",
         "--ignore-not-existing",
     ];
-    generate_args.ignore.iter().for_each(|i| args.extend(vec!["--ignore", i]));
+    generate_args
+        .ignore
+        .iter()
+        .for_each(|i| args.extend(vec!["--ignore", i]));
     let status = Command::new("grcov")
         .args(args)
         .status()

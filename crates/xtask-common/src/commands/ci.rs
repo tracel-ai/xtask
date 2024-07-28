@@ -5,15 +5,19 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         workspace::{get_workspace_members, WorkspaceMemberType},
-    }, versions::TYPOS_VERSION,
+    },
+    versions::TYPOS_VERSION,
 };
 
 use super::{
-    check::run_compile, test::{run_documentation, run_integration, run_unit}, Target
+    check::run_compile,
+    test::{run_documentation, run_integration, run_unit},
+    Target,
 };
 
 #[derive(Args, Clone)]
@@ -71,10 +75,13 @@ pub enum CICommand {
 }
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
+    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    }
     match args.command {
         CICommand::Audit => run_audit(),
         CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
-        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
+        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only, None),
         CICommand::DocTests => run_documentation(&args.target, &args.exclude, &args.only),
         CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CICommand::IntegrationTests => run_integration(&args.target, &args.exclude, &args.only),
@@ -154,6 +161,11 @@ fn run_build(
                 endgroup!();
             }
         }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_build(&t, excluded, only))?;
+        }
     }
     Ok(())
 }
@@ -187,7 +199,10 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
                     info!("Skip '{}' because it has been excluded!", &member.name);
                     continue;
                 }
-                info!("Command line: cargo fmt --check -p {} -- --color=always", &member.name);
+                info!(
+                    "Command line: cargo fmt --check -p {} -- --color=always",
+                    &member.name
+                );
                 let status = Command::new("cargo")
                     .args(["fmt", "--check", "-p", &member.name, "--", "--color=always"])
                     .status()
@@ -201,6 +216,11 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
                 endgroup!();
             }
         }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_format(&t, excluded, only))?;
+        }
     }
     Ok(())
 }
@@ -211,7 +231,14 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
             group!("Lint Workspace");
             info!("Command line: cargo clippy --no-deps --color=always -- --deny warnings");
             let status = Command::new("cargo")
-                .args(["clippy", "--no-deps", "--color=always", "--", "--deny", "warnings"])
+                .args([
+                    "clippy",
+                    "--no-deps",
+                    "--color=always",
+                    "--",
+                    "--deny",
+                    "warnings",
+                ])
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
             if !status.success() {
@@ -256,6 +283,11 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                 }
                 endgroup!();
             }
+        }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_lint(&t, excluded, only))?;
         }
     }
     Ok(())

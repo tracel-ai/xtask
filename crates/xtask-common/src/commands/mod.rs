@@ -14,10 +14,14 @@ use strum::{Display, EnumIter, EnumString};
 
 pub const CARGO_NIGHTLY_MSG: &str = "You must use 'cargo +nightly' to run nightly checks.
 Install a nightly toolchain with 'rustup toolchain install nightly'.";
+pub const WARN_IGNORED_EXCLUDE_ONLY_ARGS: &str =
+    "--target workspace ignores the arguments --exclude and --only.
+Use --target all-packages instead.";
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Target {
+    AllPackages,
     Crates,
     Examples,
     #[default]

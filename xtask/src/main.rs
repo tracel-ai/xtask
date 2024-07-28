@@ -6,7 +6,18 @@ extern crate log;
 use std::time::Instant;
 use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_duration};
 
-#[xtask_macros::commands(Bump, Check, CI, Coverage, Doc, Dependencies, Publish, PullRequestChecks, Test, Vulnerabilities)]
+#[xtask_macros::commands(
+    Bump,
+    Check,
+    CI,
+    Coverage,
+    Doc,
+    Dependencies,
+    Publish,
+    PullRequestChecks,
+    Test,
+    Vulnerabilities
+)]
 pub enum Command {
     /// Print a message
     Foo,

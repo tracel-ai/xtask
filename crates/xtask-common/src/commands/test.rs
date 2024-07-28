@@ -5,6 +5,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
     endgroup, group,
     utils::workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
 };
@@ -52,6 +53,9 @@ pub enum TestCommand {
 }
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
+    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    }
     match args.command {
         TestCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
         TestCommand::Integration => run_integration(&args.target, &args.exclude, &args.only),
@@ -100,6 +104,11 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
                 run_unit_test(&member)?;
             }
         }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_unit(&t, excluded, only))?;
+        }
     }
     Ok(())
 }
@@ -108,7 +117,16 @@ fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     info!("Command line: cargo test --lib --bins -p {}", &member.name);
     let error_output = Command::new("cargo")
-        .args(["test", "--lib", "--bins", "-p", &member.name, "--color=always",  "--", "--color=always" ])
+        .args([
+            "test",
+            "--lib",
+            "--bins",
+            "-p",
+            &member.name,
+            "--color=always",
+            "--",
+            "--color=always",
+        ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .output()
@@ -168,6 +186,11 @@ pub(crate) fn run_documentation(
                 }
                 run_doc_test(&member)?;
             }
+        }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_documentation(&t, excluded, only))?;
         }
     }
     Ok(())
@@ -238,6 +261,11 @@ pub(crate) fn run_integration(
                 run_integration_test(&member)?;
             }
         }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_integration(&t, excluded, only))?;
+        }
     }
     Ok(())
 }
@@ -249,7 +277,15 @@ fn run_integration_test(member: &WorkspaceMember) -> Result<()> {
         &member.name
     );
     let output = Command::new("cargo")
-        .args(["test", "--test", "test_*", "-p", &member.name, "--color", "always"])
+        .args([
+            "test",
+            "--test",
+            "test_*",
+            "-p",
+            &member.name,
+            "--color",
+            "always",
+        ])
         .output()
         .map_err(|e| anyhow!("Failed to execute integration test: {}", e))?;
 

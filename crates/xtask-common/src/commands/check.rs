@@ -5,12 +5,14 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         prompt::ask_once,
         workspace::{get_workspace_members, WorkspaceMemberType},
-    }, versions::TYPOS_VERSION,
+    },
+    versions::TYPOS_VERSION,
 };
 
 use super::Target;
@@ -60,9 +62,15 @@ pub enum CheckCommand {
 }
 
 pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
+    if answer.is_none()
+        && args.target == Target::Workspace
+        && (!args.exclude.is_empty() || !args.only.is_empty())
+    {
+        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    }
     match args.command {
         CheckCommand::Audit => run_audit(answer),
-        CheckCommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
+        CheckCommand::Compile => run_compile(&args.target, &args.exclude, &args.only, answer),
         CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
         CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
         CheckCommand::Typos => run_typos(answer),
@@ -113,7 +121,11 @@ pub(crate) fn run_compile(
     target: &Target,
     excluded: &Vec<String>,
     only: &Vec<String>,
+    answer: Option<bool>,
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
+    if answer.is_some() && !answer.unwrap() {
+        return Ok(());
+    };
     match target {
         Target::Workspace => {
             group!("Compile Workspace");
@@ -153,6 +165,11 @@ pub(crate) fn run_compile(
                 endgroup!();
             }
         }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_compile(&t, excluded, only, None))?;
+        }
     }
     Ok(())
 }
@@ -166,7 +183,9 @@ fn run_format(
     match target {
         Target::Workspace => {
             if answer.is_none() {
-                answer = Some(ask_once("This will run format with auto-fix on the workspace."));
+                answer = Some(ask_once(
+                    "This will run format with auto-fix on the workspace.",
+                ));
             }
             if answer.unwrap() {
                 group!("Format Workspace");
@@ -208,7 +227,10 @@ fn run_format(
                         info!("Skip '{}' because it has been excluded!", &member.name);
                         continue;
                     }
-                    info!("Command line: cargo fmt -p {} -- --color=always", &member.name);
+                    info!(
+                        "Command line: cargo fmt -p {} -- --color=always",
+                        &member.name
+                    );
                     let status = Command::new("cargo")
                         .args(["fmt", "-p", &member.name, "--", "--color=always"])
                         .status()
@@ -221,6 +243,18 @@ fn run_format(
                     }
                     endgroup!();
                 }
+            }
+        }
+        Target::AllPackages => {
+            if answer.is_none() {
+                answer = Some(ask_once(
+                    "This will run format check with auto-fix on all packages of the workspace.",
+                ));
+            }
+            if answer.unwrap() {
+                Target::iter()
+                    .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                    .try_for_each(|t| run_format(&t, excluded, only, answer))?;
             }
         }
     }
@@ -236,7 +270,9 @@ fn run_lint(
     match target {
         Target::Workspace => {
             if answer.is_none() {
-                answer = Some(ask_once("This will run lint with auto-fix on the workspace."));
+                answer = Some(ask_once(
+                    "This will run lint with auto-fix on the workspace.",
+                ));
             }
             if answer.unwrap() {
                 group!("Lint Workspace");
@@ -251,7 +287,7 @@ fn run_lint(
                         "--color=always",
                         "--",
                         "--deny",
-                        "warnings"
+                        "warnings",
                     ])
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
@@ -304,7 +340,7 @@ fn run_lint(
                             &member.name,
                             "--",
                             "--deny",
-                            "warnings"
+                            "warnings",
                         ])
                         .status()
                         .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
@@ -313,6 +349,18 @@ fn run_lint(
                     }
                     endgroup!();
                 }
+            }
+        }
+        Target::AllPackages => {
+            if answer.is_none() {
+                answer = Some(ask_once(
+                    "This will run lint check with auto-fix on all packages of the workspace.",
+                ));
+            }
+            if answer.unwrap() {
+                Target::iter()
+                    .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                    .try_for_each(|t| run_lint(&t, excluded, only, answer))?;
             }
         }
     }

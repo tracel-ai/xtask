@@ -2,9 +2,10 @@ use std::process::Command;
 
 use anyhow::{anyhow, Ok};
 use clap::{Args, Subcommand};
-use strum::{Display, EnumIter, EnumString};
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
     endgroup, group,
     utils::workspace::{get_workspace_members, WorkspaceMemberType},
 };
@@ -47,6 +48,9 @@ pub enum DocCommand {
 }
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {
+    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    }
     match args.command {
         DocCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),
     }
@@ -98,6 +102,11 @@ fn run_documentation_build(
                 }
                 endgroup!();
             }
+        }
+        Target::AllPackages => {
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_documentation_build(&t, excluded, only))?;
         }
     }
     Ok(())

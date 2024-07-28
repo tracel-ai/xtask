@@ -47,12 +47,19 @@ pub fn additional_crates_unit_tests(crates: Vec<&str>, params: Vec<&str>) -> any
 }
 
 /// Allow to integration test additional crates outside the common integration-tests commands
-pub fn additional_crates_integration_tests(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Result<()> {
+pub fn additional_crates_integration_tests(
+    crates: Vec<&str>,
+    params: Vec<&str>,
+) -> anyhow::Result<()> {
     let params_display = params.join(", ");
     let mut base_args = vec!["test", "--test", "test_*"];
     base_args.extend(params);
     crates.iter().try_for_each(|c| {
-        group!("Integration Tests: {} (with params: {})", *c, params_display);
+        group!(
+            "Integration Tests: {} (with params: {})",
+            *c,
+            params_display
+        );
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
         let status = Command::new("cargo")
