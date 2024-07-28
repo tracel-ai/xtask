@@ -14,7 +14,7 @@ use super::Target;
 #[derive(Args, Clone)]
 pub struct TestCmdArgs {
     /// Target to test for.
-    #[arg(short, long, value_enum, default_value_t = Target::All)]
+    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
     target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(
@@ -71,6 +71,18 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
 
 pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Workspace Unit Tests");
+            info!("Command line: cargo test --workspace --color=always");
+            let status = Command::new("cargo")
+                .args(["test", "--workspace", "--color", "always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace unit test failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -87,11 +99,6 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
                 }
                 run_unit_test(&member)?;
             }
-        }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_unit(&t, excluded, only))?;
         }
     }
     Ok(())
@@ -133,6 +140,18 @@ pub(crate) fn run_documentation(
     only: &Vec<String>,
 ) -> Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Workspace Documentation Tests");
+            info!("Command line: cargo test --workspace --doc --color=always");
+            let status = Command::new("cargo")
+                .args(["test", "--workspace", "--doc", "--color", "always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace documentation test failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -149,11 +168,6 @@ pub(crate) fn run_documentation(
                 }
                 run_doc_test(&member)?;
             }
-        }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_documentation(&t, excluded, only))?;
         }
     }
     Ok(())
@@ -195,6 +209,18 @@ pub(crate) fn run_integration(
     only: &Vec<String>,
 ) -> anyhow::Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Workspace Integration Tests");
+            info!("Command line: cargo test --test \"test_*\" --color=always");
+            let status = Command::new("cargo")
+                .args(["test", "--test", "test_*", "--color", "always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace integration test failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -212,11 +238,6 @@ pub(crate) fn run_integration(
                 run_integration_test(&member)?;
             }
         }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_integration(&t, excluded, only))?;
-        }
     }
     Ok(())
 }
@@ -224,11 +245,11 @@ pub(crate) fn run_integration(
 fn run_integration_test(member: &WorkspaceMember) -> Result<()> {
     group!("Integration Tests: {}", &member.name);
     info!(
-        "Command line: cargo test --test \"test_*\" -p {}",
+        "Command line: cargo test --test \"test_*\" -p {} --color=always",
         &member.name
     );
     let output = Command::new("cargo")
-        .args(["test", "--test", "test_*", "-p", &member.name])
+        .args(["test", "--test", "test_*", "-p", &member.name, "--color", "always"])
         .output()
         .map_err(|e| anyhow!("Failed to execute integration test: {}", e))?;
 

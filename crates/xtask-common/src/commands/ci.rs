@@ -13,14 +13,13 @@ use crate::{
 };
 
 use super::{
-    test::{run_documentation, run_integration, run_unit},
-    Target,
+    check::run_compile, test::{run_documentation, run_integration, run_unit}, Target
 };
 
 #[derive(Args, Clone)]
 pub struct CICmdArgs {
     /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::All)]
+    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
     pub target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(
@@ -55,6 +54,8 @@ pub enum CICommand {
     Audit,
     /// Build the targets.
     Build,
+    /// Compile the targets (does not write actual binaries).
+    Compile,
     /// Run documentation tests.
     DocTests,
     /// Run format command.
@@ -71,16 +72,15 @@ pub enum CICommand {
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
-        CICommand::Audit => run_audit(&args.target),
+        CICommand::Audit => run_audit(),
         CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
-        CICommand::DocTests => run_doc_tests(&args.target, &args.exclude, &args.only),
+        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
+        CICommand::DocTests => run_documentation(&args.target, &args.exclude, &args.only),
         CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
-        CICommand::IntegrationTests => {
-            run_integration_tests(&args.target, &args.exclude, &args.only)
-        }
+        CICommand::IntegrationTests => run_integration(&args.target, &args.exclude, &args.only),
         CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
-        CICommand::Typos => run_typos(&args.target),
-        CICommand::UnitTests => run_unit_tests(&args.target, &args.exclude, &args.only),
+        CICommand::Typos => run_typos(),
+        CICommand::UnitTests => run_unit(&args.target, &args.exclude, &args.only),
         CICommand::AllTests => run_all_tests(&args.target, &args.exclude, &args.only),
         CICommand::All => CICommand::iter()
             .filter(|c| *c != CICommand::All && *c != CICommand::AllTests)
@@ -95,27 +95,18 @@ pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     }
 }
 
-fn run_audit(target: &Target) -> anyhow::Result<()> {
-    match target {
-        Target::Crates | Target::Examples => {
-            group!("Audit: Crates and Examples");
-            ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
-            info!("Command line: cargo audit");
-            let status = Command::new("cargo")
-                .args(["audit", "-q", "--color", "always"])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo audit: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Audit check execution failed"));
-            }
-            endgroup!();
-        }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All && *t != Target::Examples)
-                .try_for_each(|t| run_audit(&t))?;
-        }
+fn run_audit() -> anyhow::Result<()> {
+    group!("Audit Rust Dependencies");
+    ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
+    info!("Command line: cargo audit");
+    let status = Command::new("cargo")
+        .args(["audit", "-q", "--color", "always"])
+        .status()
+        .map_err(|e| anyhow!("Failed to execute cargo audit: {}", e))?;
+    if !status.success() {
+        return Err(anyhow!("Audit check execution failed"));
     }
+    endgroup!();
     Ok(())
 }
 
@@ -125,6 +116,18 @@ fn run_build(
     only: &Vec<String>,
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
+        Target::Workspace => {
+            group!("Build Workspace");
+            info!("Command line: cargo build");
+            let status = Command::new("cargo")
+                .args(["build"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace build failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -151,17 +154,24 @@ fn run_build(
                 endgroup!();
             }
         }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_build(&t, excluded, only))?;
-        }
     }
     Ok(())
 }
 
 fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Format Workspace");
+            info!("Command line: cargo fmt --check -- --color=always");
+            let status = Command::new("cargo")
+                .args(["fmt", "--check", "--", "--color=always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace format failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -191,17 +201,24 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
                 endgroup!();
             }
         }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_format(&t, excluded, only))?;
-        }
     }
     Ok(())
 }
 
 fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Lint Workspace");
+            info!("Command line: cargo clippy --no-deps --color=always -- --deny warnings");
+            let status = Command::new("cargo")
+                .args(["clippy", "--no-deps", "--color=always", "--", "--deny", "warnings"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace lint failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -240,61 +257,23 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                 endgroup!();
             }
         }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_lint(&t, excluded, only))?;
-        }
     }
     Ok(())
 }
 
-fn run_typos(target: &Target) -> anyhow::Result<()> {
-    match target {
-        Target::Crates | Target::Examples => {
-            group!("Typos: Crates and Examples");
-            ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
-            info!("Command line: typos --diff --color always");
-            let status = Command::new("typos")
-                .args(["--diff", "--color", "always"])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Typos check execution failed"));
-            }
-            endgroup!();
-        }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All && *t != Target::Examples)
-                .try_for_each(|t| run_typos(&t))?;
-        }
+fn run_typos() -> anyhow::Result<()> {
+    group!("Typos");
+    ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+    info!("Command line: typos --diff --color always");
+    let status = Command::new("typos")
+        .args(["--diff", "--color", "always"])
+        .status()
+        .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
+    if !status.success() {
+        return Err(anyhow!("Typos check execution failed"));
     }
+    endgroup!();
     Ok(())
-}
-
-fn run_unit_tests(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
-    run_unit(target, excluded, only)
-}
-
-fn run_integration_tests(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
-    run_integration(target, excluded, only)
-}
-
-fn run_doc_tests(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
-    run_documentation(target, excluded, only)
 }
 
 fn run_all_tests(
@@ -302,8 +281,8 @@ fn run_all_tests(
     excluded: &Vec<String>,
     only: &Vec<String>,
 ) -> anyhow::Result<()> {
-    run_unit_tests(target, excluded, only)?;
-    run_integration_tests(target, excluded, only)?;
-    run_doc_tests(target, excluded, only)?;
+    run_unit(target, excluded, only)?;
+    run_integration(target, excluded, only)?;
+    run_documentation(target, excluded, only)?;
     Ok(())
 }

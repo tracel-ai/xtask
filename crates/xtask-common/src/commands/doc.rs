@@ -2,7 +2,7 @@ use std::process::Command;
 
 use anyhow::{anyhow, Ok};
 use clap::{Args, Subcommand};
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     endgroup, group,
@@ -14,7 +14,7 @@ use super::Target;
 #[derive(Args, Clone)]
 pub struct DocCmdArgs {
     /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::All)]
+    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
     target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(
@@ -58,6 +58,18 @@ fn run_documentation_build(
     only: &Vec<String>,
 ) -> anyhow::Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Build Workspace documentation");
+            info!("Command line: cargo doc --workspace --color=always");
+            let status = Command::new("cargo")
+                .args(["doc", "--workspace", "--color=always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo doc: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace documentation build failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -86,11 +98,6 @@ fn run_documentation_build(
                 }
                 endgroup!();
             }
-        }
-        Target::All => {
-            Target::iter()
-                .filter(|t| *t != Target::All)
-                .try_for_each(|t| run_documentation_build(&t, excluded, only))?;
         }
     }
     Ok(())

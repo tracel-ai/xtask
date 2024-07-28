@@ -18,10 +18,10 @@ Install a nightly toolchain with 'rustup toolchain install nightly'.";
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Target {
-    #[default]
-    All,
     Crates,
     Examples,
+    #[default]
+    Workspace,
 }
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]

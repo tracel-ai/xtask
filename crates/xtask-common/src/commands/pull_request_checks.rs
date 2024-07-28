@@ -8,7 +8,7 @@ pub fn handle_command() -> anyhow::Result<()> {
         .filter(|c| *c != CICommand::All && *c != CICommand::AllTests && *c != CICommand::Audit)
         .try_for_each(|c| {
             ci::handle_command(CICmdArgs {
-                target: super::Target::All,
+                target: super::Target::Workspace,
                 command: c.clone(),
                 exclude: vec![],
                 only: vec![],

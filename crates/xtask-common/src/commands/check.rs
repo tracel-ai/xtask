@@ -18,7 +18,7 @@ use super::Target;
 #[derive(Args, Clone)]
 pub struct CheckCmdArgs {
     /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::All)]
+    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
     target: Target,
     /// Comma-separated list of excluded crates.
     #[arg(
@@ -47,6 +47,8 @@ pub struct CheckCmdArgs {
 pub enum CheckCommand {
     /// Run audit command.
     Audit,
+    /// Compile the targets (does not write actual binaries).
+    Compile,
     /// Run format command and fix formatting.
     Format,
     /// Run lint command and fix issues.
@@ -59,10 +61,11 @@ pub enum CheckCommand {
 
 pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     match args.command {
-        CheckCommand::Audit => run_audit(&args.target, answer),
+        CheckCommand::Audit => run_audit(answer),
+        CheckCommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
         CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
         CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
-        CheckCommand::Typos => run_typos(&args.target, answer),
+        CheckCommand::Typos => run_typos(answer),
         CheckCommand::All => {
             let answer = ask_once(
                 "This will run all the checks with autofix on all members of the workspace.",
@@ -84,35 +87,71 @@ pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Resul
     }
 }
 
-pub(crate) fn run_audit(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
+pub(crate) fn run_audit(mut answer: Option<bool>) -> anyhow::Result<()> {
+    if answer.is_none() {
+        answer = Some(ask_once(
+            "This will run the audit check with autofix mode enabled.",
+        ));
+    };
+    if answer.unwrap() {
+        ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
+        group!("Audit Rust Dependencies");
+        info!("Command line: cargo audit -q --color always fix");
+        let status = Command::new("cargo")
+            .args(["audit", "-q", "--color", "always", "fix"])
+            .status()
+            .map_err(|e| anyhow!("Failed to execute cargo audit: {}", e))?;
+        if !status.success() {
+            return Err(anyhow!("Audit check execution failed"));
+        }
+        endgroup!();
+    }
+    Ok(())
+}
+
+pub(crate) fn run_compile(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
+        Target::Workspace => {
+            group!("Compile Workspace");
+            info!("Command line: cargo check --workspace");
+            let status = Command::new("cargo")
+                .args(["check", "--workspace"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo check: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace compilation failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run the audit check with autofix mode enabled.",
-                ));
+            let members = match target {
+                Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
+                Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
+                _ => unreachable!(),
             };
-            if answer.unwrap() {
-                ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
-                group!("Audit: Crates and Examples");
-                info!("Command line: cargo audit -q --color always fix");
+
+            for member in members {
+                group!("Compile: {}", member.name);
+                if excluded.contains(&member.name)
+                    || (!only.is_empty() && !only.contains(&member.name))
+                {
+                    info!("Skip '{}' because it has been excluded!", &member.name);
+                    continue;
+                }
+                info!("Command line: cargo check -p {}", &member.name);
                 let status = Command::new("cargo")
-                    .args(["audit", "-q", "--color", "always", "fix"])
+                    .args(["check", "-p", &member.name])
                     .status()
-                    .map_err(|e| anyhow!("Failed to execute cargo audit: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to execute cargo check: {}", e))?;
                 if !status.success() {
-                    return Err(anyhow!("Audit check execution failed"));
+                    return Err(anyhow!("Compilation failed for {}", &member.name));
                 }
                 endgroup!();
             }
-        }
-        Target::All => {
-            if answer.is_none() {
-                answer = Some(ask_once("This will run audit checks on all targets."));
-            };
-            Target::iter()
-                .filter(|p| *p != Target::All && *p != Target::Examples)
-                .try_for_each(|p| run_audit(&p, answer))?;
         }
     }
     Ok(())
@@ -125,6 +164,18 @@ fn run_format(
     mut answer: Option<bool>,
 ) -> Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Format Workspace");
+            info!("Command line: cargo fmt -- --color=always");
+            let status = Command::new("cargo")
+                .args(["fmt", "--", "--color=always"])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace format failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -167,18 +218,6 @@ fn run_format(
                 }
             }
         }
-        Target::All => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run format check on all members of the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                Target::iter()
-                    .filter(|t| *t != Target::All)
-                    .try_for_each(|t| run_format(&t, excluded, only, answer))?;
-            }
-        }
     }
     Ok(())
 }
@@ -190,6 +229,28 @@ fn run_lint(
     mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
     match target {
+        Target::Workspace => {
+            group!("Lint Workspace");
+            info!("Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged --color=always -- --deny warnings");
+            let status = Command::new("cargo")
+                .args([
+                    "clippy",
+                    "--no-deps",
+                    "--fix",
+                    "--allow-dirty",
+                    "--allow-staged",
+                    "--color=always",
+                    "--",
+                    "--deny",
+                    "warnings"
+                ])
+                .status()
+                .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("Workspace lint failed"));
+            }
+            endgroup!();
+        }
         Target::Crates | Target::Examples => {
             let members = match target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
@@ -244,52 +305,28 @@ fn run_lint(
                 }
             }
         }
-        Target::All => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run lint fix on all members of the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                Target::iter()
-                    .filter(|t| *t != Target::All)
-                    .try_for_each(|t| run_lint(&t, excluded, only, answer))?;
-            }
-        }
     }
     Ok(())
 }
 
-pub(crate) fn run_typos(target: &Target, mut answer: Option<bool>) -> anyhow::Result<()> {
-    match target {
-        Target::Crates | Target::Examples => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will look for typos in the source code check and auto-fix them.",
-                ));
-            };
-            if answer.unwrap() {
-                ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
-                group!("Typos: Crates and Examples");
-                info!("Command line: typos --write-changes --color always");
-                let status = Command::new("typos")
-                    .args(["--write-changes", "--color", "always"])
-                    .status()
-                    .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
-                if !status.success() {
-                    return Err(anyhow!("Some typos have been found and cannot be fixed."));
-                }
-                endgroup!();
-            }
+pub(crate) fn run_typos(mut answer: Option<bool>) -> anyhow::Result<()> {
+    if answer.is_none() {
+        answer = Some(ask_once(
+            "This will look for typos in the source code check and auto-fix them.",
+        ));
+    };
+    if answer.unwrap() {
+        ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+        group!("Typos");
+        info!("Command line: typos --write-changes --color always");
+        let status = Command::new("typos")
+            .args(["--write-changes", "--color", "always"])
+            .status()
+            .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
+        if !status.success() {
+            return Err(anyhow!("Some typos have been found and cannot be fixed."));
         }
-        Target::All => {
-            if answer.is_none() {
-                answer = Some(ask_once("This will look for typos on all targets."));
-            };
-            Target::iter()
-                .filter(|p| *p != Target::All && *p != Target::Examples)
-                .try_for_each(|p| run_typos(&p, answer))?;
-        }
+        endgroup!();
     }
     Ok(())
 }
