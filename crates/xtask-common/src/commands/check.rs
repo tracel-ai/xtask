@@ -165,14 +165,19 @@ fn run_format(
 ) -> Result<()> {
     match target {
         Target::Workspace => {
-            group!("Format Workspace");
-            info!("Command line: cargo fmt -- --color=always");
-            let status = Command::new("cargo")
-                .args(["fmt", "--", "--color=always"])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace format failed"));
+            if answer.is_none() {
+                answer = Some(ask_once("This will run format with auto-fix on the workspace."));
+            }
+            if answer.unwrap() {
+                group!("Format Workspace");
+                info!("Command line: cargo fmt -- --color=always");
+                let status = Command::new("cargo")
+                    .args(["fmt", "--", "--color=always"])
+                    .status()
+                    .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
+                if !status.success() {
+                    return Err(anyhow!("Workspace format failed"));
+                }
             }
             endgroup!();
         }
@@ -185,7 +190,7 @@ fn run_format(
 
             if answer.is_none() {
                 answer = Some(ask_once(&format!(
-                    "This will run format checks on all {} of the workspace.",
+                    "This will run format with auto-fix on all {} of the workspace.",
                     if *target == Target::Crates {
                         "crates"
                     } else {
@@ -230,26 +235,31 @@ fn run_lint(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
-            group!("Lint Workspace");
-            info!("Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged --color=always -- --deny warnings");
-            let status = Command::new("cargo")
-                .args([
-                    "clippy",
-                    "--no-deps",
-                    "--fix",
-                    "--allow-dirty",
-                    "--allow-staged",
-                    "--color=always",
-                    "--",
-                    "--deny",
-                    "warnings"
-                ])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace lint failed"));
+            if answer.is_none() {
+                answer = Some(ask_once("This will run lint with auto-fix on the workspace."));
             }
-            endgroup!();
+            if answer.unwrap() {
+                group!("Lint Workspace");
+                info!("Command line: cargo clippy --no-deps --fix --allow-dirty --allow-staged --color=always -- --deny warnings");
+                let status = Command::new("cargo")
+                    .args([
+                        "clippy",
+                        "--no-deps",
+                        "--fix",
+                        "--allow-dirty",
+                        "--allow-staged",
+                        "--color=always",
+                        "--",
+                        "--deny",
+                        "warnings"
+                    ])
+                    .status()
+                    .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
+                if !status.success() {
+                    return Err(anyhow!("Workspace lint failed"));
+                }
+                endgroup!();
+            }
         }
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -260,7 +270,7 @@ fn run_lint(
 
             if answer.is_none() {
                 answer = Some(ask_once(&format!(
-                    "This will run lint fix on all {} of the workspace.",
+                    "This will run lint with auto-fix on all {} of the workspace.",
                     if *target == Target::Crates {
                         "crates"
                     } else {
