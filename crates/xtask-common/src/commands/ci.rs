@@ -309,7 +309,6 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
 
 fn run_typos() -> anyhow::Result<()> {
     group!("Typos");
-    ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
     info!("Command line: typos --diff --color always");
     let status = Command::new("typos")
         .args(["--diff", "--color", "always"])
