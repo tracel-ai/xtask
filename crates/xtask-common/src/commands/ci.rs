@@ -11,7 +11,6 @@ use crate::{
         cargo::ensure_cargo_crate_is_installed,
         workspace::{get_workspace_members, WorkspaceMemberType},
     },
-    versions::TYPOS_VERSION,
 };
 
 use super::{
