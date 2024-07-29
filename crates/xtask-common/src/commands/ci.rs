@@ -133,7 +133,7 @@ fn run_build(
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["build"];
+            let mut args = vec!["build", "--workspace"];
             let excluded_crates = excluded.join(",");
             if !excluded.is_empty() {
                 args.extend(["--exclude", &excluded_crates]);
