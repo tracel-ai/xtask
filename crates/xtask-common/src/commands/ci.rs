@@ -78,6 +78,7 @@ pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::Build |
         CICommand::AllTests |
+        CICommand::DocTests |
         CICommand::IntegrationTests |
         CICommand::UnitTests => if args.target == Target::Workspace && !args.only.is_empty() {
             warn!("{}", WARN_IGNORED_ONLY_ARGS);
