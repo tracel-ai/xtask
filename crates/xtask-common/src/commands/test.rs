@@ -237,16 +237,23 @@ pub(crate) fn run_integration(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["test", "--test", "test_*", "--color", "always"];
+            let mut args = vec!["test", "--workspace", "--test", "test_*", "--color", "always"];
             excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Workspace Integration Tests");
             info!("Command line: cargo {}", args.join(" "));
-            let status = Command::new("cargo")
+            let output = Command::new("cargo")
                 .args(args)
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace integration test failed"));
+                .output()
+                .map_err(|e| anyhow!("Failed to execute workspace integration test: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if stderr.contains("no test target matches pattern") {
+                    warn!("No tests found matching the pattern `test_*`.");
+                    endgroup!();
+                    return Ok(());
+                }
+                return Err(anyhow!("Failed to execute workspace integration test {}", stderr));
             }
             endgroup!();
         }
