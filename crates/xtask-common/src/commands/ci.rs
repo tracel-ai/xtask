@@ -185,9 +185,9 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
     match target {
         Target::Workspace => {
             group!("Format Workspace");
-            info!("Command line: cargo fmt --check -- --color=always");
+            info!("Command line: cargo fmt --check");
             let status = Command::new("cargo")
-                .args(["fmt", "--check", "--", "--color=always"])
+                .args(["fmt", "--check"])
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
             if !status.success() {
@@ -211,11 +211,11 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
                     continue;
                 }
                 info!(
-                    "Command line: cargo fmt --check -p {} -- --color=always",
+                    "Command line: cargo fmt --check -p {}",
                     &member.name
                 );
                 let status = Command::new("cargo")
-                    .args(["fmt", "--check", "-p", &member.name, "--", "--color=always"])
+                    .args(["fmt", "--check", "-p", &member.name])
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                 if !status.success() {

@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Ok, Result};
 use clap::{Args, Subcommand};
@@ -195,9 +195,11 @@ fn run_format(
             }
             if answer.unwrap() {
                 group!("Format Workspace");
-                info!("Command line: cargo fmt -- --color=always");
+                info!("Command line: cargo fmt");
                 let status = Command::new("cargo")
-                    .args(["fmt", "--", "--color=always"])
+                    .args(["fmt"])
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
                     .status()
                     .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                 if !status.success() {
@@ -234,11 +236,11 @@ fn run_format(
                         continue;
                     }
                     info!(
-                        "Command line: cargo fmt -p {} -- --color=always",
+                        "Command line: cargo fmt -p {}",
                         &member.name
                     );
                     let status = Command::new("cargo")
-                        .args(["fmt", "-p", &member.name, "--", "--color=always"])
+                        .args(["fmt", "-p", &member.name])
                         .status()
                         .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
                     if !status.success() {
