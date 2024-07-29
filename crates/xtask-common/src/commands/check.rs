@@ -5,7 +5,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
+    commands::{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, WARN_IGNORED_ONLY_ARGS},
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
@@ -62,11 +62,15 @@ pub enum CheckCommand {
 }
 
 pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
-    if answer.is_none()
-        && args.target == Target::Workspace
-        && (!args.exclude.is_empty() || !args.only.is_empty())
-    {
-        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    if answer.is_none() {
+        match args.command {
+            CheckCommand::Compile => if args.target == Target::Workspace && !args.only.is_empty() {
+                warn!("{}", WARN_IGNORED_ONLY_ARGS);
+            }
+            _ => if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+                warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+            }
+        }
     }
     match args.command {
         CheckCommand::Audit => run_audit(answer),
@@ -128,10 +132,15 @@ pub(crate) fn run_compile(
     };
     match target {
         Target::Workspace => {
+            let mut args = vec!["check", "--workspace"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Compile Workspace");
-            info!("Command line: cargo check --workspace");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["check", "--workspace"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo check: {}", e))?;
             if !status.success() {

@@ -5,7 +5,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
+    commands::{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, WARN_IGNORED_ONLY_ARGS},
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
@@ -75,9 +75,18 @@ pub enum CICommand {
 }
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
-    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    match args.command {
+        CICommand::Build |
+        CICommand::AllTests |
+        CICommand::IntegrationTests |
+        CICommand::UnitTests => if args.target == Target::Workspace && !args.only.is_empty() {
+            warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        }
+        _ => if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+            warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+        }
     }
+
     match args.command {
         CICommand::Audit => run_audit(),
         CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
@@ -124,10 +133,15 @@ fn run_build(
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
         Target::Workspace => {
+            let mut args = vec!["build"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Build Workspace");
-            info!("Command line: cargo build");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["build"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
             if !status.success() {

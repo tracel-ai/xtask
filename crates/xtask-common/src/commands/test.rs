@@ -5,7 +5,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
+    commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
     utils::workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
 };
@@ -53,8 +53,8 @@ pub enum TestCommand {
 }
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
-    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+    if args.target == Target::Workspace && !args.only.is_empty() {
+        warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
     match args.command {
         TestCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
@@ -76,10 +76,15 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
 pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     match target {
         Target::Workspace => {
+            let mut args = vec!["test", "--workspace", "--color", "always"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Workspace Unit Tests");
-            info!("Command line: cargo test --workspace --color=always");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["test", "--workspace", "--color", "always"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
             if !status.success() {
@@ -159,10 +164,15 @@ pub(crate) fn run_documentation(
 ) -> Result<()> {
     match target {
         Target::Workspace => {
+            let mut args = vec!["test", "--workspace", "--doc", "--color", "always"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Workspace Documentation Tests");
-            info!("Command line: cargo test --workspace --doc --color=always");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["test", "--workspace", "--doc", "--color", "always"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
             if !status.success() {
@@ -233,10 +243,15 @@ pub(crate) fn run_integration(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
+            let mut args = vec!["test", "--test", "test_*", "--color", "always"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Workspace Integration Tests");
-            info!("Command line: cargo test --test \"test_*\" --color=always");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["test", "--test", "test_*", "--color", "always"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
             if !status.success() {

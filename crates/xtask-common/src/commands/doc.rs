@@ -5,7 +5,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_ONLY_ARGS,
+    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
     endgroup, group,
     utils::workspace::{get_workspace_members, WorkspaceMemberType},
 };
@@ -49,7 +49,7 @@ pub enum DocCommand {
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-        warn!("{}", WARN_IGNORED_EXCLUDE_ONLY_ARGS);
+        warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
     match args.command {
         DocCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),
@@ -63,10 +63,15 @@ fn run_documentation_build(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
+            let mut args = vec!["doc", "--workspace", "--color=always"];
+            let excluded_crates = excluded.join(",");
+            if !excluded.is_empty() {
+                args.extend(["--exclude", &excluded_crates]);
+            }
             group!("Build Workspace documentation");
-            info!("Command line: cargo doc --workspace --color=always");
+            info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
-                .args(["doc", "--workspace", "--color=always"])
+                .args(args)
                 .status()
                 .map_err(|e| anyhow!("Failed to execute cargo doc: {}", e))?;
             if !status.success() {
