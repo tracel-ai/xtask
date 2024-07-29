@@ -133,10 +133,7 @@ pub(crate) fn run_compile(
     match target {
         Target::Workspace => {
             let mut args = vec!["check", "--workspace"];
-            let excluded_crates = excluded.join(",");
-            if !excluded.is_empty() {
-                args.extend(["--exclude", &excluded_crates]);
-            }
+            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Compile Workspace");
             info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")

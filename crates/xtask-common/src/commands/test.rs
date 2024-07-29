@@ -77,10 +77,7 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
     match target {
         Target::Workspace => {
             let mut args = vec!["test", "--workspace", "--color", "always"];
-            let excluded_crates = excluded.join(",");
-            if !excluded.is_empty() {
-                args.extend(["--exclude", &excluded_crates]);
-            }
+            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Workspace Unit Tests");
             info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
@@ -165,10 +162,7 @@ pub(crate) fn run_documentation(
     match target {
         Target::Workspace => {
             let mut args = vec!["test", "--workspace", "--doc", "--color", "always"];
-            let excluded_crates = excluded.join(",");
-            if !excluded.is_empty() {
-                args.extend(["--exclude", &excluded_crates]);
-            }
+            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Workspace Documentation Tests");
             info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
@@ -244,10 +238,7 @@ pub(crate) fn run_integration(
     match target {
         Target::Workspace => {
             let mut args = vec!["test", "--test", "test_*", "--color", "always"];
-            let excluded_crates = excluded.join(",");
-            if !excluded.is_empty() {
-                args.extend(["--exclude", &excluded_crates]);
-            }
+            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Workspace Integration Tests");
             info!("Command line: cargo {}", args.join(" "));
             let status = Command::new("cargo")
