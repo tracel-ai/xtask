@@ -1,63 +1,8 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::process::Command;
 
-use crate::{endgroup, group};
+use anyhow::Ok;
 
-use super::{process::run_process_command, Params};
-
-/// Return a cargo command without executing it
-pub fn cargo_command(command: &str, params: Params, envs: HashMap<&str, &str>) -> Command {
-    cargo_command_with_path::<String>(command, params, envs, None)
-}
-
-/// Run a cargo command with the passed directory as the current directory
-pub fn cargo_command_with_path<P: AsRef<Path>>(
-    command: &str,
-    params: Params,
-    envs: HashMap<&str, &str>,
-    path: Option<P>,
-) -> Command {
-    let mut cargo = Command::new("cargo");
-    cargo
-        .env("CARGO_INCREMENTAL", "0")
-        .envs(&envs)
-        .arg(command)
-        .args(&params.params)
-        .stdout(Stdio::inherit()) // Send stdout directly to terminal
-        .stderr(Stdio::inherit()); // Send stderr directly to terminal
-
-    if let Some(path) = path {
-        cargo.current_dir(path);
-    }
-
-    cargo
-}
-
-/// Run a cargo command
-pub fn run_cargo(
-    command: &str,
-    params: Params,
-    envs: HashMap<&str, &str>,
-    error: &str,
-) -> anyhow::Result<()> {
-    let mut cargo = cargo_command(command, params.clone(), envs);
-    run_process_command(&mut cargo, error)
-}
-
-/// Run a cargo command with path as current working directory
-pub fn run_cargo_with_path(
-    command: &str,
-    params: Params,
-    envs: HashMap<&str, &str>,
-    path: &Path,
-    error: &str,
-) -> anyhow::Result<()> {
-    let mut cargo = cargo_command_with_path(command, params.clone(), envs, Some(path));
-    run_process_command(&mut cargo, error)
-}
+use crate::{endgroup, group, utils::process::run_process};
 
 /// Ensure that a cargo crate is installed
 pub fn ensure_cargo_crate_is_installed(
@@ -68,7 +13,7 @@ pub fn ensure_cargo_crate_is_installed(
 ) -> anyhow::Result<()> {
     if !is_cargo_crate_installed(crate_name) {
         group!("Cargo: install crate '{}'", crate_name);
-        let mut args = vec![crate_name];
+        let mut args = vec!["install", crate_name];
         if locked {
             args.push("--locked");
         }
@@ -80,12 +25,7 @@ pub fn ensure_cargo_crate_is_installed(
         if let Some(version) = version {
             args.extend(vec!["--version", version]);
         }
-        run_cargo(
-            "install",
-            args.into(),
-            HashMap::new(),
-            &format!("crate '{}' should be installed", crate_name),
-        )?;
+        run_process("cargo", &args, &format!("crate '{}' should be installed", crate_name), true)?;
         endgroup!();
     }
     Ok(())

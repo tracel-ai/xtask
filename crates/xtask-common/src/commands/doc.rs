@@ -1,13 +1,11 @@
-use std::process::Command;
-
-use anyhow::{anyhow, Ok};
+use anyhow::Ok;
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
-    utils::workspace::{get_workspace_members, WorkspaceMemberType},
+    utils::{process::{run_process_for_package, run_process_for_workspace}, workspace::{get_workspace_members, WorkspaceMemberType}},
 };
 
 use super::Target;
@@ -63,17 +61,14 @@ fn run_documentation_build(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["doc", "--workspace", "--color=always"];
-            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Build Workspace documentation");
-            info!("Command line: cargo {}", args.join(" "));
-            let status = Command::new("cargo")
-                .args(args)
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo doc: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace documentation build failed"));
-            }
+            run_process_for_workspace(
+                "cargo",
+                vec!["doc", "--workspace", "--color=always"],
+                excluded,
+                "Workspace documentation build failed",
+                None,
+            )?;
             endgroup!();
         }
         Target::Crates | Target::Examples => {
@@ -85,23 +80,16 @@ fn run_documentation_build(
 
             for member in members {
                 group!("Doc Build: {}", member.name);
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                info!("Command line: cargo doc -p {} --color=always", &member.name);
-                let status = Command::new("cargo")
-                    .args(["doc", "-p", &member.name, "--color=always"])
-                    .status()
-                    .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
-                if !status.success() {
-                    return Err(anyhow!(
-                        "Format check execution failed for {}",
-                        &member.name
-                    ));
-                }
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec!["doc", "-p", &member.name, "--color=always"],
+                    excluded,
+                    only,
+                    &format!("Format check execution failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
                 endgroup!();
             }
         }

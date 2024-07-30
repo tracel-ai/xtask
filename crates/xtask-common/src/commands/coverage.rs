@@ -1,12 +1,10 @@
-use std::process::Command;
-
-use anyhow::{anyhow, Ok};
+use anyhow::Ok;
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     endgroup, group,
-    utils::{cargo::ensure_cargo_crate_is_installed, rustup::rustup_add_component},
+    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process, rustup::rustup_add_component},
     versions::GRCOV_VERSION,
 };
 
@@ -73,13 +71,12 @@ fn run_grcov(generate_args: &GenerateCmdArgs) -> anyhow::Result<()> {
         .ignore
         .iter()
         .for_each(|i| args.extend(vec!["--ignore", i]));
-    let status = Command::new("grcov")
-        .args(args)
-        .status()
-        .map_err(|e| anyhow!("Failed to execute grcov: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!("Error executing grcov"));
-    }
+    run_process(
+        "grcov",
+        &args,
+        "Error executing grcov",
+        true,
+    )?;
     endgroup!();
     Ok(())
 }

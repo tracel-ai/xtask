@@ -1,8 +1,6 @@
-use std::process::Command;
+use anyhow::Ok;
 
-use anyhow::{anyhow, Ok};
-
-use crate::{endgroup, group};
+use crate::{endgroup, group, utils::process::run_process};
 
 /// Allow to build additional crates outside the common build commands
 pub fn additional_crates_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Result<()> {
@@ -13,13 +11,12 @@ pub fn additional_crates_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::
         group!("Build: {} (with params: {})", *c, params_display);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        let status = Command::new("cargo")
-            .args(args)
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Build failed for {}", *c));
-        }
+        run_process(
+            "cargo",
+            &args,
+            &format!("Build failed for {}", *c),
+            true,
+        )?;
         endgroup!();
         Ok(())
     })
@@ -34,13 +31,12 @@ pub fn additional_crates_unit_tests(crates: Vec<&str>, params: Vec<&str>) -> any
         group!("Unit Tests: {} (with params: {})", *c, params_display);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        let status = Command::new("cargo")
-            .args(args)
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Unit test failed for {}", *c));
-        }
+        run_process(
+            "cargo",
+            &args,
+            &format!("Unit test failed for {}", *c),
+            true,
+        )?;
         endgroup!();
         Ok(())
     })
@@ -62,13 +58,12 @@ pub fn additional_crates_integration_tests(
         );
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        let status = Command::new("cargo")
-            .args(args)
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Integration test failed for {}", *c));
-        }
+        run_process(
+            "cargo",
+            &args,
+            &format!("Integration test failed for {}", *c),
+            true,
+        )?;
         endgroup!();
         Ok(())
     })
@@ -83,13 +78,12 @@ pub fn additional_crates_doc_build(crates: Vec<&str>, params: Vec<&str>) -> anyh
         group!("Doc Build: {} (with params: {})", *c, params_display);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        let status = Command::new("cargo")
-            .args(args)
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo doc: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Doc build failed for {}", *c));
-        }
+        run_process(
+            "cargo",
+            &args,
+            &format!("Doc build failed for {}", *c),
+            true,
+        )?;
         endgroup!();
         Ok(())
     })

@@ -3,7 +3,7 @@ use std::{env, process::Command, str};
 use anyhow::{anyhow, Ok};
 use clap::Args;
 
-use crate::{endgroup, group};
+use crate::{endgroup, group, utils::process::run_process};
 
 // Crates.io API token
 const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
@@ -82,16 +82,13 @@ fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
 
 fn publish(crate_name: String) -> anyhow::Result<()> {
     // Perform dry-run to ensure everything is good for publishing
-    let status = Command::new("cargo")
-        .args(["publish", "-p", &crate_name, "--dry-run"])
-        .status()
-        .map_err(|e| anyhow!("Failed to execute cargo publish dry run: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!(
-            "Publish dry run failed for crate '{}'.",
-            &crate_name
-        ));
-    }
+    run_process(
+        "cargo",
+        &vec!["publish", "-p", &crate_name, "--dry-run"],
+        &format!("Publish dry run failed for crate '{}'.", &crate_name),
+        true,
+    )?;
+
     let crates_io_token =
         env::var(CRATES_IO_API_TOKEN).expect("Failed to retrieve the crates.io API token");
     // Actually publish the crate

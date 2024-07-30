@@ -1,10 +1,8 @@
-use std::process::Command;
-
-use anyhow::{anyhow, Ok};
+use anyhow::Ok;
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString};
 
-use crate::{endgroup, group, utils::cargo::ensure_cargo_crate_is_installed};
+use crate::{endgroup, group, utils::{cargo::ensure_cargo_crate_is_installed, process::run_process}};
 
 #[derive(Args, Clone)]
 pub struct BumpCmdArgs {
@@ -30,13 +28,12 @@ pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {
 fn bump(command: &BumpCommand) -> anyhow::Result<()> {
     group!("Bump version: {command}");
     ensure_cargo_crate_is_installed("cargo-edit", None, None, false)?;
-    let status = Command::new("cargo")
-        .args(["set-version", "--bump", &command.to_string()])
-        .status()
-        .map_err(|e| anyhow!("Failed to execute cargo set-version: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!("Error trying to bump {command} version"));
-    }
+    run_process(
+        "cargo",
+        &vec!["set-version", "--bump", &command.to_string()],
+        &format!("Error trying to bump {command} version"),
+        true,
+    )?;
     endgroup!();
     Ok(())
 }

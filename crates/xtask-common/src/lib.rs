@@ -58,7 +58,9 @@ pub fn init_xtask<C: Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
 }
 
 fn setup_coverage() -> anyhow::Result<()> {
-    std::env::set_var("RUSTFLAGS", "-Cinstrument-coverage");
-    std::env::set_var("LLVM_PROFILE_FILE", "burn-%p-%m.profraw");
+    unsafe {
+        std::env::set_var("RUSTFLAGS", "-Cinstrument-coverage");
+        std::env::set_var("LLVM_PROFILE_FILE", "burn-%p-%m.profraw");
+    }
     Ok(())
 }

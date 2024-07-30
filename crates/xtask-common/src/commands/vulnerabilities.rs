@@ -8,8 +8,7 @@ use crate::{
     commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
     utils::{
-        cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly},
-        rustup::{rustup_add_component, rustup_get_installed_targets},
+        cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly}, process::run_process, rustup::{rustup_add_component, rustup_get_installed_targets}
     },
 };
 
@@ -89,23 +88,21 @@ fn run_cargo_careful() -> anyhow::Result<()> {
         rustup_add_component("rust-src")?;
         // prepare careful sysroot
         group!("Cargo: careful setup");
-        let status = Command::new("cargo")
-            .args(["careful", "setup"])
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo careful setup: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Error preparing cargo sysroot."));
-        }
+        run_process(
+            "cargo",
+            &vec!["careful", "setup"],
+            "Error preparing cargo sysroot.",
+            true,
+        )?;
         endgroup!();
         // Run cargo careful
         group!("Cargo: run careful checks");
-        let status = Command::new("cargo")
-            .args(["careful", "test"])
-            .status()
-            .map_err(|e| anyhow!("Failed to execute cargo careful test: {}", e))?;
-        if !status.success() {
-            return Err(anyhow!("Cargo careful test has errors."));
-        }
+        run_process(
+            "cargo",
+            &vec!["careful", "test"],
+            "Cargo careful test has errors.",
+            true,
+        )?;
         endgroup!();
     } else {
         error!("{}", CARGO_NIGHTLY_MSG);

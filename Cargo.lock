@@ -870,6 +870,7 @@ dependencies = [
  "env_logger",
  "log",
  "rand",
+ "regex",
  "rstest",
  "serde_json",
  "strum",

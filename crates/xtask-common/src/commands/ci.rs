@@ -1,6 +1,4 @@
-use std::process::Command;
-
-use anyhow::{anyhow, Ok};
+use anyhow::Ok;
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
@@ -9,6 +7,7 @@ use crate::{
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
+        process::{run_process, run_process_for_package, run_process_for_workspace},
         workspace::{get_workspace_members, WorkspaceMemberType},
     },
 };
@@ -75,15 +74,21 @@ pub enum CICommand {
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
-        CICommand::Build |
-        CICommand::AllTests |
-        CICommand::DocTests |
-        CICommand::IntegrationTests |
-        CICommand::UnitTests => if args.target == Target::Workspace && !args.only.is_empty() {
-            warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        CICommand::Build
+        | CICommand::AllTests
+        | CICommand::DocTests
+        | CICommand::IntegrationTests
+        | CICommand::UnitTests => {
+            if args.target == Target::Workspace && !args.only.is_empty() {
+                warn!("{}", WARN_IGNORED_ONLY_ARGS);
+            }
         }
-        _ => if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-            warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+        _ => {
+            if args.target == Target::Workspace
+                && (!args.exclude.is_empty() || !args.only.is_empty())
+            {
+                warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+            }
         }
     }
 
@@ -114,14 +119,12 @@ pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
 fn run_audit() -> anyhow::Result<()> {
     group!("Audit Rust Dependencies");
     ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
-    info!("Command line: cargo audit");
-    let status = Command::new("cargo")
-        .args(["audit", "-q", "--color", "always"])
-        .status()
-        .map_err(|e| anyhow!("Failed to execute cargo audit: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!("Audit check execution failed"));
-    }
+    run_process(
+        "cargo",
+        &vec!["audit", "-q", "--color", "always"],
+        "Audit check execution failed",
+        true,
+    )?;
     endgroup!();
     Ok(())
 }
@@ -133,17 +136,14 @@ fn run_build(
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["build", "--workspace"];
-            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Build Workspace");
-            info!("Command line: cargo {}", args.join(" "));
-            let status = Command::new("cargo")
-                .args(args)
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace build failed"));
-            }
+            run_process_for_workspace(
+                "cargo",
+                vec!["build", "--workspace"],
+                excluded,
+                "Workspace build failed",
+                None,
+            )?;
             endgroup!();
         }
         Target::Crates | Target::Examples => {
@@ -155,20 +155,16 @@ fn run_build(
 
             for member in members {
                 group!("Build: {}", member.name);
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                info!("Command line: cargo build -p {}", &member.name);
-                let status = Command::new("cargo")
-                    .args(["build", "-p", &member.name])
-                    .status()
-                    .map_err(|e| anyhow!("Failed to execute cargo build: {}", e))?;
-                if !status.success() {
-                    return Err(anyhow!("Build failed for {}", &member.name));
-                }
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec!["build", "-p", &member.name],
+                    excluded,
+                    only,
+                    &format!("Buid command failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
                 endgroup!();
             }
         }
@@ -185,14 +181,13 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
     match target {
         Target::Workspace => {
             group!("Format Workspace");
-            info!("Command line: cargo fmt --check");
-            let status = Command::new("cargo")
-                .args(["fmt", "--check"])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace format failed"));
-            }
+            run_process_for_workspace(
+                "cargo",
+                vec!["fmt", "--check"],
+                &vec![],
+                "Workspace format failed",
+                None,
+            )?;
             endgroup!();
         }
         Target::Crates | Target::Examples => {
@@ -204,26 +199,16 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
 
             for member in members {
                 group!("Format: {}", member.name);
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                info!(
-                    "Command line: cargo fmt --check -p {}",
-                    &member.name
-                );
-                let status = Command::new("cargo")
-                    .args(["fmt", "--check", "-p", &member.name])
-                    .status()
-                    .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
-                if !status.success() {
-                    return Err(anyhow!(
-                        "Format check execution failed for {}",
-                        &member.name
-                    ));
-                }
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec!["fmt", "--check", "-p", &member.name],
+                    excluded,
+                    only,
+                    &format!("Format check execution failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
                 endgroup!();
             }
         }
@@ -240,21 +225,20 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
     match target {
         Target::Workspace => {
             group!("Lint Workspace");
-            info!("Command line: cargo clippy --no-deps --color=always -- --deny warnings");
-            let status = Command::new("cargo")
-                .args([
+            run_process_for_workspace(
+                "cargo",
+                vec![
                     "clippy",
                     "--no-deps",
                     "--color=always",
                     "--",
                     "--deny",
                     "warnings",
-                ])
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo fmt: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace lint failed"));
-            }
+                ],
+                &vec![],
+                "Workspace lint failed",
+                None,
+            )?;
             endgroup!();
         }
         Target::Crates | Target::Examples => {
@@ -266,18 +250,10 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
 
             for member in members {
                 group!("Lint: {}", member.name);
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                info!(
-                    "Command line: cargo clippy --no-deps --color=always -p {} -- --deny warnings",
-                    &member.name
-                );
-                let status = Command::new("cargo")
-                    .args([
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec![
                         "clippy",
                         "--no-deps",
                         "--color=always",
@@ -286,12 +262,13 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                         "--",
                         "--deny",
                         "warnings",
-                    ])
-                    .status()
-                    .map_err(|e| anyhow!("Failed to execute cargo clippy: {}", e))?;
-                if !status.success() {
-                    return Err(anyhow!("Lint fix execution failed for {}", &member.name));
-                }
+                    ],
+                    excluded,
+                    only,
+                    &format!("Lint fix execution failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
                 endgroup!();
             }
         }
@@ -306,14 +283,12 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
 
 fn run_typos() -> anyhow::Result<()> {
     group!("Typos");
-    info!("Command line: typos --diff --color always");
-    let status = Command::new("typos")
-        .args(["--diff", "--color", "always"])
-        .status()
-        .map_err(|e| anyhow!("Failed to execute typos: {}", e))?;
-    if !status.success() {
-        return Err(anyhow!("Typos check execution failed"));
-    }
+    run_process(
+        "typos",
+        &vec!["--diff", "--color", "always"],
+        "Typos check execution failed",
+        true,
+    )?;
     endgroup!();
     Ok(())
 }

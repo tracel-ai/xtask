@@ -1,13 +1,11 @@
-use std::process::{Command, Stdio};
-
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result};
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
-    utils::workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
+    utils::{process::{run_process_for_package, run_process_for_workspace}, workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType}},
 };
 
 use super::Target;
@@ -76,18 +74,14 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
 pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["test", "--workspace", "--color", "always"];
-            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
-            group!("Workspace Unit Tests");
-            info!("Command line: cargo {}", args.join(" "));
-            let status = Command::new("cargo")
-                .args(args)
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace unit test failed"));
-            }
-            endgroup!();
+            info!("Workspace Unit Tests");
+            run_process_for_workspace(
+                "cargo",
+                vec!["test", "--workspace", "--tests", "--color", "always"],
+                excluded,
+                "Workspace Unit Tests failed",
+                Some(r".*target/[^/]+/deps/([^-\s]+)"),
+            )?;
         }
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -97,13 +91,7 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
             };
 
             for member in members {
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                run_unit_test(&member)?;
+                run_unit_test(&member, excluded, only)?;
             }
         }
         Target::AllPackages => {
@@ -115,11 +103,12 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
     Ok(())
 }
 
-fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
+fn run_unit_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
-    info!("Command line: cargo test --lib --bins -p {}", &member.name);
-    let error_output = Command::new("cargo")
-        .args([
+    run_process_for_package(
+        "cargo",
+        &member.name,
+        &vec![
             "test",
             "--lib",
             "--bins",
@@ -128,28 +117,13 @@ fn run_unit_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
             "--color=always",
             "--",
             "--color=always",
-        ])
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| anyhow!("Failed to execute unit test: {}", e))?;
-
-    let stderr = String::from_utf8_lossy(&error_output.stderr);
-    if !error_output.status.success() {
-        if stderr.contains("no library targets found") {
-            warn!(
-                "No library found to test for in the crate '{}'",
-                &member.name
-            );
-            endgroup!();
-            return Ok(());
-        }
-        return Err(anyhow!(
-            "Failed to execute unit test for {}: {}",
-            &member.name,
-            stderr
-        ));
-    }
+        ],
+        excluded,
+        only,
+        &format!("Failed to execute unit test for '{}'", &member.name),
+        Some("no library targets found"),
+        Some(&format!("No library found to test for in the crate '{}'", &member.name)),
+    )?;
     endgroup!();
     Ok(())
 }
@@ -161,17 +135,14 @@ pub(crate) fn run_documentation(
 ) -> Result<()> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["test", "--workspace", "--doc", "--color", "always"];
-            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
             group!("Workspace Documentation Tests");
-            info!("Command line: cargo {}", args.join(" "));
-            let status = Command::new("cargo")
-                .args(args)
-                .status()
-                .map_err(|e| anyhow!("Failed to execute cargo test: {}", e))?;
-            if !status.success() {
-                return Err(anyhow!("Workspace documentation test failed"));
-            }
+            run_process_for_workspace(
+                "cargo",
+                vec!["test", "--workspace", "--doc", "--color", "always"],
+                excluded,
+                "Workspace documentation test failed",
+                Some(r".*Doc-tests\s([^-\s]+)$"),
+            )?;
             endgroup!();
         }
         Target::Crates | Target::Examples => {
@@ -182,13 +153,7 @@ pub(crate) fn run_documentation(
             };
 
             for member in members {
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                run_doc_test(&member)?;
+                run_doc_test(&member, excluded, only)?;
             }
         }
         Target::AllPackages => {
@@ -200,32 +165,18 @@ pub(crate) fn run_documentation(
     Ok(())
 }
 
-fn run_doc_test(member: &WorkspaceMember) -> Result<(), anyhow::Error> {
+fn run_doc_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<(), anyhow::Error> {
     group!("Doc Tests: {}", member.name);
-    info!("Command line: cargo test --doc -p {}", &member.name);
-    let error_output = Command::new("cargo")
-        .args(["test", "--doc", "-p", &member.name])
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| anyhow!("Failed to execute documentation test: {}", e))?;
-
-    let stderr = String::from_utf8_lossy(&error_output.stderr);
-    if !error_output.status.success() {
-        if stderr.contains("no library targets found") {
-            warn!(
-                "No library found to test documentation for in the crate '{}'",
-                &member.name
-            );
-            endgroup!();
-            return Ok(());
-        }
-        return Err(anyhow!(
-            "Failed to execute documentation test for {}: {}",
-            &member.name,
-            stderr
-        ));
-    }
+    run_process_for_package(
+        "cargo",
+        &member.name,
+        &vec!["test", "--doc", "-p", &member.name],
+        excluded,
+        only,
+        &format!("Failed to execute documentation test for '{}'", &member.name),
+        Some("no library targets found"),
+        Some(&format!("No library found to test documentation for in the crate '{}'", &member.name)),
+    )?;
     endgroup!();
     Ok(())
 }
@@ -237,25 +188,21 @@ pub(crate) fn run_integration(
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
-            let mut args = vec!["test", "--workspace", "--test", "test_*", "--color", "always"];
-            excluded.iter().for_each(|ex| args.extend(["--exclude", ex]));
-            group!("Workspace Integration Tests");
-            info!("Command line: cargo {}", args.join(" "));
-            let output = Command::new("cargo")
-                .args(args)
-                .output()
-                .map_err(|e| anyhow!("Failed to execute workspace integration test: {}", e))?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                if stderr.contains("no test target matches pattern") {
-                    warn!("No tests found matching the pattern `test_*`.");
-                    endgroup!();
-                    return Ok(());
-                }
-                return Err(anyhow!("Failed to execute workspace integration test {}", stderr));
-            }
-            endgroup!();
+            info!("Workspace Integration Tests");
+            run_process_for_workspace(
+                "cargo",
+                vec![
+                    "test",
+                    "--workspace",
+                    "--test",
+                    "test_*",
+                    "--color",
+                    "always",
+                ],
+                excluded,
+                "Workspace Integration Tests failed",
+                Some(r".*target/[^/]+/deps/([^-\s]+)"),
+            )?;
         }
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -265,13 +212,7 @@ pub(crate) fn run_integration(
             };
 
             for member in members {
-                if excluded.contains(&member.name)
-                    || (!only.is_empty() && !only.contains(&member.name))
-                {
-                    info!("Skip '{}' because it has been excluded!", &member.name);
-                    continue;
-                }
-                run_integration_test(&member)?;
+                run_integration_test(&member, excluded, only)?;
             }
         }
         Target::AllPackages => {
@@ -283,14 +224,12 @@ pub(crate) fn run_integration(
     Ok(())
 }
 
-fn run_integration_test(member: &WorkspaceMember) -> Result<()> {
+fn run_integration_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     group!("Integration Tests: {}", &member.name);
-    info!(
-        "Command line: cargo test --test \"test_*\" -p {} --color=always",
-        &member.name
-    );
-    let output = Command::new("cargo")
-        .args([
+    run_process_for_package(
+        "cargo",
+        &member.name,
+        &vec![
             "test",
             "--test",
             "test_*",
@@ -298,26 +237,13 @@ fn run_integration_test(member: &WorkspaceMember) -> Result<()> {
             &member.name,
             "--color",
             "always",
-        ])
-        .output()
-        .map_err(|e| anyhow!("Failed to execute integration test: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("no test target matches pattern") {
-            warn!(
-                "No tests found matching the pattern `test_*` for {}",
-                &member.name
-            );
-            endgroup!();
-            return Ok(());
-        }
-        return Err(anyhow!(
-            "Failed to execute integration test for {}: {}",
-            &member.name,
-            stderr
-        ));
-    }
+        ],
+        excluded,
+        only,
+        &format!("Failed to execute integration test for '{}'", &member.name),
+        Some("no test target matches pattern"),
+        Some(&format!("No tests found matching the pattern `test_*` for '{}'", &member.name)),
+    )?;
     endgroup!();
     Ok(())
 }

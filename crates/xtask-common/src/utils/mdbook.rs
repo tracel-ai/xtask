@@ -22,8 +22,8 @@ pub fn run_mdbook_with_path<P: AsRef<Path>>(
         .envs(&envs)
         .arg(command)
         .args(&params.params)
-        .stdout(Stdio::inherit()) // Send stdout directly to terminal
-        .stderr(Stdio::inherit()); // Send stderr directly to terminal
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
 
     if let Some(path) = path {
         mdbook.current_dir(path);
