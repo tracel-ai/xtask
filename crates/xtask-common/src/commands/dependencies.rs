@@ -5,7 +5,10 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 use crate::{
     commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
-    utils::{cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly}, process::run_process},
+    utils::{
+        cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly},
+        process::run_process,
+    },
 };
 
 #[derive(Args, Clone)]
@@ -57,12 +60,7 @@ fn run_cargo_udeps() -> anyhow::Result<()> {
         ensure_cargo_crate_is_installed("cargo-udeps", None, None, false)?;
         // Run cargo udeps
         group!("Cargo: run unused dependencies checks");
-        run_process(
-            "cargo",
-            &vec!["udeps"],
-            "Unused dependencies found!",
-            true,
-        )?;
+        run_process("cargo", &vec!["udeps"], "Unused dependencies found!", true)?;
         endgroup!();
     } else {
         error!("{}", CARGO_NIGHTLY_MSG);

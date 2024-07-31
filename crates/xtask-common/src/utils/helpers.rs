@@ -11,12 +11,7 @@ pub fn additional_crates_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::
         group!("Build: {} (with params: {})", *c, params_display);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        run_process(
-            "cargo",
-            &args,
-            &format!("Build failed for {}", *c),
-            true,
-        )?;
+        run_process("cargo", &args, &format!("Build failed for {}", *c), true)?;
         endgroup!();
         Ok(())
     })

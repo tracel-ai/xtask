@@ -162,7 +162,7 @@ pub(crate) fn run_compile(
                     only,
                     &format!("Compilation failed for {}", &member.name),
                     None,
-                    None
+                    None,
                 )?;
                 endgroup!();
             }
@@ -194,7 +194,7 @@ fn run_format(
                 run_process_for_workspace(
                     "cargo",
                     vec!["fmt"],
-                    &vec![],
+                    &[],
                     "Workspace compilation failed",
                     None,
                 )?;
@@ -230,7 +230,7 @@ fn run_format(
                         only,
                         &format!("Format check execution failed for {}", &member.name),
                         None,
-                        None
+                        None,
                     )?;
                     endgroup!();
                 }
@@ -280,7 +280,7 @@ fn run_lint(
                         "--deny",
                         "warnings",
                     ],
-                    &vec![],
+                    &[],
                     "Workspace lint failed",
                     None,
                 )?;

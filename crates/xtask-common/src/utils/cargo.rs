@@ -25,7 +25,12 @@ pub fn ensure_cargo_crate_is_installed(
         if let Some(version) = version {
             args.extend(vec!["--version", version]);
         }
-        run_process("cargo", &args, &format!("crate '{}' should be installed", crate_name), true)?;
+        run_process(
+            "cargo",
+            &args,
+            &format!("crate '{}' should be installed", crate_name),
+            true,
+        )?;
         endgroup!();
     }
     Ok(())

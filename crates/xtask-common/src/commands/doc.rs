@@ -5,7 +5,10 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
-    utils::{process::{run_process_for_package, run_process_for_workspace}, workspace::{get_workspace_members, WorkspaceMemberType}},
+    utils::{
+        process::{run_process_for_package, run_process_for_workspace},
+        workspace::{get_workspace_members, WorkspaceMemberType},
+    },
 };
 
 use super::Target;

@@ -4,7 +4,9 @@ use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     endgroup, group,
-    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process, rustup::rustup_add_component},
+    utils::{
+        cargo::ensure_cargo_crate_is_installed, process::run_process, rustup::rustup_add_component,
+    },
     versions::GRCOV_VERSION,
 };
 
@@ -71,12 +73,7 @@ fn run_grcov(generate_args: &GenerateCmdArgs) -> anyhow::Result<()> {
         .ignore
         .iter()
         .for_each(|i| args.extend(vec!["--ignore", i]));
-    run_process(
-        "grcov",
-        &args,
-        "Error executing grcov",
-        true,
-    )?;
+    run_process("grcov", &args, "Error executing grcov", true)?;
     endgroup!();
     Ok(())
 }

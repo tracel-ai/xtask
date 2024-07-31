@@ -131,8 +131,8 @@ fn run_audit() -> anyhow::Result<()> {
 
 fn run_build(
     target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
+    excluded: &[String],
+    only: &[String],
 ) -> std::prelude::v1::Result<(), anyhow::Error> {
     match target {
         Target::Workspace => {
@@ -161,7 +161,7 @@ fn run_build(
                     &vec!["build", "-p", &member.name],
                     excluded,
                     only,
-                    &format!("Buid command failed for {}", &member.name),
+                    &format!("Build command failed for {}", &member.name),
                     None,
                     None,
                 )?;
@@ -177,14 +177,14 @@ fn run_build(
     Ok(())
 }
 
-fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
+fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Format Workspace");
             run_process_for_workspace(
                 "cargo",
                 vec!["fmt", "--check"],
-                &vec![],
+                &[],
                 "Workspace format failed",
                 None,
             )?;
@@ -221,7 +221,7 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> an
     Ok(())
 }
 
-fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
+fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Lint Workspace");
@@ -235,7 +235,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                     "--deny",
                     "warnings",
                 ],
-                &vec![],
+                &[],
                 "Workspace lint failed",
                 None,
             )?;
@@ -293,11 +293,7 @@ fn run_typos() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_all_tests(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
+fn run_all_tests(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
     run_unit(target, excluded, only)?;
     run_integration(target, excluded, only)?;
     run_documentation(target, excluded, only)?;

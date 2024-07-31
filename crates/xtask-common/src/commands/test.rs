@@ -5,7 +5,10 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
-    utils::{process::{run_process_for_package, run_process_for_workspace}, workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType}},
+    utils::{
+        process::{run_process_for_package, run_process_for_workspace},
+        workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
+    },
 };
 
 use super::Target;
@@ -71,7 +74,7 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
+pub(crate) fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
@@ -103,7 +106,11 @@ pub(crate) fn run_unit(target: &Target, excluded: &Vec<String>, only: &Vec<Strin
     Ok(())
 }
 
-fn run_unit_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<(), anyhow::Error> {
+fn run_unit_test(
+    member: &WorkspaceMember,
+    excluded: &[String],
+    only: &[String],
+) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     run_process_for_package(
         "cargo",
@@ -122,7 +129,10 @@ fn run_unit_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<St
         only,
         &format!("Failed to execute unit test for '{}'", &member.name),
         Some("no library targets found"),
-        Some(&format!("No library found to test for in the crate '{}'", &member.name)),
+        Some(&format!(
+            "No library found to test for in the crate '{}'",
+            &member.name
+        )),
     )?;
     endgroup!();
     Ok(())
@@ -130,8 +140,8 @@ fn run_unit_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<St
 
 pub(crate) fn run_documentation(
     target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
+    excluded: &[String],
+    only: &[String],
 ) -> Result<()> {
     match target {
         Target::Workspace => {
@@ -165,7 +175,11 @@ pub(crate) fn run_documentation(
     Ok(())
 }
 
-fn run_doc_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<(), anyhow::Error> {
+fn run_doc_test(
+    member: &WorkspaceMember,
+    excluded: &[String],
+    only: &[String],
+) -> Result<(), anyhow::Error> {
     group!("Doc Tests: {}", member.name);
     run_process_for_package(
         "cargo",
@@ -173,9 +187,15 @@ fn run_doc_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<Str
         &vec!["test", "--doc", "-p", &member.name],
         excluded,
         only,
-        &format!("Failed to execute documentation test for '{}'", &member.name),
+        &format!(
+            "Failed to execute documentation test for '{}'",
+            &member.name
+        ),
         Some("no library targets found"),
-        Some(&format!("No library found to test documentation for in the crate '{}'", &member.name)),
+        Some(&format!(
+            "No library found to test documentation for in the crate '{}'",
+            &member.name
+        )),
     )?;
     endgroup!();
     Ok(())
@@ -183,8 +203,8 @@ fn run_doc_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<Str
 
 pub(crate) fn run_integration(
     target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
+    excluded: &[String],
+    only: &[String],
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
@@ -224,7 +244,11 @@ pub(crate) fn run_integration(
     Ok(())
 }
 
-fn run_integration_test(member: &WorkspaceMember, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
+fn run_integration_test(
+    member: &WorkspaceMember,
+    excluded: &[String],
+    only: &[String],
+) -> Result<()> {
     group!("Integration Tests: {}", &member.name);
     run_process_for_package(
         "cargo",
@@ -242,7 +266,10 @@ fn run_integration_test(member: &WorkspaceMember, excluded: &Vec<String>, only: 
         only,
         &format!("Failed to execute integration test for '{}'", &member.name),
         Some("no test target matches pattern"),
-        Some(&format!("No tests found matching the pattern `test_*` for '{}'", &member.name)),
+        Some(&format!(
+            "No tests found matching the pattern `test_*` for '{}'",
+            &member.name
+        )),
     )?;
     endgroup!();
     Ok(())

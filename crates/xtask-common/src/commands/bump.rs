@@ -2,7 +2,10 @@ use anyhow::Ok;
 use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString};
 
-use crate::{endgroup, group, utils::{cargo::ensure_cargo_crate_is_installed, process::run_process}};
+use crate::{
+    endgroup, group,
+    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
+};
 
 #[derive(Args, Clone)]
 pub struct BumpCmdArgs {
