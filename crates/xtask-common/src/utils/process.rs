@@ -57,7 +57,7 @@ pub fn run_process_for_workspace<'a>(
                         group!("Unit Tests: {}", crate_name);
                     });
                 }
-                println!("{}", line);
+                eprintln!("{}", line);
                 close_group = true;
             });
         });
