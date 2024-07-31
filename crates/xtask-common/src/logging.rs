@@ -48,7 +48,7 @@ macro_rules! group {
     ($($arg:tt)*) => {
         let title = format!($($arg)*);
         if std::env::var("CI").is_ok() {
-            log!(log::Level::Info, "::group::{}", title)
+            println!("::group::{}", title)
         } else {
             log!(log::Level::Info, "{}", title)
         }
@@ -61,7 +61,7 @@ macro_rules! endgroup {
     // endgroup!()
     () => {
         if std::env::var("CI").is_ok() {
-            log!(log::Level::Info, "::endgroup::")
+            println!("::endgroup::")
         }
     };
 }
