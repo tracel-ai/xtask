@@ -142,6 +142,7 @@ pub(crate) fn run_compile(
                 excluded,
                 "Workspace compilation failed",
                 None,
+                None,
             )?;
             endgroup!();
         }
@@ -196,6 +197,7 @@ fn run_format(
                     vec!["fmt"],
                     &[],
                     "Workspace compilation failed",
+                    None,
                     None,
                 )?;
                 endgroup!();
@@ -282,6 +284,7 @@ fn run_lint(
                     ],
                     &[],
                     "Workspace lint failed",
+                    None,
                     None,
                 )?;
                 endgroup!();

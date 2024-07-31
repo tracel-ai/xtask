@@ -143,6 +143,7 @@ fn run_build(
                 excluded,
                 "Workspace build failed",
                 None,
+                None,
             )?;
             endgroup!();
         }
@@ -186,6 +187,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
                 vec!["fmt", "--check"],
                 &[],
                 "Workspace format failed",
+                None,
                 None,
             )?;
             endgroup!();
@@ -237,6 +239,7 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
                 ],
                 &[],
                 "Workspace lint failed",
+                None,
                 None,
             )?;
             endgroup!();

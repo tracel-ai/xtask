@@ -43,6 +43,7 @@ pub fn run_process_for_workspace<'a>(
     excluded: &'a [String],
     error_msg: &str,
     group_regexp: Option<&str>,
+    group_name: Option<&str>,
 ) -> anyhow::Result<()> {
     let re: Option<Regex> = group_regexp.map(|r| Regex::new(r).unwrap());
     excluded
@@ -73,7 +74,7 @@ pub fn run_process_for_workspace<'a>(
                         if close_group {
                             endgroup!();
                         }
-                        group!("Unit Tests: {}", crate_name);
+                        group!("{}: {}", group_name.unwrap_or("Group"), crate_name);
                     }
                 }
                 eprintln!("{}", line);

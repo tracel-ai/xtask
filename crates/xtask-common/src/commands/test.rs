@@ -84,6 +84,7 @@ pub(crate) fn run_unit(target: &Target, excluded: &[String], only: &[String]) ->
                 excluded,
                 "Workspace Unit Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
+                Some("Unit Tests"),
             )?;
         }
         Target::Crates | Target::Examples => {
@@ -152,6 +153,7 @@ pub(crate) fn run_documentation(
                 excluded,
                 "Workspace documentation test failed",
                 Some(r".*Doc-tests\s([^-\s]+)$"),
+                Some("Doc Tests"),
             )?;
             endgroup!();
         }
@@ -222,6 +224,7 @@ pub(crate) fn run_integration(
                 excluded,
                 "Workspace Integration Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
+                Some("Integration Tests"),
             )?;
         }
         Target::Crates | Target::Examples => {

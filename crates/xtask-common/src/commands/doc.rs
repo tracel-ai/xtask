@@ -71,6 +71,7 @@ fn run_documentation_build(
                 excluded,
                 "Workspace documentation build failed",
                 None,
+                None,
             )?;
             endgroup!();
         }
