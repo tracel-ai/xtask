@@ -69,7 +69,8 @@ pub fn run_process_for_workspace<'a>(
         reader.lines().for_each(|line| {
             if let Ok(line) = line {
                 if let Some(rx) = &re {
-                    if let Some(caps) = rx.captures(&line) {
+                    let cleaned_line = standardize_slashes(&remove_ansi_codes(&line));
+                    if let Some(caps) = rx.captures(&cleaned_line) {
                         let crate_name = &caps[1];
                         if close_group {
                             endgroup!();
@@ -186,4 +187,13 @@ pub fn handle_child_process(mut child: Child, error: &str) -> anyhow::Result<()>
 pub fn random_port() -> u16 {
     let mut rng = rand::thread_rng();
     rng.gen_range(3000..=9999)
+}
+
+fn remove_ansi_codes(s: &str) -> String {
+    let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+    re.replace_all(s, "").to_string()
+}
+
+fn standardize_slashes(s: &str) -> String {
+    s.replace('\\', "/")
 }

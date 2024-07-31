@@ -152,7 +152,7 @@ pub(crate) fn run_documentation(
                 vec!["test", "--workspace", "--doc", "--color", "always"],
                 excluded,
                 "Workspace documentation test failed",
-                Some(r".*Doc-tests\s([^-\s]+)$"),
+                Some(r"Doc-tests (\w+)"),
                 Some("Doc Tests"),
             )?;
             endgroup!();
