@@ -23,21 +23,28 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Bump",
         quote! {
-            #[doc = r"Bump the version of all crates to be published"]
+            #[doc = r"Bump the version of all crates to be published."]
             Bump(xtask_common::commands::bump::BumpCmdArgs)
         },
     );
     variant_map.insert(
         "Fix",
         quote! {
-            #[doc = r"Run checks and try to fix the detected issues"]
+            #[doc = r"Run checks and try to fix the detected issues."]
             Fix(xtask_common::commands::fix::FixCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Checks",
+        quote! {
+            #[doc = r"Runs all the checks that should pass before creating a pull-request."]
+            Checks(xtask_common::commands::checks::ChecksCmdArgs)
         },
     );
     variant_map.insert(
         "CI",
         quote! {
-            #[doc = r"Runs checks for Continuous Integration"]
+            #[doc = r"Runs checks for Continuous Integration."]
             CI(xtask_common::commands::ci::CICmdArgs)
         },
     );
@@ -51,47 +58,47 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Coverage",
         quote! {
-            #[doc = r"Install and run coverage tools"]
+            #[doc = r"Install and run coverage tools."]
             Coverage(xtask_common::commands::coverage::CoverageCmdArgs)
         },
     );
     variant_map.insert(
         "Doc",
         quote! {
-            #[doc = r"Build documentation"]
+            #[doc = r"Build documentation."]
             Doc(xtask_common::commands::doc::DocCmdArgs)
         },
     );
     variant_map.insert(
         "Dependencies",
         quote! {
-            #[doc = r"Run the specified dependencies check locally"]
+            #[doc = r"Run the specified dependencies check locally."]
             Dependencies(xtask_common::commands::dependencies::DependenciesCmdArgs)
         },
     );
     variant_map.insert(
         "Publish",
         quote! {
-            #[doc = r"Publish a crate to crates.io"]
+            #[doc = r"Publish a crate to crates.io."]
             Publish(xtask_common::commands::publish::PublishCmdArgs)
         },
     );
     variant_map.insert(
         "PullRequestChecks",
         quote! {
-            #[doc = r"Runs all tests and checks that should pass before opening a Pull Request"]
+            #[doc = r"Runs all tests and checks that should pass before opening a Pull Request."]
             PullRequestChecks
         },
     );
     variant_map.insert(
         "Test",
         quote! {
-            #[doc = r"Runs tests"]
+            #[doc = r"Runs tests."]
             Test(xtask_common::commands::test::TestCmdArgs)
         },
     );
     variant_map.insert("Vulnerabilities", quote! {
-        #[doc = r"Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'"]
+        #[doc = r"Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'."]
         Vulnerabilities(xtask_common::commands::vulnerabilities::VulnerabilitiesCmdArgs)
     });
 

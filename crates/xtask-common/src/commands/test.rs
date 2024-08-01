@@ -80,7 +80,15 @@ pub(crate) fn run_unit(target: &Target, excluded: &[String], only: &[String]) ->
             info!("Workspace Unit Tests");
             run_process_for_workspace(
                 "cargo",
-                vec!["test", "--workspace", "--lib", "--bins", "--examples", "--color", "always"],
+                vec![
+                    "test",
+                    "--workspace",
+                    "--lib",
+                    "--bins",
+                    "--examples",
+                    "--color",
+                    "always",
+                ],
                 excluded,
                 "Workspace Unit Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
