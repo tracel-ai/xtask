@@ -38,7 +38,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Checks",
         quote! {
             #[doc = r"Runs all the checks that should pass before creating a pull-request."]
-            Checks(xtask_common::commands::checks::ChecksCmdArgs)
+            Checks
         },
     );
     variant_map.insert(
