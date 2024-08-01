@@ -13,10 +13,7 @@ use crate::{
 };
 
 use super::{
-    build::run_build,
-    compile::run_compile,
-    test::{run_documentation, run_integration, run_unit},
-    Target,
+    build::run_build, compile::run_compile, doc::run_documentation, test::{run_integration, run_unit}, Target
 };
 
 #[xtask_macros::arguments(target, exclude, only)]
@@ -30,7 +27,7 @@ pub struct CICmdArgs {
 pub enum CICommand {
     /// Run all the checks.
     All,
-    /// Run all tests.
+    /// Run both unit and integrations tests but not documentation tests.
     AllTests,
     /// Run audit command.
     Audit,
@@ -231,6 +228,5 @@ fn run_typos() -> anyhow::Result<()> {
 fn run_all_tests(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
     run_unit(target, excluded, only)?;
     run_integration(target, excluded, only)?;
-    run_documentation(target, excluded, only)?;
     Ok(())
 }

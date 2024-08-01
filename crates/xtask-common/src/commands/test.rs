@@ -26,8 +26,6 @@ pub enum TestCommand {
     Unit,
     /// Run integration tests.
     Integration,
-    /// Run documentation tests.
-    Documentation,
     /// Run all the checks.
     All,
 }
@@ -39,7 +37,6 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     match args.command {
         TestCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
         TestCommand::Integration => run_integration(&args.target, &args.exclude, &args.only),
-        TestCommand::Documentation => run_documentation(&args.target, &args.exclude, &args.only),
         TestCommand::All => TestCommand::iter()
             .filter(|c| *c != TestCommand::All)
             .try_for_each(|c| {
@@ -120,70 +117,6 @@ fn run_unit_test(
         Some("no library targets found"),
         Some(&format!(
             "No library found to test for in the crate '{}'",
-            &member.name
-        )),
-    )?;
-    endgroup!();
-    Ok(())
-}
-
-pub(crate) fn run_documentation(
-    target: &Target,
-    excluded: &[String],
-    only: &[String],
-) -> Result<()> {
-    match target {
-        Target::Workspace => {
-            group!("Workspace Documentation Tests");
-            run_process_for_workspace(
-                "cargo",
-                vec!["test", "--workspace", "--doc", "--color", "always"],
-                excluded,
-                "Workspace documentation test failed",
-                Some(r"Doc-tests (\w+)"),
-                Some("Doc Tests"),
-            )?;
-            endgroup!();
-        }
-        Target::Crates | Target::Examples => {
-            let members = match target {
-                Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
-                Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
-                _ => unreachable!(),
-            };
-
-            for member in members {
-                run_doc_test(&member, excluded, only)?;
-            }
-        }
-        Target::AllPackages => {
-            Target::iter()
-                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_documentation(&t, excluded, only))?;
-        }
-    }
-    Ok(())
-}
-
-fn run_doc_test(
-    member: &WorkspaceMember,
-    excluded: &[String],
-    only: &[String],
-) -> Result<(), anyhow::Error> {
-    group!("Doc Tests: {}", member.name);
-    run_process_for_package(
-        "cargo",
-        &member.name,
-        &vec!["test", "--doc", "-p", &member.name],
-        excluded,
-        only,
-        &format!(
-            "Failed to execute documentation test for '{}'",
-            &member.name
-        ),
-        Some("no library targets found"),
-        Some(&format!(
-            "No library found to test documentation for in the crate '{}'",
             &member.name
         )),
     )?;
