@@ -46,7 +46,7 @@ fn run_documentation_build(
             group!("Build Workspace documentation");
             run_process_for_workspace(
                 "cargo",
-                vec!["doc", "--workspace", "--color=always"],
+                vec!["doc", "--workspace", "--no-deps", "--color=always"],
                 excluded,
                 "Workspace documentation build failed",
                 None,
@@ -66,7 +66,7 @@ fn run_documentation_build(
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["doc", "-p", &member.name, "--color=always"],
+                    &vec!["doc", "-p", &member.name, "--no-deps", "--color=always"],
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
