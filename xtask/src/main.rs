@@ -9,7 +9,7 @@ use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_du
 #[xtask_macros::commands(
     Build,
     Bump,
-    CI,
+    Check,
     Compile,
     Coverage,
     Doc,
@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
         // You can easily insert specific pre-processing for each command if required by your repository
         Command::Build(args) => build::handle_command(args),
         Command::Bump(args) => bump::handle_command(args),
-        Command::CI(args) => ci::handle_command(args),
+        Command::Check(args) => check::handle_command(args),
         Command::Compile(args) => compile::handle_command(args),
         Command::Coverage(args) => coverage::handle_command(args),
         Command::Dependencies(args) => dependencies::handle_command(args),

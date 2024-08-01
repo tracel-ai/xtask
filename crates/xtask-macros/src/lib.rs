@@ -30,22 +30,15 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Fix",
         quote! {
-            #[doc = r"Run checks and try to fix the detected issues."]
+            #[doc = r"Fix issues found with the 'check' command."]
             Fix(xtask_common::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(
-        "Checks",
+        "Check",
         quote! {
-            #[doc = r"Runs all the checks that should pass before creating a pull-request."]
-            Checks
-        },
-    );
-    variant_map.insert(
-        "CI",
-        quote! {
-            #[doc = r"Runs checks for Continuous Integration."]
-            CI(xtask_common::commands::ci::CICmdArgs)
+            #[doc = r"Run checks like formating, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
+            Check(xtask_common::commands::check::CheckCmdArgs)
         },
     );
     variant_map.insert(
@@ -88,6 +81,13 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Runs tests."]
             Test(xtask_common::commands::test::TestCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Validate",
+        quote! {
+            #[doc = r"Validate the code base by running all the relevant checks and tests. Use this command before creating a new pull-request."]
+            Validate
         },
     );
     variant_map.insert("Vulnerabilities", quote! {

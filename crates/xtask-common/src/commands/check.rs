@@ -3,7 +3,7 @@ use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, WARN_IGNORED_ONLY_ARGS},
+    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
@@ -12,79 +12,45 @@ use crate::{
     },
 };
 
-use super::{
-    build::run_build, compile::run_compile, doc::run_documentation, test::{run_integration, run_unit}, Target
-};
+use super::Target;
 
 #[xtask_macros::arguments(target, exclude, only)]
-pub struct CICmdArgs {
+pub struct CheckCmdArgs {
     #[command(subcommand)]
-    pub command: CICommand,
+    pub command: CheckCommand,
 }
 
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-pub enum CICommand {
+pub enum CheckCommand {
     /// Run all the checks.
     All,
-    /// Run both unit and integrations tests but not documentation tests.
-    AllTests,
     /// Run audit command.
     Audit,
-    /// Build the targets.
-    Build,
-    /// Compile check the code (does not write binaries to disk).
-    Compile,
-    /// Run documentation tests.
-    DocTests,
     /// Run format command.
     Format,
-    /// Run integration tests.
-    IntegrationTests,
     /// Run lint command.
     Lint,
     /// Report typos in source code.
     Typos,
-    /// Run unit tests.
-    UnitTests,
 }
 
-pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
-    match args.command {
-        CICommand::AllTests
-        | CICommand::Build
-        | CICommand::Compile
-        | CICommand::DocTests
-        | CICommand::IntegrationTests
-        | CICommand::UnitTests => {
-            if args.target == Target::Workspace && !args.only.is_empty() {
-                warn!("{}", WARN_IGNORED_ONLY_ARGS);
-            }
-        }
-        _ => {
-            if args.target == Target::Workspace
-                && (!args.exclude.is_empty() || !args.only.is_empty())
-            {
-                warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
-            }
-        }
+pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
+    if args.target == Target::Workspace
+        && (!args.exclude.is_empty() || !args.only.is_empty())
+    {
+        warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
 
     match args.command {
-        CICommand::Audit => run_audit(),
-        CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
-        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
-        CICommand::DocTests => run_documentation(&args.target, &args.exclude, &args.only),
-        CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
-        CICommand::IntegrationTests => run_integration(&args.target, &args.exclude, &args.only),
-        CICommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
-        CICommand::Typos => run_typos(),
-        CICommand::UnitTests => run_unit(&args.target, &args.exclude, &args.only),
-        CICommand::AllTests => run_all_tests(&args.target, &args.exclude, &args.only),
-        CICommand::All => CICommand::iter()
-            .filter(|c| *c != CICommand::All && *c != CICommand::AllTests)
+        CheckCommand::Audit => run_audit(),
+        CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only),
+        CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+        CheckCommand::Typos => run_typos(),
+        CheckCommand::All => CheckCommand::iter()
+            .filter(|c| *c != CheckCommand::All)
             .try_for_each(|c| {
-                handle_command(CICmdArgs {
+                handle_command(CheckCmdArgs {
                     command: c,
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
@@ -222,11 +188,5 @@ fn run_typos() -> anyhow::Result<()> {
         true,
     )?;
     endgroup!();
-    Ok(())
-}
-
-fn run_all_tests(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
-    run_unit(target, excluded, only)?;
-    run_integration(target, excluded, only)?;
     Ok(())
 }
