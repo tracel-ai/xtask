@@ -1,5 +1,4 @@
 use anyhow::Ok;
-use clap::Args;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -13,30 +12,8 @@ use crate::{
 
 use super::Target;
 
-#[derive(Args, Clone)]
-pub struct CompileCmdArgs {
-    /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
-    target: Target,
-    /// Comma-separated list of excluded crates.
-    #[arg(
-        short = 'x',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub exclude: Vec<String>,
-    /// Comma-separated list of crates to include exclusively.
-    #[arg(
-        short = 'n',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub only: Vec<String>,
-}
+#[xtask_macros::arguments(target, exclude, only)]
+pub struct CompileCmdArgs {}
 
 pub fn handle_command(args: CompileCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {

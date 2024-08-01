@@ -875,6 +875,7 @@ dependencies = [
  "serde_json",
  "strum",
  "tracing-subscriber",
+ "xtask-macros",
 ]
 
 [[package]]

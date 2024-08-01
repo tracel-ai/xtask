@@ -3,13 +3,13 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse_macro_input, punctuated::Punctuated, ItemEnum, Meta};
+use syn::{parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta};
 
 #[proc_macro_attribute]
 pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let item = parse_macro_input!(input as ItemEnum);
-    let args = parse_macro_input!(args with Punctuated::<Meta, syn::Token![,]>::parse_terminated);
+    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
 
     // Supported commands and their quoted expansions
     let mut variant_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
@@ -84,13 +84,6 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
-        "PullRequestChecks",
-        quote! {
-            #[doc = r"Runs all tests and checks that should pass before opening a Pull Request."]
-            PullRequestChecks
-        },
-    );
-    variant_map.insert(
         "Test",
         quote! {
             #[doc = r"Runs tests."]
@@ -102,24 +95,23 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         Vulnerabilities(xtask_common::commands::vulnerabilities::VulnerabilitiesCmdArgs)
     });
 
-    let mut variants = vec![];
-
     // Generate the corresponding enum variant
+    let mut variants = vec![];
     for arg in args {
         if let Meta::Path(path) = arg {
             if let Some(ident) = path.get_ident() {
-                let ident_str = ident.to_string();
-                if let Some(variant) = variant_map.get(ident_str.as_str()) {
+                let ident_string = ident.to_string();
+                if let Some(variant) = variant_map.get(ident_string.as_str()) {
                     variants.push(variant.clone());
                 } else {
                     let err_msg = format!(
                         "Unknown command: {}\nPossible commands are:\n  {}",
-                        ident_str,
+                        ident_string,
                         variant_map
                             .keys()
                             .cloned()
                             .collect::<Vec<&str>>()
-                            .join("\n  ")
+                            .join("\n  "),
                     );
                     return TokenStream::from(quote! {
                         compile_error!(#err_msg);
@@ -137,6 +129,98 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         pub enum #enum_name {
             #(#variants,)*
             #other_variants
+        }
+    };
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemStruct);
+    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
+
+    let mut field_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
+    field_map.insert(
+        "target",
+        quote! {
+            #[doc = r"The target on which executing the command."]
+            #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
+            pub target: Target
+        },
+    );
+    field_map.insert(
+        "exclude",
+        quote! {
+            #[doc = r"Comma-separated list of excluded crates."]
+            #[arg(
+                short = 'x',
+                long,
+                value_name = "CRATE,CRATE,...",
+                value_delimiter = ',',
+                required = false
+            )]
+            pub exclude: Vec<String>
+        },
+    );
+    field_map.insert(
+        "only",
+        quote! {
+            #[doc = r"Comma-separated list of crates to include exclusively."]
+            #[arg(
+                short = 'n',
+                long,
+                value_name = "CRATE,CRATE,...",
+                value_delimiter = ',',
+                required = false
+            )]
+            pub only: Vec<String>
+        },
+    );
+
+    let mut fields = vec![];
+    for arg in args {
+        if let Meta::Path(path) = arg {
+            if let Some(ident) = path.get_ident() {
+                let ident_string = ident.to_string();
+                if let Some(field) = field_map.get(ident_string.as_str()) {
+                    fields.push(field.clone());
+                } else {
+                    let err_msg = format!(
+                        "Unknown argument: {}\nPossible arguments are:\n  {}",
+                        ident_string,
+                        field_map
+                            .keys()
+                            .cloned()
+                            .collect::<Vec<&str>>()
+                            .join("\n  "),
+                    );
+                    return TokenStream::from(quote! {
+                        compile_error!(#err_msg);
+                    });
+                }
+            }
+        }
+    }
+
+    let struct_name = &item.ident;
+    // we quote each componnets of each field manually to avoid
+    // having the wrapping curly braces of the struct
+    let original_fields = item.fields.iter().map(|f| {
+        let attrs = &f.attrs;
+        let vis = &f.vis;
+        let ident = &f.ident;
+        let ty = &f.ty;
+        quote! {
+            #(#attrs)*
+            #vis #ident: #ty
+        }
+    });
+
+    let expanded = quote! {
+        #[derive(clap::Args, Clone)]
+        pub struct #struct_name {
+            #(#fields,)*
+            #(#original_fields,)*
         }
     };
     TokenStream::from(expanded)

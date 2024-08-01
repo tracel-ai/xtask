@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
@@ -13,29 +13,8 @@ use crate::{
 
 use super::Target;
 
-#[derive(Args, Clone)]
+#[xtask_macros::arguments(target, exclude, only)]
 pub struct DocCmdArgs {
-    /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
-    target: Target,
-    /// Comma-separated list of excluded crates.
-    #[arg(
-        short = 'x',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub exclude: Vec<String>,
-    /// Comma-separated list of crates to include exclusively.
-    #[arg(
-        short = 'n',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub only: Vec<String>,
     #[command(subcommand)]
     pub command: DocCommand,
 }

@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
@@ -13,32 +13,14 @@ use crate::{
 };
 
 use super::{
-    build::run_build, compile::run_compile, test::{run_documentation, run_integration, run_unit}, Target
+    build::run_build,
+    compile::run_compile,
+    test::{run_documentation, run_integration, run_unit},
+    Target,
 };
 
-#[derive(Args, Clone)]
+#[xtask_macros::arguments(target, exclude, only)]
 pub struct CICmdArgs {
-    /// Target to check for.
-    #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
-    pub target: Target,
-    /// Comma-separated list of excluded crates.
-    #[arg(
-        short = 'x',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub exclude: Vec<String>,
-    /// Comma-separated list of crates to include exclusively.
-    #[arg(
-        short = 'n',
-        long,
-        value_name = "CRATE,CRATE,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub only: Vec<String>,
     #[command(subcommand)]
     pub command: CICommand,
 }
@@ -73,15 +55,15 @@ pub enum CICommand {
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::AllTests
-            | CICommand::Build
-            | CICommand::Compile
-            | CICommand::DocTests
-            | CICommand::IntegrationTests
-            | CICommand::UnitTests => {
-                if args.target == Target::Workspace && !args.only.is_empty() {
-                    warn!("{}", WARN_IGNORED_ONLY_ARGS);
-                }
+        | CICommand::Build
+        | CICommand::Compile
+        | CICommand::DocTests
+        | CICommand::IntegrationTests
+        | CICommand::UnitTests => {
+            if args.target == Target::Workspace && !args.only.is_empty() {
+                warn!("{}", WARN_IGNORED_ONLY_ARGS);
             }
+        }
         _ => {
             if args.target == Target::Workspace
                 && (!args.exclude.is_empty() || !args.only.is_empty())

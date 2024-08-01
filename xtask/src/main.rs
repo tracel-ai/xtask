@@ -16,7 +16,6 @@ use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_du
     Dependencies,
     Fix,
     Publish,
-    PullRequestChecks,
     Test,
     Vulnerabilities
 )]
@@ -41,7 +40,6 @@ fn main() -> anyhow::Result<()> {
         Command::Doc(args) => doc::handle_command(args),
         Command::Fix(args) => fix::handle_command(args, None),
         Command::Publish(args) => publish::handle_command(args),
-        Command::PullRequestChecks => pull_request_checks::handle_command(),
         Command::Test(args) => test::handle_command(args),
         Command::Vulnerabilities(args) => vulnerabilities::handle_command(args),
 
