@@ -21,10 +21,10 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
-        "Check",
+        "Fix",
         quote! {
-            #[doc = r"Runs checks and fix issues (used for development purposes)"]
-            Check(xtask_common::commands::check::CheckCmdArgs)
+            #[doc = r"Run checks and try to fix the detected issues"]
+            Fix(xtask_common::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(

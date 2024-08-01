@@ -17,7 +17,7 @@ use crate::{
 use super::Target;
 
 #[derive(Args, Clone)]
-pub struct CheckCmdArgs {
+pub struct FixCmdArgs {
     /// Target to check for.
     #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
     target: Target,
@@ -40,12 +40,12 @@ pub struct CheckCmdArgs {
     )]
     pub only: Vec<String>,
     #[command(subcommand)]
-    pub command: CheckCommand,
+    pub command: FixCommand,
 }
 
 #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
 #[strum(serialize_all = "lowercase")]
-pub enum CheckCommand {
+pub enum FixCommand {
     /// Run audit command.
     Audit,
     /// Compile the targets (does not write actual binaries).
@@ -60,10 +60,10 @@ pub enum CheckCommand {
     All,
 }
 
-pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
+pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     if answer.is_none() {
         match args.command {
-            CheckCommand::Compile => {
+            FixCommand::Compile => {
                 if args.target == Target::Workspace && !args.only.is_empty() {
                     warn!("{}", WARN_IGNORED_ONLY_ARGS);
                 }
@@ -78,20 +78,20 @@ pub fn handle_command(args: CheckCmdArgs, answer: Option<bool>) -> anyhow::Resul
         }
     }
     match args.command {
-        CheckCommand::Audit => run_audit(answer),
-        CheckCommand::Compile => run_compile(&args.target, &args.exclude, &args.only, answer),
-        CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
-        CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
-        CheckCommand::Typos => run_typos(answer),
-        CheckCommand::All => {
+        FixCommand::Audit => run_audit(answer),
+        FixCommand::Compile => run_compile(&args.target, &args.exclude, &args.only, answer),
+        FixCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
+        FixCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
+        FixCommand::Typos => run_typos(answer),
+        FixCommand::All => {
             let answer = ask_once(
                 "This will run all the checks with autofix on all members of the workspace.",
             );
-            CheckCommand::iter()
-                .filter(|c| *c != CheckCommand::All)
+            FixCommand::iter()
+                .filter(|c| *c != FixCommand::All)
                 .try_for_each(|c| {
                     handle_command(
-                        CheckCmdArgs {
+                        FixCmdArgs {
                             command: c,
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
