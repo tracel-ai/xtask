@@ -7,6 +7,7 @@ use std::time::Instant;
 use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_duration};
 
 #[xtask_macros::commands(
+    Build,
     Bump,
     CI,
     Compile,
@@ -31,6 +32,7 @@ fn main() -> anyhow::Result<()> {
     match args.command {
         // From common_xtask
         // You can easily insert specific pre-processing for each command if required by your repository
+        Command::Build(args) => build::handle_command(args),
         Command::Bump(args) => bump::handle_command(args),
         Command::CI(args) => ci::handle_command(args),
         Command::Compile(args) => compile::handle_command(args),

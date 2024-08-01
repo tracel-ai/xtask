@@ -128,55 +128,6 @@ fn run_audit() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_build(
-    target: &Target,
-    excluded: &[String],
-    only: &[String],
-) -> std::prelude::v1::Result<(), anyhow::Error> {
-    match target {
-        Target::Workspace => {
-            group!("Build Workspace");
-            run_process_for_workspace(
-                "cargo",
-                vec!["build", "--workspace"],
-                excluded,
-                "Workspace build failed",
-                None,
-                None,
-            )?;
-            endgroup!();
-        }
-        Target::Crates | Target::Examples => {
-            let members = match target {
-                Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
-                Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
-                _ => unreachable!(),
-            };
-
-            for member in members {
-                group!("Build: {}", member.name);
-                run_process_for_package(
-                    "cargo",
-                    &member.name,
-                    &vec!["build", "-p", &member.name],
-                    excluded,
-                    only,
-                    &format!("Build command failed for {}", &member.name),
-                    None,
-                    None,
-                )?;
-                endgroup!();
-            }
-        }
-        Target::AllPackages => {
-            Target::iter()
-                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_build(&t, excluded, only))?;
-        }
-    }
-    Ok(())
-}
-
 fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {

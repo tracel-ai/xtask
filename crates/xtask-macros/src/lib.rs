@@ -14,6 +14,13 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Supported commands and their quoted expansions
     let mut variant_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
     variant_map.insert(
+        "Build",
+        quote! {
+            #[doc = r"Build the code."]
+            Build(xtask_common::commands::build::BuildCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Bump",
         quote! {
             #[doc = r"Bump the version of all crates to be published"]

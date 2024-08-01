@@ -1,3 +1,4 @@
+pub mod build;
 pub mod bump;
 pub mod ci;
 pub mod compile;
