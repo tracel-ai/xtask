@@ -35,6 +35,13 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Compile",
+        quote! {
+            #[doc = r"Compile check the code (does not write binaries to disk)."]
+            Compile(xtask_common::commands::compile::CompileCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Coverage",
         quote! {
             #[doc = r"Install and run coverage tools"]

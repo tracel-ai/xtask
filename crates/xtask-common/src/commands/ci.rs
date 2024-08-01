@@ -13,9 +13,7 @@ use crate::{
 };
 
 use super::{
-    check::run_compile,
-    test::{run_documentation, run_integration, run_unit},
-    Target,
+    build::run_build, compile::run_compile, test::{run_documentation, run_integration, run_unit}, Target
 };
 
 #[derive(Args, Clone)]
@@ -56,7 +54,7 @@ pub enum CICommand {
     Audit,
     /// Build the targets.
     Build,
-    /// Compile the targets (does not write actual binaries).
+    /// Compile check the code (does not write binaries to disk).
     Compile,
     /// Run documentation tests.
     DocTests,
@@ -74,15 +72,16 @@ pub enum CICommand {
 
 pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
-        CICommand::Build
-        | CICommand::AllTests
-        | CICommand::DocTests
-        | CICommand::IntegrationTests
-        | CICommand::UnitTests => {
-            if args.target == Target::Workspace && !args.only.is_empty() {
-                warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        CICommand::AllTests
+            | CICommand::Build
+            | CICommand::Compile
+            | CICommand::DocTests
+            | CICommand::IntegrationTests
+            | CICommand::UnitTests => {
+                if args.target == Target::Workspace && !args.only.is_empty() {
+                    warn!("{}", WARN_IGNORED_ONLY_ARGS);
+                }
             }
-        }
         _ => {
             if args.target == Target::Workspace
                 && (!args.exclude.is_empty() || !args.only.is_empty())
@@ -95,7 +94,7 @@ pub fn handle_command(args: CICmdArgs) -> anyhow::Result<()> {
     match args.command {
         CICommand::Audit => run_audit(),
         CICommand::Build => run_build(&args.target, &args.exclude, &args.only),
-        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only, None),
+        CICommand::Compile => run_compile(&args.target, &args.exclude, &args.only),
         CICommand::DocTests => run_documentation(&args.target, &args.exclude, &args.only),
         CICommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CICommand::IntegrationTests => run_integration(&args.target, &args.exclude, &args.only),

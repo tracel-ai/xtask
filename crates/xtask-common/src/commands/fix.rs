@@ -3,7 +3,7 @@ use clap::{Args, Subcommand};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    commands::{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, WARN_IGNORED_ONLY_ARGS},
+    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
     endgroup, group,
     utils::{
         cargo::ensure_cargo_crate_is_installed,
@@ -48,8 +48,6 @@ pub struct FixCmdArgs {
 pub enum FixCommand {
     /// Run audit command.
     Audit,
-    /// Compile the targets (does not write actual binaries).
-    Compile,
     /// Run format command and fix formatting.
     Format,
     /// Run lint command and fix issues.
@@ -62,24 +60,14 @@ pub enum FixCommand {
 
 pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     if answer.is_none() {
-        match args.command {
-            FixCommand::Compile => {
-                if args.target == Target::Workspace && !args.only.is_empty() {
-                    warn!("{}", WARN_IGNORED_ONLY_ARGS);
-                }
-            }
-            _ => {
-                if args.target == Target::Workspace
-                    && (!args.exclude.is_empty() || !args.only.is_empty())
-                {
-                    warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
-                }
-            }
+        if args.target == Target::Workspace
+            && (!args.exclude.is_empty() || !args.only.is_empty())
+        {
+            warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
         }
     }
     match args.command {
         FixCommand::Audit => run_audit(answer),
-        FixCommand::Compile => run_compile(&args.target, &args.exclude, &args.only, answer),
         FixCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
         FixCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
         FixCommand::Typos => run_typos(answer),
@@ -124,58 +112,6 @@ pub(crate) fn run_audit(mut answer: Option<bool>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub(crate) fn run_compile(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-    answer: Option<bool>,
-) -> std::prelude::v1::Result<(), anyhow::Error> {
-    if answer.is_some() && !answer.unwrap() {
-        return Ok(());
-    };
-    match target {
-        Target::Workspace => {
-            group!("Compile Workspace");
-            run_process_for_workspace(
-                "cargo",
-                vec!["check", "--workspace"],
-                excluded,
-                "Workspace compilation failed",
-                None,
-                None,
-            )?;
-            endgroup!();
-        }
-        Target::Crates | Target::Examples => {
-            let members = match target {
-                Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
-                Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
-                _ => unreachable!(),
-            };
-
-            for member in members {
-                group!("Compile: {}", member.name);
-                run_process_for_package(
-                    "cargo",
-                    &member.name,
-                    &vec!["check", "-p", &member.name],
-                    excluded,
-                    only,
-                    &format!("Compilation failed for {}", &member.name),
-                    None,
-                    None,
-                )?;
-                endgroup!();
-            }
-        }
-        Target::AllPackages => {
-            Target::iter()
-                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_compile(&t, excluded, only, None))?;
-        }
-    }
-    Ok(())
-}
 
 fn run_format(
     target: &Target,

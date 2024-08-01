@@ -1,5 +1,6 @@
 pub mod bump;
 pub mod ci;
+pub mod compile;
 pub mod coverage;
 pub mod dependencies;
 pub mod doc;
