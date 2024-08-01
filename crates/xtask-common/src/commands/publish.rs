@@ -86,7 +86,6 @@ fn publish(crate_name: String) -> anyhow::Result<()> {
         "cargo",
         &vec!["publish", "-p", &crate_name, "--dry-run"],
         &format!("Publish dry run failed for crate '{}'.", &crate_name),
-        true,
     )?;
 
     let crates_io_token =

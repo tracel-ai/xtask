@@ -15,12 +15,9 @@ pub fn run_process(
     name: &str,
     args: &Vec<&str>,
     error_msg: &str,
-    quiet: bool,
 ) -> anyhow::Result<()> {
     let joined_args = args.join(" ");
-    if !quiet {
-        info!("Command line: {} {}", name, &joined_args);
-    }
+    info!("Command line: {} {}", name, &joined_args);
     let status = Command::new(name).args(args).status().map_err(|e| {
         anyhow!(
             "Failed to execute {} {}: {}",

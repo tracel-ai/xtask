@@ -94,7 +94,6 @@ fn run_cargo_careful() -> anyhow::Result<()> {
             "cargo",
             &vec!["careful", "setup"],
             "Error preparing cargo sysroot.",
-            true,
         )?;
         endgroup!();
         // Run cargo careful
@@ -103,7 +102,6 @@ fn run_cargo_careful() -> anyhow::Result<()> {
             "cargo",
             &vec!["careful", "test"],
             "Cargo careful test has errors.",
-            true,
         )?;
         endgroup!();
     } else {

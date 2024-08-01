@@ -67,7 +67,6 @@ fn run_audit() -> anyhow::Result<()> {
         "cargo",
         &vec!["audit", "-q", "--color", "always"],
         "Audit check execution failed",
-        true,
     )?;
     endgroup!();
     Ok(())
@@ -185,7 +184,6 @@ fn run_typos() -> anyhow::Result<()> {
         "typos",
         &vec!["--diff", "--color", "always"],
         "Typos check execution failed",
-        true,
     )?;
     endgroup!();
     Ok(())

@@ -75,7 +75,7 @@ fn run_grcov(generate_args: &GenerateCmdArgs) -> anyhow::Result<()> {
         .ignore
         .iter()
         .for_each(|i| args.extend(vec!["--ignore", i]));
-    run_process("grcov", &args, "Error executing grcov", true)?;
+    run_process("grcov", &args, "Error executing grcov")?;
     endgroup!();
     Ok(())
 }

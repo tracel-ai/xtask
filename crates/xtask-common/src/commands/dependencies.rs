@@ -48,7 +48,6 @@ fn run_cargo_deny() -> anyhow::Result<()> {
         "cargo",
         &vec!["deny", "check"],
         "Some dependencies don't meet the requirements!",
-        true,
     )?;
     endgroup!();
     Ok(())
@@ -60,7 +59,7 @@ fn run_cargo_udeps() -> anyhow::Result<()> {
         ensure_cargo_crate_is_installed("cargo-udeps", None, None, false)?;
         // Run cargo udeps
         group!("Cargo: run unused dependencies checks");
-        run_process("cargo", &vec!["udeps"], "Unused dependencies found!", true)?;
+        run_process("cargo", &vec!["udeps"], "Unused dependencies found!")?;
         endgroup!();
     } else {
         error!("{}", CARGO_NIGHTLY_MSG);

@@ -84,7 +84,6 @@ pub(crate) fn run_audit(mut answer: Option<bool>) -> anyhow::Result<()> {
             "cargo",
             &vec!["audit", "-q", "--color", "always", "fix"],
             "Audit check execution failed",
-            true,
         )?;
         endgroup!();
     }
@@ -281,7 +280,6 @@ pub(crate) fn run_typos(mut answer: Option<bool>) -> anyhow::Result<()> {
             "typos",
             &vec!["--write-changes", "--color", "always"],
             "Some typos have been found and cannot be fixed.",
-            true,
         )?;
         endgroup!();
     }

@@ -35,7 +35,6 @@ fn bump(command: &BumpCommand) -> anyhow::Result<()> {
         "cargo",
         &vec!["set-version", "--bump", &command.to_string()],
         &format!("Error trying to bump {command} version"),
-        true,
     )?;
     endgroup!();
     Ok(())
