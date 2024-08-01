@@ -52,7 +52,9 @@ pub fn handle_command(args: CoverageCmdArgs) -> anyhow::Result<()> {
 
 fn install_grcov() -> anyhow::Result<()> {
     rustup_add_component("llvm-tools-preview")?;
-    ensure_cargo_crate_is_installed("grcov", None, Some(GRCOV_VERSION), false)?;
+    if std::env::var("CI").is_err() {
+        ensure_cargo_crate_is_installed("grcov", None, Some(GRCOV_VERSION), false)?;
+    }
     Ok(())
 }
 
