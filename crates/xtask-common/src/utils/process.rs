@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use rand::Rng;
 use regex::Regex;
 
-use crate::utils::get_command_line_from_command;
+use crate::{group_info, utils::get_command_line_from_command};
 use crate::{endgroup, group};
 
 /// Run a process
@@ -17,7 +17,7 @@ pub fn run_process(
     error_msg: &str,
 ) -> anyhow::Result<()> {
     let joined_args = args.join(" ");
-    info!("Command line: {} {}", name, &joined_args);
+    group_info!("Command line: {} {}", name, &joined_args);
     let status = Command::new(name).args(args).status().map_err(|e| {
         anyhow!(
             "Failed to execute {} {}: {}",
@@ -46,7 +46,7 @@ pub fn run_process_for_workspace<'a>(
     excluded
         .iter()
         .for_each(|ex| args.extend(["--exclude", ex]));
-    info!("Command line: cargo {}", args.join(" "));
+    group_info!("Command line: cargo {}", args.join(" "));
     let mut child = Command::new(name)
         .args(&args)
         .stderr(Stdio::piped())
@@ -106,11 +106,11 @@ pub fn run_process_for_package(
     ignore_msg: Option<&str>,
 ) -> anyhow::Result<()> {
     if excluded.contains(package) || (!only.is_empty() && !only.contains(package)) {
-        info!("Skip '{}' because it has been excluded!", package);
+        group_info!("Skip '{}' because it has been excluded!", package);
         return anyhow::Ok(());
     }
     let joined_args = args.join(" ");
-    info!("Command line: cargo {}", &joined_args);
+    group_info!("Command line: cargo {}", &joined_args);
     let output = Command::new("cargo")
         .args(args)
         .output()
@@ -135,7 +135,7 @@ pub fn run_process_for_package(
 pub fn run_process_command(command: &mut Command, error: &str) -> anyhow::Result<()> {
     // Handle cargo child process
     let command_line = get_command_line_from_command(command);
-    info!("{command_line}\n");
+    group_info!("{command_line}\n");
     let process = command.spawn().expect(error);
     let error = format!(
         "{} process should run flawlessly",
@@ -152,7 +152,7 @@ pub fn run_command(
     child_error: &str,
 ) -> anyhow::Result<()> {
     // Format command
-    info!("{command} {}\n\n", args.join(" "));
+    group_info!("{command} {}\n\n", args.join(" "));
 
     // Run command as child process
     let command = Command::new(command)

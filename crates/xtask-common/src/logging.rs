@@ -55,6 +55,19 @@ macro_rules! group {
     };
 }
 
+#[macro_export]
+macro_rules! group_info {
+    // group_info!()
+    ($($arg:tt)*) => {
+        let title = format!($($arg)*);
+        if std::env::var("CI").is_ok() {
+            eprintln!("{}", title)
+        } else {
+            log!(log::Level::Info, "{}", title)
+        }
+    };
+}
+
 /// End Group Macro
 #[macro_export]
 macro_rules! endgroup {

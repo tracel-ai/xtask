@@ -46,11 +46,11 @@ pub fn init_xtask<C: Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     init_logger().init();
     let args = XtaskArgs::<C>::parse();
 
-    info!("Execution environment: {}", args.execution_environment);
+    group_info!("Execution environment: {}", args.execution_environment);
 
     // initialize code coverage
     if args.enable_coverage {
-        info!("Enabling coverage support...");
+        group_info!("Enabling coverage support...");
         setup_coverage()?;
     }
 
