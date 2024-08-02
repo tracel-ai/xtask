@@ -7,15 +7,11 @@ use anyhow::anyhow;
 use rand::Rng;
 use regex::Regex;
 
-use crate::{group_info, utils::get_command_line_from_command};
 use crate::{endgroup, group};
+use crate::{group_info, utils::get_command_line_from_command};
 
 /// Run a process
-pub fn run_process(
-    name: &str,
-    args: &Vec<&str>,
-    error_msg: &str,
-) -> anyhow::Result<()> {
+pub fn run_process(name: &str, args: &Vec<&str>, error_msg: &str) -> anyhow::Result<()> {
     let joined_args = args.join(" ");
     group_info!("Command line: {} {}", name, &joined_args);
     let status = Command::new(name).args(args).status().map_err(|e| {

@@ -1,10 +1,6 @@
 mod commands;
 
-#[macro_use]
-extern crate log;
-
-use std::time::Instant;
-use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_duration};
+use xtask_common::{anyhow, clap, commands::*, init_xtask};
 
 #[xtask_macros::commands(
     Build,
@@ -20,13 +16,11 @@ use xtask_common::{anyhow, clap, commands::*, init_xtask, utils::time::format_du
     Vulnerabilities
 )]
 pub enum Command {
-    /// Print a message
-    Foo,
+    /// Example of an additional command
+    Foo(commands::foo::FooCmdArgs),
 }
 
 fn main() -> anyhow::Result<()> {
-    let start = Instant::now();
-
     let args = init_xtask::<Command>()?;
     match args.command {
         // From common_xtask
@@ -43,17 +37,8 @@ fn main() -> anyhow::Result<()> {
         Command::Test(args) => test::handle_command(args),
         Command::Vulnerabilities(args) => vulnerabilities::handle_command(args),
 
-        // Implementation of new commands for your repository
-        Command::Foo => {
-            println!("Custom command foo");
-            Ok(())
-        }
+        // Implementation of a new command that is not part of xtask-common
+        Command::Foo(args) => commands::foo::handle_commands(args),
     }?;
-
-    let duration = start.elapsed();
-    info!(
-        "\x1B[32;1mTime elapsed for the current execution: {}\x1B[0m",
-        format_duration(&duration)
-    );
     Ok(())
 }

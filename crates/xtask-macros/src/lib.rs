@@ -37,7 +37,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Check",
         quote! {
-            #[doc = r"Run checks like formating, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
+            #[doc = r"Run checks like formatting, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
             Check(xtask_common::commands::check::CheckCmdArgs)
         },
     );

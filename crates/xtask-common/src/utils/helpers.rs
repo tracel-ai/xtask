@@ -24,11 +24,7 @@ pub fn custom_crates_tests(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Resu
         group!("Custom Tests: {}", *c);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        run_process(
-            "cargo",
-            &args,
-            &format!("Custom test failed for {}", *c),
-        )?;
+        run_process("cargo", &args, &format!("Custom test failed for {}", *c))?;
         endgroup!();
         Ok(())
     })

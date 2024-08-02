@@ -4,6 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-log = { workspace = true }
-xtask-common = { path = "../crates/xtask-common", version = "0.1.0" }
-xtask-macros = { path = "../crates/xtask-macros", version = "0.1.0" }
+xtask-common = { path = "../crates/xtask-common" }
+xtask-macros = { path = "../crates/xtask-macros" }

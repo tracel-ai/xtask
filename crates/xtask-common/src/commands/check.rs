@@ -36,9 +36,7 @@ pub enum CheckCommand {
 }
 
 pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
-    if args.target == Target::Workspace
-        && (!args.exclude.is_empty() || !args.only.is_empty())
-    {
+    if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
         warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
 
