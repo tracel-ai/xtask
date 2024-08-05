@@ -185,8 +185,10 @@ pub fn command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
                 if field_name == "target" {
                     let target_type = path.segments.last().unwrap().ident.to_string();
                     let target_field = field_map.get("target").unwrap().to_string();
-                    let replaced_target_field = target_field.replace("PLACEHOLDER", &target_type.to_string());
-                    fields.push(proc_macro2::TokenStream::from_str(&replaced_target_field).unwrap());
+                    let replaced_target_field =
+                        target_field.replace("PLACEHOLDER", &target_type.to_string());
+                    fields
+                        .push(proc_macro2::TokenStream::from_str(&replaced_target_field).unwrap());
                 } else if let Some(field) = field_map.get(field_name.as_str()) {
                     fields.push(field.clone());
                 } else {
@@ -228,4 +230,99 @@ pub fn command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
     TokenStream::from(expanded)
+}
+
+// Extend command arguments macros
+
+fn generate_command_arguments(
+    args: TokenStream,
+    input: TokenStream,
+    include_target: bool,
+) -> TokenStream {
+    let item = parse_macro_input!(input as ItemStruct);
+    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
+
+    if include_target {
+        if args.len() != 1 {
+            return TokenStream::from(quote! {
+                compile_error!("You must provide the Target type.")
+            });
+        }
+
+        let target_type = args.first().unwrap();
+        let target_type = if let Some(target_type_ident) = target_type.path().get_ident() {
+            quote! { #target_type_ident }
+        } else {
+            return TokenStream::from(quote! {
+                compile_error!("The first argument must be a type name without any module path.")
+            });
+        };
+
+        let expanded = quote! {
+            #[tracel_xtask_macros::command_arguments(target::#target_type, exclude, only)]
+            #item
+        };
+        TokenStream::from(expanded)
+    } else {
+        let expanded = quote! {
+            #[tracel_xtask_macros::command_arguments()]
+            #item
+        };
+        TokenStream::from(expanded)
+    }
+}
+
+#[proc_macro_attribute]
+pub fn build_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn bump_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, false)
+}
+
+#[proc_macro_attribute]
+pub fn check_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn compile_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn coverage_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, false)
+}
+
+#[proc_macro_attribute]
+pub fn dependencies_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, false)
+}
+
+#[proc_macro_attribute]
+pub fn doc_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn fix_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn publish_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, false)
+}
+
+#[proc_macro_attribute]
+pub fn test_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, true)
+}
+
+#[proc_macro_attribute]
+pub fn vulnerabilities_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_command_arguments(args, input, false)
 }

@@ -1,14 +1,13 @@
 use std::{env, process::Command, str};
 
 use anyhow::{anyhow, Ok};
-use clap::Args;
 
 use crate::{endgroup, group, utils::process::run_process};
 
 // Crates.io API token
 const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
 
-#[derive(Args, Clone)]
+#[tracel_xtask_macros::publish_command_arguments()]
 pub struct PublishCmdArgs {
     /// The name of the crate to publish on crates.io
     name: String,

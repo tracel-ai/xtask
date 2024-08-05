@@ -12,7 +12,7 @@ use crate::{
 
 use super::Profile;
 
-#[derive(Args, Clone)]
+#[tracel_xtask_macros::coverage_command_arguments()]
 pub struct CoverageCmdArgs {
     #[command(subcommand)]
     pub command: CoverageCommand,

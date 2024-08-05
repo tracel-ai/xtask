@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use anyhow::{anyhow, Ok};
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-#[derive(Args, Clone)]
+#[tracel_xtask_macros::vulnerabilities_command_arguments()]
 pub struct VulnerabilitiesCmdArgs {
     #[command(subcommand)]
     pub command: VulnerabilitiesCommand,

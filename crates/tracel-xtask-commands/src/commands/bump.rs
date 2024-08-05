@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
-#[derive(Args, Clone)]
+#[tracel_xtask_macros::bump_command_arguments()]
 pub struct BumpCmdArgs {
     #[command(subcommand)]
     pub command: BumpCommand,

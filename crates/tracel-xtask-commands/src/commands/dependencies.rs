@@ -1,5 +1,5 @@
 use anyhow::Ok;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-#[derive(Args, Clone)]
+#[tracel_xtask_macros::dependencies_command_arguments()]
 pub struct DependenciesCmdArgs {
     #[command(subcommand)]
     pub command: DependencyCommand,

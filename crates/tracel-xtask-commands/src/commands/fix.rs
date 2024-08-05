@@ -16,7 +16,7 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::command_arguments(target::Target, exclude, only)]
+#[tracel_xtask_macros::fix_command_arguments(Target)]
 pub struct FixCmdArgs {
     #[command(subcommand)]
     pub command: FixCommand,

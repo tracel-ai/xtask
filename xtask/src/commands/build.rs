@@ -1,38 +1,13 @@
 use strum::{Display, EnumIter, EnumString};
+use tracel_xtask_commands::clap::ValueEnum;
 use tracel_xtask_commands::commands::build::BuildCmdArgs;
 use tracel_xtask_commands::commands::Target;
 use tracel_xtask_commands::{anyhow, clap, declare_target};
-use tracel_xtask_commands::clap::ValueEnum;
 
 declare_target!(BuildTarget, Frontend);
 
-#[tracel_xtask_macros::command_arguments(target::BuildTarget, exclude, only)]
+#[tracel_xtask_macros::build_command_arguments(BuildTarget)]
 pub struct ExtendedBuildCmdArgs {}
-
-// #[derive(clap::Args, Clone)]
-// pub struct ExtendedBuildCmdArgs {
-//     #[doc = r"The target on which executing the command."]
-//     #[arg(short,long,value_enum,default_value_t = BuildTarget::Workspace)]
-//     pub target: BuildTarget,
-//     #[doc = r"Comma-separated list of excluded crates."]
-//     #[arg(
-//         short = 'x',
-//         long,
-//         value_name = "CRATE,CRATE,...",
-//         value_delimiter = ',',
-//         required = false
-//     )]
-//     pub exclude: Vec<String>,
-//     #[doc = r"Comma-separated list of crates to include exclusively."]
-//     #[arg(
-//         short = 'n',
-//         long,
-//         value_name = "CRATE,CRATE,...",
-//         value_delimiter = ',',
-//         required = false
-//     )]
-//     pub only: Vec<String>,
-// }
 
 impl std::convert::TryInto<BuildCmdArgs> for ExtendedBuildCmdArgs {
     type Error = anyhow::Error;
@@ -42,7 +17,9 @@ impl std::convert::TryInto<BuildCmdArgs> for ExtendedBuildCmdArgs {
             BuildTarget::Crates => Target::Crates,
             BuildTarget::Examples => Target::Examples,
             BuildTarget::Workspace => Target::Workspace,
-            BuildTarget::Frontend => return Err(anyhow::anyhow!("Frontend target is not supported.")),
+            BuildTarget::Frontend => {
+                return Err(anyhow::anyhow!("Frontend target is not supported."))
+            }
         };
         Ok(BuildCmdArgs {
             target,
