@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-xtask-common = { path = "../crates/xtask-common" }
-xtask-macros = { path = "../crates/xtask-macros" }
+strum = { workspace = true }
+log = { workspace = true }
+tracel-xtask-commands = { path = "../crates/tracel-xtask-commands" }
+tracel-xtask-macros = { path = "../crates/tracel-xtask-macros" }

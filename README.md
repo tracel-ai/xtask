@@ -22,12 +22,12 @@ echo '[dependencies]\nxtask-common = "*"\nxtask-macros = "*"' >> Cargo.toml
 cargo build
 ```
 
-In the `main.rs` file declare a `Command` struct and select the commands you want to use using `xtask_macros::commands` macro:
+In the `main.rs` file declare a `Command` struct and select the commands you want to use using `tracel_xtask_macros::commands` macro:
 
 ```rust
-use xtask_common::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
 
-#[xtask_macros::commands(
+#[tracel_xtask_macros::commands(
     Build,
     Check,
     Fix,
@@ -155,9 +155,9 @@ To add specific new commands, first add new variants to the `Command` enum:
 ```rust
 mod commands;
 
-use xtask_common::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
 
-#[xtask_macros::commands(
+#[tracel_xtask_macros::commands(
     Build,
     Check,
     Fix,
@@ -200,9 +200,9 @@ Note that `xtask-macros` provides a macro to easily add common arguments to the 
 exclusion of crates with `--exclusion` etc... In this case we will just add the `--target` argument:
 
 ```rust
-use xtask_common::{commands::Target, anyhow::{self, Ok}, clap};
+use tracel_xtask_commands::{commands::Target, anyhow::{self, Ok}, clap};
 
-#[xtask_macros::arguments(target)]
+#[tracel_xtask_macros::arguments(target::Target)]
 struct MyCommandCmdArgs {}
 ```
 
@@ -237,9 +237,9 @@ To extend the `build` command for instance we can just create a custom command c
 Then inside the `handle_command` function we can call the implement provided by `xtask-common` like so:
 
 ```rust
-pub fn handle_commands(mut args: xtask_common::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
+pub fn handle_commands(mut args: tracel_xtask_commands::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
     // do some stuff before like tweaking the arguments or performinig setup
-    xtask_common::commands::build::handle_command(args)?;
+    tracel_xtask_commands::commands::build::handle_command(args)?;
     // do some stuff after like cleaning state etc...
     Ok(())
 }
@@ -257,17 +257,17 @@ For instance we can extend the `build` command using the `Extend an existing xta
 build additional crates with custom features or build targets:
 
 ```rust
-pub fn handle_commands(mut args: xtask_common::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
+pub fn handle_commands(mut args: tracel_xtask_commands::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
     // regular execution of the build command
-    xtask_common::commands::build::handle_command(args)?;
+    tracel_xtask_commands::commands::build::handle_command(args)?;
 
     // additional crate builds
     // build 'my-crate' with all the features
-    xtask_common::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"])?;
+    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"])?;
     // build 'my-crate' with specific features
-    xtask_common::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"])?;
+    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"])?;
     // build 'my-crate' with a different target than the default one
-    xtask_common::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"])?;
+    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"])?;
     Ok(())
 }
 ```
@@ -317,7 +317,7 @@ jobs:
 
 ## Special command 'validate'
 
-The command `Validate` can been added via the macro `xtask_macros::commands`, this command has no implementations in `xtask_common` though.
+The command `Validate` can been added via the macro `tracel_xtask_macros::commands`, this command has no implementations in `xtask_common` though.
 
 This is a special command that you can implement in your repository to perform all the checks and tests needed to validate your code base.
 
@@ -325,19 +325,19 @@ Here is a simple example to perform all checks, build and test:
 
 ```rust
 pub fn handle_command() -> anyhow::Result<()> {
-    let target = xtask_common::commands::Target::Workspace;
+    let target = tracel_xtask_commands::commands::Target::Workspace;
     let exclude = vec![];
     let only = vec![];
     // checks
     [
-        xtask_common::commands::check::CheckCommand::Audit,
-        xtask_common::commands::check::CheckCommand::Format,
-        xtask_common::commands::check::CheckCommand::Lint,
-        xtask_common::commands::check::CheckCommand::Typos,
+        tracel_xtask_commands::commands::check::CheckCommand::Audit,
+        tracel_xtask_commands::commands::check::CheckCommand::Format,
+        tracel_xtask_commands::commands::check::CheckCommand::Lint,
+        tracel_xtask_commands::commands::check::CheckCommand::Typos,
     ]
     .iter()
     .try_for_each(|c| {
-        xtask_common::commands::check::handle_command(xtask_common::commands::check::CheckCmdArgs {
+        tracel_xtask_commands::commands::check::handle_command(tracel_xtask_commands::commands::check::CheckCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
@@ -346,8 +346,8 @@ pub fn handle_command() -> anyhow::Result<()> {
     })?;
 
     // build
-    xtask_common::commands::build::handle_command(
-        xtask_common::commands::build::BuildCmdArgs {
+    tracel_xtask_commands::commands::build::handle_command(
+        tracel_xtask_commands::commands::build::BuildCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
@@ -355,12 +355,12 @@ pub fn handle_command() -> anyhow::Result<()> {
     )?;
 
     // tests
-    xtask_common::commands::test::handle_command(
-        xtask_common::commands::test::TestCmdArgs {
+    tracel_xtask_commands::commands::test::handle_command(
+        tracel_xtask_commands::commands::test::TestCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
-            command: xtask_common::commands::test::TestCommand::All,
+            command: tracel_xtask_commands::commands::test::TestCommand::All,
         },
     )?;
 }

@@ -1,8 +1,7 @@
 extern crate proc_macro;
-
 use proc_macro::TokenStream;
 use quote::quote;
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use syn::{parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta};
 
 #[proc_macro_attribute]
@@ -17,70 +16,70 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Build",
         quote! {
             #[doc = r"Build the code."]
-            Build(xtask_common::commands::build::BuildCmdArgs)
+            Build(tracel_xtask_commands::commands::build::BuildCmdArgs)
         },
     );
     variant_map.insert(
         "Bump",
         quote! {
             #[doc = r"Bump the version of all crates to be published."]
-            Bump(xtask_common::commands::bump::BumpCmdArgs)
+            Bump(tracel_xtask_commands::commands::bump::BumpCmdArgs)
         },
     );
     variant_map.insert(
         "Fix",
         quote! {
             #[doc = r"Fix issues found with the 'check' command."]
-            Fix(xtask_common::commands::fix::FixCmdArgs)
+            Fix(tracel_xtask_commands::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(
         "Check",
         quote! {
             #[doc = r"Run checks like formatting, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
-            Check(xtask_common::commands::check::CheckCmdArgs)
+            Check(tracel_xtask_commands::commands::check::CheckCmdArgs)
         },
     );
     variant_map.insert(
         "Compile",
         quote! {
             #[doc = r"Compile check the code (does not write binaries to disk)."]
-            Compile(xtask_common::commands::compile::CompileCmdArgs)
+            Compile(tracel_xtask_commands::commands::compile::CompileCmdArgs)
         },
     );
     variant_map.insert(
         "Coverage",
         quote! {
             #[doc = r"Install and run coverage tools."]
-            Coverage(xtask_common::commands::coverage::CoverageCmdArgs)
+            Coverage(tracel_xtask_commands::commands::coverage::CoverageCmdArgs)
         },
     );
     variant_map.insert(
         "Doc",
         quote! {
             #[doc = r"Build documentation."]
-            Doc(xtask_common::commands::doc::DocCmdArgs)
+            Doc(tracel_xtask_commands::commands::doc::DocCmdArgs)
         },
     );
     variant_map.insert(
         "Dependencies",
         quote! {
             #[doc = r"Run the specified dependencies check locally."]
-            Dependencies(xtask_common::commands::dependencies::DependenciesCmdArgs)
+            Dependencies(tracel_xtask_commands::commands::dependencies::DependenciesCmdArgs)
         },
     );
     variant_map.insert(
         "Publish",
         quote! {
             #[doc = r"Publish a crate to crates.io."]
-            Publish(xtask_common::commands::publish::PublishCmdArgs)
+            Publish(tracel_xtask_commands::commands::publish::PublishCmdArgs)
         },
     );
     variant_map.insert(
         "Test",
         quote! {
             #[doc = r"Runs tests."]
-            Test(xtask_common::commands::test::TestCmdArgs)
+            Test(tracel_xtask_commands::commands::test::TestCmdArgs)
         },
     );
     variant_map.insert(
@@ -92,7 +91,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     );
     variant_map.insert("Vulnerabilities", quote! {
         #[doc = r"Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'."]
-        Vulnerabilities(xtask_common::commands::vulnerabilities::VulnerabilitiesCmdArgs)
+        Vulnerabilities(tracel_xtask_commands::commands::vulnerabilities::VulnerabilitiesCmdArgs)
     });
 
     // Generate the corresponding enum variant
@@ -135,7 +134,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
 
@@ -144,8 +143,8 @@ pub fn arguments(args: TokenStream, input: TokenStream) -> TokenStream {
         "target",
         quote! {
             #[doc = r"The target on which executing the command."]
-            #[arg(short, long, value_enum, default_value_t = Target::Workspace)]
-            pub target: Target
+            #[arg(short, long, value_enum, default_value_t = PLACEHOLDER::Workspace)]
+            pub target: PLACEHOLDER
         },
     );
     field_map.insert(
@@ -178,16 +177,22 @@ pub fn arguments(args: TokenStream, input: TokenStream) -> TokenStream {
     );
 
     let mut fields = vec![];
+
     for arg in args {
         if let Meta::Path(path) = arg {
-            if let Some(ident) = path.get_ident() {
-                let ident_string = ident.to_string();
-                if let Some(field) = field_map.get(ident_string.as_str()) {
+            if let Some(first_segment) = path.segments.first() {
+                let field_name = first_segment.ident.to_string();
+                if field_name == "target" {
+                    let target_type = path.segments.last().unwrap().ident.to_string();
+                    let target_field = field_map.get("target").unwrap().to_string();
+                    let replaced_target_field = target_field.replace("PLACEHOLDER", &target_type.to_string());
+                    fields.push(proc_macro2::TokenStream::from_str(&replaced_target_field).unwrap());
+                } else if let Some(field) = field_map.get(field_name.as_str()) {
                     fields.push(field.clone());
                 } else {
                     let err_msg = format!(
                         "Unknown argument: {}\nPossible arguments are:\n  {}",
-                        ident_string,
+                        field_name,
                         field_map
                             .keys()
                             .cloned()
@@ -215,7 +220,6 @@ pub fn arguments(args: TokenStream, input: TokenStream) -> TokenStream {
             #vis #ident: #ty
         }
     });
-
     let expanded = quote! {
         #[derive(clap::Args, Clone)]
         pub struct #struct_name {

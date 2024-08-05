@@ -3,19 +3,24 @@ pub mod logging;
 pub mod utils;
 mod versions;
 
+#[macro_use]
+pub mod macros;
+
 // re-exports
 pub use anyhow;
 pub use clap;
-use clap::{Parser, Subcommand, ValueEnum};
+pub use clap::{Parser, Subcommand, ValueEnum};
 pub use derive_more;
 pub use env_logger;
 pub use rand;
 pub use serde_json;
-pub use strum;
-use strum::{Display, EnumIter, EnumString};
 pub use tracing_subscriber;
 
 use crate::logging::init_logger;
+
+// does not re-export strum has it is incompatible with strum macros expansions
+use strum;
+use strum::{Display, EnumIter, EnumString};
 
 #[macro_use]
 extern crate log;

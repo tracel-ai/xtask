@@ -13,7 +13,7 @@ use crate::{
 
 use super::Target;
 
-#[xtask_macros::arguments(target, exclude, only)]
+#[tracel_xtask_macros::command_arguments(target::Target, exclude, only)]
 pub struct TestCmdArgs {
     #[command(subcommand)]
     pub command: TestCommand,

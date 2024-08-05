@@ -16,7 +16,7 @@ use crate::{
 
 use super::Target;
 
-#[xtask_macros::arguments(target, exclude, only)]
+#[tracel_xtask_macros::command_arguments(target::Target, exclude, only)]
 pub struct FixCmdArgs {
     #[command(subcommand)]
     pub command: FixCommand,
@@ -38,7 +38,10 @@ pub enum FixCommand {
 }
 
 pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
-    if answer.is_none() && args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+    if answer.is_none()
+        && args.target == Target::Workspace
+        && (!args.exclude.is_empty() || !args.only.is_empty())
+    {
         warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
     match args.command {

@@ -1,9 +1,8 @@
 mod commands;
 
-use xtask_common::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
 
-#[xtask_macros::commands(
-    Build,
+#[tracel_xtask_macros::commands(
     Bump,
     Check,
     Compile,
@@ -18,6 +17,8 @@ use xtask_common::{anyhow, clap, commands::*, init_xtask};
 pub enum Command {
     /// Example of an additional command
     Foo(commands::foo::FooCmdArgs),
+    /// Extended Build command
+    Build(commands::build::ExtendedBuildCmdArgs),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -25,7 +26,7 @@ fn main() -> anyhow::Result<()> {
     match args.command {
         // From common_xtask
         // You can easily insert specific pre-processing for each command if required by your repository
-        Command::Build(args) => build::handle_command(args),
+        Command::Build(args) => commands::build::handle_command(args),
         Command::Bump(args) => bump::handle_command(args),
         Command::Check(args) => check::handle_command(args),
         Command::Compile(args) => compile::handle_command(args),
