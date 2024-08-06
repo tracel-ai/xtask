@@ -1,8 +1,7 @@
-use std::process::Command;
-
 use anyhow::{anyhow, Ok};
 use clap::Subcommand;
 use strum::{Display, EnumIter, EnumString};
+use std::process::Command as StdCommand;
 
 use crate::{
     commands::CARGO_NIGHTLY_MSG,
@@ -14,7 +13,7 @@ use crate::{
     },
 };
 
-#[tracel_xtask_macros::vulnerabilities_command_arguments()]
+#[tracel_xtask_macros::command_args()]
 pub struct VulnerabilitiesCmdArgs {
     #[command(subcommand)]
     pub command: VulnerabilitiesCommand,
@@ -162,7 +161,7 @@ impl Sanitizer {
                 let features = self.cargo_features();
                 let mut args = vec!["test", "--", "--color=always", "--no-capture"];
                 args.extend(features);
-                let status = Command::new("cargo")
+                let status = StdCommand::new("cargo")
                     .args(&args)
                     .envs(envs)
                     .status()

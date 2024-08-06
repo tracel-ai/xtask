@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 use syn::{parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta};
 
 #[proc_macro_attribute]
@@ -133,85 +133,16 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_attribute]
-pub fn command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
+// Extend command arguments macros
+
+fn generate_command_args_struct(
+    args: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
 
-    let mut field_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
-    field_map.insert(
-        "target",
-        quote! {
-            #[doc = r"The target on which executing the command."]
-            #[arg(short, long, value_enum, default_value_t = PLACEHOLDER::Workspace)]
-            pub target: PLACEHOLDER
-        },
-    );
-    field_map.insert(
-        "exclude",
-        quote! {
-            #[doc = r"Comma-separated list of excluded crates."]
-            #[arg(
-                short = 'x',
-                long,
-                value_name = "CRATE,CRATE,...",
-                value_delimiter = ',',
-                required = false
-            )]
-            pub exclude: Vec<String>
-        },
-    );
-    field_map.insert(
-        "only",
-        quote! {
-            #[doc = r"Comma-separated list of crates to include exclusively."]
-            #[arg(
-                short = 'n',
-                long,
-                value_name = "CRATE,CRATE,...",
-                value_delimiter = ',',
-                required = false
-            )]
-            pub only: Vec<String>
-        },
-    );
-
-    let mut fields = vec![];
-
-    for arg in args {
-        if let Meta::Path(path) = arg {
-            if let Some(first_segment) = path.segments.first() {
-                let field_name = first_segment.ident.to_string();
-                if field_name == "target" {
-                    let target_type = path.segments.last().unwrap().ident.to_string();
-                    let target_field = field_map.get("target").unwrap().to_string();
-                    let replaced_target_field =
-                        target_field.replace("PLACEHOLDER", &target_type.to_string());
-                    fields
-                        .push(proc_macro2::TokenStream::from_str(&replaced_target_field).unwrap());
-                } else if let Some(field) = field_map.get(field_name.as_str()) {
-                    fields.push(field.clone());
-                } else {
-                    let err_msg = format!(
-                        "Unknown argument: {}\nPossible arguments are:\n  {}",
-                        field_name,
-                        field_map
-                            .keys()
-                            .cloned()
-                            .collect::<Vec<&str>>()
-                            .join("\n  "),
-                    );
-                    return TokenStream::from(quote! {
-                        compile_error!(#err_msg);
-                    });
-                }
-            }
-        }
-    }
-
     let struct_name = &item.ident;
-    // we quote each componnets of each field manually to avoid
-    // having the wrapping curly braces of the struct
     let original_fields = item.fields.iter().map(|f| {
         let attrs = &f.attrs;
         let vis = &f.vis;
@@ -222,107 +153,116 @@ pub fn command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
             #vis #ident: #ty
         }
     });
-    let expanded = quote! {
-        #[derive(clap::Args, Clone)]
-        pub struct #struct_name {
-            #(#fields,)*
-            #(#original_fields,)*
-        }
-    };
-    TokenStream::from(expanded)
-}
 
-// Extend command arguments macros
-
-fn generate_command_arguments(
-    args: TokenStream,
-    input: TokenStream,
-    include_target: bool,
-) -> TokenStream {
-    let item = parse_macro_input!(input as ItemStruct);
-    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
-
-    if include_target {
-        if args.len() != 1 {
-            return TokenStream::from(quote! {
-                compile_error!("You must provide the Target type.")
-            });
-        }
-
-        let target_type = args.first().unwrap();
-        let target_type = if let Some(target_type_ident) = target_type.path().get_ident() {
-            quote! { #target_type_ident }
+    if !args.is_empty() {
+        let target_type = if args.len() == 1 {
+            args.get(0).unwrap()
+        } else if args.len() == 2 {
+            args.get(1).unwrap()
         } else {
             return TokenStream::from(quote! {
-                compile_error!("The first argument must be a type name without any module path.")
-            });
+                compile_error!("Cannot find target type in args_struct.");
+            })
         };
+        let target_type = quote! { #target_type };
 
-        let expanded = quote! {
-            #[tracel_xtask_macros::command_arguments(target::#target_type, exclude, only)]
-            #item
+        let output = quote! {
+            #[derive(clap::Args, Clone)]
+            pub struct #struct_name {
+                #[doc = r"The target on which executing the command."]
+                #[arg(short, long, value_enum, default_value_t = #target_type::Workspace)]
+                pub target: #target_type,
+                #[doc = r"Comma-separated list of excluded crates."]
+                #[arg(
+                    short = 'x',
+                    long,
+                    value_name = "CRATE,CRATE,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub exclude: Vec<String>,
+                #[doc = r"Comma-separated list of crates to include exclusively."]
+                #[arg(
+                    short = 'n',
+                    long,
+                    value_name = "CRATE,CRATE,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub only: Vec<String>,
+                #(#original_fields,)*
+            }
         };
-        TokenStream::from(expanded)
+        TokenStream::from(output)
     } else {
-        let expanded = quote! {
-            #[tracel_xtask_macros::command_arguments()]
-            #item
+        let output = quote! {
+            #[derive(clap::Args, Clone)]
+            pub struct #struct_name {
+                #(#original_fields,)*
+            }
         };
-        TokenStream::from(expanded)
+        TokenStream::from(output)
     }
 }
 
-#[proc_macro_attribute]
-pub fn build_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
+fn generate_command_args_tryinto(
+    args: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
+    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
+    let base_type = args.get(0).unwrap();
+    let item = parse_macro_input!(input as ItemStruct);
+    let item_ident = &item.ident;
+    let has_target = item.fields.iter().any(|f| {
+        if let Some(ident) = &f.ident {
+            "target" == ident.to_string()
+        } else {
+            false
+        }
+    });
+
+    // expand
+    let target = if has_target {
+        quote! {
+            target: self.target.try_into()?
+        }
+    } else {
+        quote! {}
+    };
+    let fields: Vec<_> = item.fields.iter().filter_map(|f| {
+        f.ident.as_ref().map(|ident| {
+            let ident_str = ident.to_string();
+            if ident_str != "target" {
+                quote! { #ident: self.#ident }
+            } else {
+                quote! {}
+            }
+        })
+    }).collect();
+
+    let tryinto = quote! {
+        impl std::convert::TryInto<#base_type> for #item_ident {
+            type Error = anyhow::Error;
+            fn try_into(self) -> Result<#base_type, Self::Error> {
+                Ok(#base_type {
+                    #target
+                    #(#fields,)*
+                })
+            }
+        }
+    };
+    TokenStream::from(tryinto)
 }
 
 #[proc_macro_attribute]
-pub fn bump_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, false)
+pub fn command_args(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut output = generate_command_args_struct(args.clone(), input);
+    let args_clone = args.clone();
+    let parsed_args = parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
+    if parsed_args.len() == 2 {
+        let tryinto = generate_command_args_tryinto(args, output.clone());
+        output.extend(TokenStream::from(tryinto));
+    }
+    output
 }
 
-#[proc_macro_attribute]
-pub fn check_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
-}
-
-#[proc_macro_attribute]
-pub fn compile_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
-}
-
-#[proc_macro_attribute]
-pub fn coverage_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, false)
-}
-
-#[proc_macro_attribute]
-pub fn dependencies_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, false)
-}
-
-#[proc_macro_attribute]
-pub fn doc_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
-}
-
-#[proc_macro_attribute]
-pub fn fix_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
-}
-
-#[proc_macro_attribute]
-pub fn publish_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, false)
-}
-
-#[proc_macro_attribute]
-pub fn test_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, true)
-}
-
-#[proc_macro_attribute]
-pub fn vulnerabilities_command_arguments(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_command_arguments(args, input, false)
-}

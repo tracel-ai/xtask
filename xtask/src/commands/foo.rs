@@ -4,7 +4,7 @@ use tracel_xtask_commands::{
     commands::Target,
 };
 
-#[tracel_xtask_macros::command_arguments(target::Target)]
+#[tracel_xtask_macros::command_args(Target)]
 struct FooCmdArgs {}
 
 pub fn handle_commands(args: FooCmdArgs) -> anyhow::Result<()> {

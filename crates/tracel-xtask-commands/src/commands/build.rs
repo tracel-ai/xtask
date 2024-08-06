@@ -12,7 +12,7 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::build_command_arguments(Target)]
+#[tracel_xtask_macros::command_args(Target)]
 pub struct BuildCmdArgs {}
 
 pub fn handle_command(args: BuildCmdArgs) -> anyhow::Result<()> {

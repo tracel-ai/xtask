@@ -14,7 +14,7 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::check_command_arguments(Target)]
+#[tracel_xtask_macros::command_args(Target)]
 pub struct CheckCmdArgs {
     #[command(subcommand)]
     pub command: CheckCommand,

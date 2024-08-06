@@ -7,7 +7,7 @@ use crate::{
     utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
-#[tracel_xtask_macros::bump_command_arguments()]
+#[tracel_xtask_macros::command_args()]
 pub struct BumpCmdArgs {
     #[command(subcommand)]
     pub command: BumpCommand,

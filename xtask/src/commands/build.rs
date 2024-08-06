@@ -6,28 +6,27 @@ use tracel_xtask_commands::{anyhow, clap, declare_target};
 
 declare_target!(BuildTarget, Frontend);
 
-#[tracel_xtask_macros::build_command_arguments(BuildTarget)]
+
+// #[tracel_xtask_macros::target()]
+// pub enum BuildTarget {
+//     /// Target the frontend.
+//     Frontend,
+// }
+
+#[tracel_xtask_macros::command_args(BuildCmdArgs, BuildTarget)]
 pub struct ExtendedBuildCmdArgs {}
 
-impl std::convert::TryInto<BuildCmdArgs> for ExtendedBuildCmdArgs {
-    type Error = anyhow::Error;
-    fn try_into(self) -> Result<BuildCmdArgs, Self::Error> {
-        let target = match self.target {
-            BuildTarget::AllPackages => Target::AllPackages,
-            BuildTarget::Crates => Target::Crates,
-            BuildTarget::Examples => Target::Examples,
-            BuildTarget::Workspace => Target::Workspace,
-            BuildTarget::Frontend => {
-                return Err(anyhow::anyhow!("Frontend target is not supported."))
-            }
-        };
-        Ok(BuildCmdArgs {
-            target,
-            exclude: self.exclude,
-            only: self.only,
-        })
-    }
-}
+// impl std::convert::TryInto<BuildCmdArgs> for ExtendedBuildCmdArgs {
+//     type Error = anyhow::Error;
+//     fn try_into(self) -> Result<BuildCmdArgs, Self::Error> {
+//         let target = self.target.try_into()?;
+//         Ok(BuildCmdArgs {
+//             target,
+//             exclude: self.exclude,
+//             only: self.only,
+//         })
+//     }
+// }
 
 pub fn handle_command(args: ExtendedBuildCmdArgs) -> anyhow::Result<()> {
     match args.target {

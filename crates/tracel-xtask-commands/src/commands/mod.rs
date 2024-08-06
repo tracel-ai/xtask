@@ -21,7 +21,7 @@ pub const WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS: &str =
 pub const WARN_IGNORED_ONLY_ARGS: &str =
     "--target workspace ignores the arguments --only. Use --target all-packages instead.";
 
-declare_target!(Target);
+declare_target!(Target, no_try_into);
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]

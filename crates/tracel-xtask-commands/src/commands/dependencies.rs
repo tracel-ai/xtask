@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-#[tracel_xtask_macros::dependencies_command_arguments()]
+#[tracel_xtask_macros::command_args()]
 pub struct DependenciesCmdArgs {
     #[command(subcommand)]
     pub command: DependencyCommand,
