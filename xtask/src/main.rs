@@ -1,8 +1,8 @@
 mod commands;
 
-use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask_commands::prelude::*;
 
-#[tracel_xtask_macros::commands(
+#[macros::commands(
     Bump,
     Check,
     Compile,
@@ -27,16 +27,16 @@ fn main() -> anyhow::Result<()> {
         // From common_xtask
         // You can easily insert specific pre-processing for each command if required by your repository
         Command::Build(args) => commands::build::handle_command(args),
-        Command::Bump(args) => bump::handle_command(args),
-        Command::Check(args) => check::handle_command(args),
-        Command::Compile(args) => compile::handle_command(args),
-        Command::Coverage(args) => coverage::handle_command(args),
-        Command::Dependencies(args) => dependencies::handle_command(args),
-        Command::Doc(args) => doc::handle_command(args),
-        Command::Fix(args) => fix::handle_command(args, None),
-        Command::Publish(args) => publish::handle_command(args),
-        Command::Test(args) => test::handle_command(args),
-        Command::Vulnerabilities(args) => vulnerabilities::handle_command(args),
+        Command::Bump(args) => base_commands::bump::handle_command(args),
+        Command::Check(args) => base_commands::check::handle_command(args),
+        Command::Compile(args) => base_commands::compile::handle_command(args),
+        Command::Coverage(args) => base_commands::coverage::handle_command(args),
+        Command::Dependencies(args) => base_commands::dependencies::handle_command(args),
+        Command::Doc(args) => base_commands::doc::handle_command(args),
+        Command::Fix(args) => base_commands::fix::handle_command(args, None),
+        Command::Publish(args) => base_commands::publish::handle_command(args),
+        Command::Test(args) => base_commands::test::handle_command(args),
+        Command::Vulnerabilities(args) => base_commands::vulnerabilities::handle_command(args),
 
         // Implementation of a new command that is not part of xtask-common
         Command::Foo(args) => commands::foo::handle_commands(args),

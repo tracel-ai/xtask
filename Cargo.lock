@@ -895,7 +895,6 @@ dependencies = [
  "log",
  "strum",
  "tracel-xtask-commands",
- "tracel-xtask-macros",
 ]
 
 [[package]]

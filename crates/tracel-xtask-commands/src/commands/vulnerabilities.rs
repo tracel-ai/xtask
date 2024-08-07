@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-#[tracel_xtask_macros::command_args()]
+#[tracel_xtask_macros::declare_command_args]
 pub struct VulnerabilitiesCmdArgs {
     #[command(subcommand)]
     pub command: VulnerabilitiesCommand,

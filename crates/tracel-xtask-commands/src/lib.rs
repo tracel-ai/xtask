@@ -3,18 +3,39 @@ pub mod logging;
 pub mod utils;
 mod versions;
 
-#[macro_use]
-pub mod macros;
-
 // re-exports
-pub use anyhow;
-pub use clap;
-pub use clap::{Parser, Subcommand, ValueEnum};
-pub use derive_more;
-pub use env_logger;
-pub use rand;
-pub use serde_json;
-pub use tracing_subscriber;
+pub mod prelude {
+    pub use anyhow;
+    pub use clap;
+    pub use derive_more;
+    pub use env_logger;
+    pub use rand;
+    pub use serde_json;
+    pub use tracing_subscriber;
+
+    pub mod macros {
+        pub use tracel_xtask_macros::commands;
+        pub use tracel_xtask_macros::declare_command_args;
+        pub use tracel_xtask_macros::extend_command_args;
+        pub use tracel_xtask_macros::extend_targets;
+    }
+
+    pub use crate::init_xtask;
+    pub use crate::commands as base_commands;
+    pub use crate::commands::build::BuildCmdArgs;
+    pub use crate::commands::bump::BumpCmdArgs;
+    pub use crate::commands::check::CheckCmdArgs;
+    pub use crate::commands::compile::CompileCmdArgs;
+    pub use crate::commands::coverage::CoverageCmdArgs;
+    pub use crate::commands::dependencies::DependenciesCmdArgs;
+    pub use crate::commands::doc::DocCmdArgs;
+    pub use crate::commands::fix::FixCmdArgs;
+    pub use crate::commands::publish::PublishCmdArgs;
+    pub use crate::commands::test::TestCmdArgs;
+    pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
+    pub use crate::commands::Target;
+
+}
 
 use crate::logging::init_logger;
 
@@ -25,7 +46,7 @@ use strum::{Display, EnumIter, EnumString};
 #[macro_use]
 extern crate log;
 
-#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
+#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum ExecutionEnvironment {
     #[strum(to_string = "no-std")]
@@ -34,9 +55,9 @@ pub enum ExecutionEnvironment {
     Std,
 }
 
-#[derive(Parser)]
+#[derive(clap::Parser)]
 #[command(author, version, about, long_about = None)]
-pub struct XtaskArgs<C: Subcommand> {
+pub struct XtaskArgs<C: clap::Subcommand> {
     /// Enable code coverage.
     #[arg(short = 'c', long)]
     pub enable_coverage: bool,
@@ -47,9 +68,9 @@ pub struct XtaskArgs<C: Subcommand> {
     pub command: C,
 }
 
-pub fn init_xtask<C: Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
+pub fn init_xtask<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     init_logger().init();
-    let args = XtaskArgs::<C>::parse();
+    let args = <XtaskArgs::<C> as clap::Parser>::parse();
 
     group_info!("Execution environment: {}", args.execution_environment);
 

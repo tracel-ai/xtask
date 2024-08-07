@@ -12,7 +12,7 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::command_args(Target)]
+#[tracel_xtask_macros::declare_command_args(Target)]
 pub struct CompileCmdArgs {}
 
 pub fn handle_command(args: CompileCmdArgs) -> anyhow::Result<()> {
@@ -26,7 +26,7 @@ pub(crate) fn run_compile(
     target: &Target,
     excluded: &Vec<String>,
     only: &Vec<String>,
-) -> std::prelude::v1::Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Compile Workspace");

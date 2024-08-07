@@ -1,10 +1,6 @@
-use tracel_xtask_commands::{
-    anyhow::{self, Ok},
-    clap,
-    commands::Target,
-};
+use tracel_xtask_commands::prelude::*;
 
-#[tracel_xtask_macros::command_args(Target)]
+#[macros::declare_command_args(Target)]
 struct FooCmdArgs {}
 
 pub fn handle_commands(args: FooCmdArgs) -> anyhow::Result<()> {

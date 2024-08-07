@@ -7,4 +7,3 @@ edition = "2021"
 strum = { workspace = true }
 log = { workspace = true }
 tracel-xtask-commands = { path = "../crates/tracel-xtask-commands" }
-tracel-xtask-macros = { path = "../crates/tracel-xtask-macros" }

@@ -7,7 +7,7 @@ use crate::{endgroup, group, utils::process::run_process};
 // Crates.io API token
 const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
 
-#[tracel_xtask_macros::command_args()]
+#[tracel_xtask_macros::declare_command_args]
 pub struct PublishCmdArgs {
     /// The name of the crate to publish on crates.io
     name: String,

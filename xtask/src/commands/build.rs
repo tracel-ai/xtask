@@ -1,27 +1,45 @@
-use strum::{Display, EnumIter, EnumString};
-use tracel_xtask_commands::clap::ValueEnum;
-use tracel_xtask_commands::commands::build::BuildCmdArgs;
-use tracel_xtask_commands::commands::Target;
-use tracel_xtask_commands::{anyhow, clap, declare_target};
+use tracel_xtask_commands::prelude::*;
 
-declare_target!(BuildTarget, Frontend);
+// declare_target!(BuildTarget, Frontend);
 
+#[macros::extend_targets]
+pub enum BuildTarget {
+    /// Target the frontend.
+    Frontend,
+}
 
-// #[tracel_xtask_macros::target()]
-// pub enum BuildTarget {
-//     /// Target the frontend.
-//     Frontend,
-// }
-
-#[tracel_xtask_macros::command_args(BuildCmdArgs, BuildTarget)]
+#[macros::extend_command_args(BuildCmdArgs, BuildTarget)]
 pub struct ExtendedBuildCmdArgs {}
 
+// #[derive(clap::Args, Clone)]
+// pub struct ExtendedBuildCmdArgs {
+//     #[doc = r"The target on which executing the command."]
+//     #[arg(short,long,value_enum,default_value_t = BuildTarget::Workspace)]
+//     pub target: BuildTarget,
+//     #[doc = r"Comma-separated list of excluded crates."]
+//     #[arg(
+//         short = 'x',
+//         long,
+//         value_name = "CRATE,CRATE,...",
+//         value_delimiter = ',',
+//         required = false
+//     )]
+//     pub exclude: Vec<String>,
+//     #[doc = r"Comma-separated list of crates to include exclusively."]
+//     #[arg(
+//         short = 'n',
+//         long,
+//         value_name = "CRATE,CRATE,...",
+//         value_delimiter = ',',
+//         required = false
+//     )]
+//     pub only: Vec<String>,
+// }
 // impl std::convert::TryInto<BuildCmdArgs> for ExtendedBuildCmdArgs {
 //     type Error = anyhow::Error;
 //     fn try_into(self) -> Result<BuildCmdArgs, Self::Error> {
-//         let target = self.target.try_into()?;
 //         Ok(BuildCmdArgs {
-//             target,
+//             target: self.target.try_into()?,
 //             exclude: self.exclude,
 //             only: self.only,
 //         })

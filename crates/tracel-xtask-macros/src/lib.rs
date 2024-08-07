@@ -4,6 +4,9 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta};
 
+// Commands
+// ========
+
 #[proc_macro_attribute]
 pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
@@ -133,7 +136,8 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-// Extend command arguments macros
+// Command arguments
+// =================
 
 fn generate_command_args_struct(
     args: TokenStream,
@@ -154,7 +158,15 @@ fn generate_command_args_struct(
         }
     });
 
-    if !args.is_empty() {
+    if args.is_empty() {
+        let output = quote! {
+            #[derive(clap::Args, Clone)]
+            pub struct #struct_name {
+                #(#original_fields,)*
+            }
+        };
+        TokenStream::from(output)
+    } else {
         let target_type = if args.len() == 1 {
             args.get(0).unwrap()
         } else if args.len() == 2 {
@@ -190,14 +202,6 @@ fn generate_command_args_struct(
                     required = false
                 )]
                 pub only: Vec<String>,
-                #(#original_fields,)*
-            }
-        };
-        TokenStream::from(output)
-    } else {
-        let output = quote! {
-            #[derive(clap::Args, Clone)]
-            pub struct #struct_name {
                 #(#original_fields,)*
             }
         };
@@ -255,14 +259,87 @@ fn generate_command_args_tryinto(
 }
 
 #[proc_macro_attribute]
-pub fn command_args(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut output = generate_command_args_struct(args.clone(), input);
+pub fn declare_command_args(args: TokenStream, input: TokenStream) -> TokenStream {
     let args_clone = args.clone();
     let parsed_args = parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
-    if parsed_args.len() == 2 {
-        let tryinto = generate_command_args_tryinto(args, output.clone());
-        output.extend(TokenStream::from(tryinto));
+    if parsed_args.len() < 2 {
+        generate_command_args_struct(args, input)
+    } else {
+        TokenStream::from(quote! {
+            compile_error!("declare_commands_args macro takes at most 1 argument with is the target type.");
+        })
     }
+}
+
+#[proc_macro_attribute]
+pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args_clone = args.clone();
+    let parsed_args = parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
+    if parsed_args.len() != 2 {
+        return TokenStream::from(quote! {
+            compile_error!("extend_command_args takes two arguments.\n"
+                           "First argument is the base commands arguments struct name.\n"
+                           "Second argument is the type of target enum.");
+        })
+    }
+    let mut output = generate_command_args_struct(args.clone(), input);
+    let tryinto = generate_command_args_tryinto(args, output.clone());
+    output.extend(TokenStream::from(tryinto));
+    output
+}
+
+// Targets
+// =======
+
+fn generate_target_enum(input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemEnum);
+    let enum_name = &item.ident;
+    let original_variants = &item.variants;
+
+    let output = quote! {
+        #[derive(strum::EnumString, strum::EnumIter, Default, strum::Display, Clone, PartialEq, clap::ValueEnum)]
+        #[strum(serialize_all = "lowercase")]
+        pub enum #enum_name {
+            AllPackages,
+            Crates,
+            Examples,
+            #[default]
+            Workspace,
+            #original_variants
+        }
+    };
+    TokenStream::from(output)
+}
+
+fn generate_target_tryinto(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemEnum);
+    let item_ident = &item.ident;
+    let tryinto = quote! {
+        impl std::convert::TryInto<tracel_xtask_commands::commands::Target> for #item_ident {
+            type Error = anyhow::Error;
+            fn try_into(self) -> Result<tracel_xtask_commands::commands::Target, Self::Error> {
+                match self {
+                    #item_ident::AllPackages => Ok(tracel_xtask_commands::commands::Target::AllPackages),
+                    #item_ident::Crates => Ok(tracel_xtask_commands::commands::Target::Crates),
+                    #item_ident::Examples => Ok(tracel_xtask_commands::commands::Target::Examples),
+                    #item_ident::Workspace => Ok(tracel_xtask_commands::commands::Target::Workspace),
+                    _ => Err(anyhow::anyhow!("{} target is not supported.", self))
+                }
+            }
+        }
+    };
+    TokenStream::from(tryinto)
+}
+
+#[proc_macro_attribute]
+pub fn declare_targets(_args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_target_enum(input)
+}
+
+#[proc_macro_attribute]
+pub fn extend_targets(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut output = generate_target_enum(input);
+    output.extend(generate_target_tryinto(args, output.clone()));
     output
 }
 

@@ -10,7 +10,7 @@ pub mod publish;
 pub mod test;
 pub mod vulnerabilities;
 
-use crate::declare_target;
+// use crate::declare_target;
 use clap::ValueEnum;
 use strum::{Display, EnumIter, EnumString};
 
@@ -21,7 +21,8 @@ pub const WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS: &str =
 pub const WARN_IGNORED_ONLY_ARGS: &str =
     "--target workspace ignores the arguments --only. Use --target all-packages instead.";
 
-declare_target!(Target, no_try_into);
+#[tracel_xtask_macros::declare_targets]
+pub enum Target {}
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
