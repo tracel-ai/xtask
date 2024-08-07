@@ -19,16 +19,8 @@ pub struct TestCmdArgs {
     pub command: TestCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum TestCommand {
-    /// Run unit tests.
-    Unit,
-    /// Run integration tests.
-    Integration,
-    /// Run all the checks.
-    All,
-}
+#[tracel_xtask_macros::declare_subcommand(Test)]
+pub enum TestCommand {}
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {

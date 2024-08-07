@@ -20,20 +20,8 @@ pub struct CheckCmdArgs {
     pub command: CheckCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum CheckCommand {
-    /// Run all the checks.
-    All,
-    /// Run audit command.
-    Audit,
-    /// Run format command.
-    Format,
-    /// Run lint command.
-    Lint,
-    /// Report typos in source code.
-    Typos,
-}
+#[tracel_xtask_macros::declare_subcommand(Check)]
+pub enum CheckCommand {}
 
 pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {

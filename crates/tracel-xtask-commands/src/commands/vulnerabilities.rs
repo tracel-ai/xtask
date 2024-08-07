@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Ok};
 use clap::Subcommand;
-use strum::{Display, EnumIter, EnumString};
 use std::process::Command as StdCommand;
+use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     commands::CARGO_NIGHTLY_MSG,
@@ -19,36 +19,8 @@ pub struct VulnerabilitiesCmdArgs {
     pub command: VulnerabilitiesCommand,
 }
 
-#[derive(EnumString, Default, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum VulnerabilitiesCommand {
-    /// Run all most useful vulnerability checks.
-    #[default]
-    All,
-    /// Run Address sanitizer (memory error detector)
-    AddressSanitizer,
-    /// Run LLVM Control Flow Integrity (CFI) (provides forward-edge control flow protection)
-    ControlFlowIntegrity,
-    /// Run newer variant of Address sanitizer (memory error detector similar to AddressSanitizer, but based on partial hardware assistance)
-    HWAddressSanitizer,
-    /// Run Kernel LLVM Control Flow Integrity (KCFI) (provides forward-edge control flow protection for operating systems kernels)
-    KernelControlFlowIntegrity,
-    /// Run Leak sanitizer (run-time memory leak detector)
-    LeakSanitizer,
-    /// Run memory sanitizer (detector of uninitialized reads)
-    MemorySanitizer,
-    /// Run another address sanitizer (like AddressSanitizer and HardwareAddressSanitizer but with lower overhead suitable for use as hardening for production binaries)
-    MemTagSanitizer,
-    /// Run nightly-only checks through cargo-careful `<https://crates.io/crates/cargo-careful>`
-    NightlyChecks,
-    /// Run SafeStack check (provides backward-edge control flow protection by separating
-    /// stack into safe and unsafe regions)
-    SafeStack,
-    /// Run ShadowCall check (provides backward-edge control flow protection - aarch64 only)
-    ShadowCallStack,
-    /// Run Thread sanitizer (data race detector)
-    ThreadSanitizer,
-}
+#[tracel_xtask_macros::declare_subcommand(Vulnerabilities)]
+pub enum VulnerabilitiesCommand {}
 
 pub fn handle_command(args: VulnerabilitiesCmdArgs) -> anyhow::Result<()> {
     args.command.run()

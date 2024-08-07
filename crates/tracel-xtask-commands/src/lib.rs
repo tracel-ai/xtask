@@ -16,11 +16,11 @@ pub mod prelude {
     pub mod macros {
         pub use tracel_xtask_macros::commands;
         pub use tracel_xtask_macros::declare_command_args;
+        pub use tracel_xtask_macros::declare_subcommand;
         pub use tracel_xtask_macros::extend_command_args;
         pub use tracel_xtask_macros::extend_targets;
     }
 
-    pub use crate::init_xtask;
     pub use crate::commands as base_commands;
     pub use crate::commands::build::BuildCmdArgs;
     pub use crate::commands::bump::BumpCmdArgs;
@@ -34,7 +34,7 @@ pub mod prelude {
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::Target;
-
+    pub use crate::init_xtask;
 }
 
 use crate::logging::init_logger;
@@ -70,7 +70,7 @@ pub struct XtaskArgs<C: clap::Subcommand> {
 
 pub fn init_xtask<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     init_logger().init();
-    let args = <XtaskArgs::<C> as clap::Parser>::parse();
+    let args = <XtaskArgs<C> as clap::Parser>::parse();
 
     group_info!("Execution environment: {}", args.execution_environment);
 

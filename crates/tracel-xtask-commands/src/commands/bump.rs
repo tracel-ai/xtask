@@ -13,16 +13,9 @@ pub struct BumpCmdArgs {
     pub command: BumpCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum BumpCommand {
-    /// Run unit tests.
-    Major,
-    /// Run integration tests.
-    Minor,
-    /// Run documentation tests.
-    Patch,
-}
+
+#[tracel_xtask_macros::declare_subcommand(Bump)]
+pub enum BumpCommand {}
 
 pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {
     bump(&args.command)

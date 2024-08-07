@@ -18,14 +18,8 @@ pub struct CoverageCmdArgs {
     pub command: CoverageCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum CoverageCommand {
-    /// Install grcov and its dependencies.
-    Install,
-    /// Generate lcov.info file.
-    Generate(GenerateCmdArgs),
-}
+#[tracel_xtask_macros::declare_subcommand(Coverage)]
+pub enum CoverageCommand {}
 
 #[derive(Args, Default, Clone, PartialEq)]
 pub struct GenerateCmdArgs {

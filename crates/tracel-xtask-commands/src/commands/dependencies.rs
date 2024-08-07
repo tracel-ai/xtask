@@ -17,16 +17,8 @@ pub struct DependenciesCmdArgs {
     pub command: DependencyCommand,
 }
 
-#[derive(EnumString, Default, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
+#[tracel_xtask_macros::declare_subcommand(Dependencies)]
 pub enum DependencyCommand {
-    /// Run all dependency checks.
-    #[default]
-    All,
-    /// Run cargo-deny Lint dependency graph to ensure all dependencies meet requirements `<https://crates.io/crates/cargo-deny>`
-    Deny,
-    /// Run cargo-udeps to find unused dependencies `<https://crates.io/crates/cargo-udeps>`
-    Unused,
 }
 
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {

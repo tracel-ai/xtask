@@ -19,14 +19,8 @@ pub struct DocCmdArgs {
     pub command: DocCommand,
 }
 
-#[derive(Default, EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
+#[tracel_xtask_macros::declare_subcommand(Doc)]
 pub enum DocCommand {
-    #[default]
-    /// Build documentation.
-    Build,
-    /// Run documentation tests.
-    Tests,
 }
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {

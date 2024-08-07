@@ -22,20 +22,8 @@ pub struct FixCmdArgs {
     pub command: FixCommand,
 }
 
-#[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand)]
-#[strum(serialize_all = "lowercase")]
-pub enum FixCommand {
-    /// Run audit command.
-    Audit,
-    /// Run format command and fix formatting.
-    Format,
-    /// Run lint command and fix issues.
-    Lint,
-    /// Find typos in source code and fix them.
-    Typos,
-    /// Run all the checks.
-    All,
-}
+#[tracel_xtask_macros::declare_subcommand(Fix)]
+pub enum FixCommand {}
 
 pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     if answer.is_none()
