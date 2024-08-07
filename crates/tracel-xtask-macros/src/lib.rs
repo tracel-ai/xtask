@@ -300,10 +300,14 @@ fn generate_target_enum(input: TokenStream) -> TokenStream {
         #[derive(strum::EnumString, strum::EnumIter, Default, strum::Display, Clone, PartialEq, clap::ValueEnum)]
         #[strum(serialize_all = "lowercase")]
         pub enum #enum_name {
+            #[doc = r"Targets all crates and examples using cargo --package."]
             AllPackages,
+            #[doc = r"Targets all binary and library crates."]
             Crates,
+            #[doc = r"Targets all example crates."]
             Examples,
             #[default]
+            #[doc = r"Targets the whole workspace using cargo --workspace."]
             Workspace,
             #original_variants
         }
