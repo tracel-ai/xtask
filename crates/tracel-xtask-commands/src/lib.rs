@@ -18,6 +18,7 @@ pub mod prelude {
         pub use tracel_xtask_macros::declare_command_args;
         pub use tracel_xtask_macros::declare_subcommand;
         pub use tracel_xtask_macros::extend_command_args;
+        pub use tracel_xtask_macros::extend_subcommand;
         pub use tracel_xtask_macros::extend_targets;
     }
 
@@ -30,17 +31,21 @@ pub mod prelude {
     pub use crate::commands::dependencies::DependenciesCmdArgs;
     pub use crate::commands::doc::DocCmdArgs;
     pub use crate::commands::fix::FixCmdArgs;
+    pub use crate::commands::fix::FixCommand;
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::Target;
+    pub use crate::endgroup;
+    pub use crate::group;
+    pub use crate::group_info;
     pub use crate::init_xtask;
+    pub use crate::utils::prompt::ask_once;
 }
 
 use crate::logging::init_logger;
 
 // does not re-export strum has it is incompatible with strum macros expansions
-use strum;
 use strum::{Display, EnumIter, EnumString};
 
 #[macro_use]

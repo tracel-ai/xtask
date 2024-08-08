@@ -274,7 +274,14 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     let item_ident = &item.ident;
     let has_target = item.fields.iter().any(|f| {
         if let Some(ident) = &f.ident {
-            "target" == ident.to_string()
+            *ident == "target"
+        } else {
+            false
+        }
+    });
+    let has_subcommand = item.fields.iter().any(|f| {
+        if let Some(ident) = &f.ident {
+            *ident == "command"
         } else {
             false
         }
@@ -283,7 +290,14 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     // expand
     let target = if has_target {
         quote! {
-            target: self.target.try_into()?
+            target: self.target.try_into()?,
+        }
+    } else {
+        quote! {}
+    };
+    let subcommand = if has_subcommand {
+        quote! {
+            command: self.command.try_into()?,
         }
     } else {
         quote! {}
@@ -294,8 +308,8 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
         .filter_map(|f| {
             f.ident.as_ref().map(|ident| {
                 let ident_str = ident.to_string();
-                if ident_str != "target" {
-                    quote! { #ident: self.#ident }
+                if ident_str != "target" && (ident_str == "exclude" || ident_str == "only") {
+                    quote! { #ident: self.#ident, }
                 } else {
                     quote! {}
                 }
@@ -309,7 +323,8 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
             fn try_into(self) -> Result<#base_type, Self::Error> {
                 Ok(#base_type {
                     #target
-                    #(#fields,)*
+                    #subcommand
+                    #(#fields)*
                 })
             }
         }
@@ -345,7 +360,7 @@ pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream
     }
     let mut output = generate_command_args_struct(args.clone(), input);
     let tryinto = generate_command_args_tryinto(args, output.clone());
-    output.extend(TokenStream::from(tryinto));
+    output.extend(tryinto);
     output
 }
 
@@ -477,21 +492,20 @@ fn generate_subcommand_enum(args: TokenStream, input: TokenStream) -> TokenStrea
     let item = parse_macro_input!(input as ItemEnum);
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
 
-    let variant_map = get_variant_map();
-
     // First argument is the name of the command
     // Boundaries check is performed by the caller.
     let command = args.get(0).unwrap();
-    let command_ident = command.path().get_ident().unwrap();
-    let command_string = command_ident.to_string();
+    let base_command_ident = command.path().get_ident().unwrap();
+    let base_command_string = base_command_ident.to_string();
     let enum_name = &item.ident;
     let original_variants = &item.variants;
 
-    let output = if let Some(variants) = variant_map.get(command_string.as_str()) {
+    let variant_map = get_variant_map();
+    let output = if let Some(variants) = variant_map.get(base_command_string.as_str()) {
         // parse the variant and look for a default attribute so that we add the default derive if required
-        let variants_ts = TokenStream::from(variants.clone());
+        let variants_tokens = TokenStream::from(variants.clone());
         let parsed_variants =
-            parse_macro_input!(variants_ts with Punctuated::<Variant, Comma>::parse_terminated);
+            parse_macro_input!(variants_tokens with Punctuated::<Variant, Comma>::parse_terminated);
         let default = if parsed_variants
             .iter()
             .any(|v| v.attrs.iter().any(|a| a.path().is_ident("default")))
@@ -501,7 +515,7 @@ fn generate_subcommand_enum(args: TokenStream, input: TokenStream) -> TokenStrea
             quote! {}
         };
         quote! {
-            #[derive(EnumString, EnumIter, Display, Clone, PartialEq, Subcommand, #default)]
+            #[derive(strum::EnumString, strum::EnumIter, strum::Display, Clone, PartialEq, clap::Subcommand, #default)]
             #[strum(serialize_all = "lowercase")]
             pub enum #enum_name {
                 #variants
@@ -511,7 +525,7 @@ fn generate_subcommand_enum(args: TokenStream, input: TokenStream) -> TokenStrea
     } else {
         let err_msg = format!(
             "Unknown command: {}\nPossible commands are:\n  {}",
-            command_string,
+            base_command_string,
             variant_map
                 .keys()
                 .cloned()
@@ -525,7 +539,52 @@ fn generate_subcommand_enum(args: TokenStream, input: TokenStream) -> TokenStrea
 }
 
 fn generate_subcomand_tryinto(args: TokenStream, input: TokenStream) -> TokenStream {
-    todo!()
+    let item = parse_macro_input!(input as ItemEnum);
+    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
+    // First argument is the name of the command
+    // Boundaries check is performed by the caller.
+    let command = args.get(0).unwrap();
+    let base_command_type = args.get(1).unwrap();
+    let base_command_ident = command.path().get_ident().unwrap();
+    let base_command_string = base_command_ident.to_string();
+    let extend_command_type = &item.ident;
+
+    let variant_map = get_variant_map();
+    let tryinto = if let Some(variants) = variant_map.get(base_command_string.as_str()) {
+        // parse the variant and look for a default attribute so that we add the default derive if required
+        let variants_tokens = TokenStream::from(variants.clone());
+        let parsed_variants =
+            parse_macro_input!(variants_tokens with Punctuated::<Variant, Comma>::parse_terminated);
+        let arms = parsed_variants.iter().map(|v| {
+            let variant_ident = &v.ident;
+            quote! {
+                 #extend_command_type::#variant_ident => Ok(#base_command_type::#variant_ident),
+            }
+        });
+        quote! {
+            impl std::convert::TryInto<#base_command_type> for #extend_command_type {
+                type Error = anyhow::Error;
+                fn try_into(self) -> Result<#base_command_type, Self::Error> {
+                    match self {
+                        #(#arms)*
+                        _ => Err(anyhow::anyhow!("{} target is not supported.", self))
+                    }
+                }
+            }
+        }
+    } else {
+        let err_msg = format!(
+            "Unknown command: {}\nPossible commands are:\n  {}",
+            base_command_string,
+            variant_map
+                .keys()
+                .cloned()
+                .collect::<Vec<&str>>()
+                .join("\n  "),
+        );
+        quote! { compile_error!(#err_msg); }
+    };
+    TokenStream::from(tryinto)
 }
 
 #[proc_macro_attribute]
@@ -535,7 +594,7 @@ pub fn declare_subcommand(args: TokenStream, input: TokenStream) -> TokenStream 
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
     if parsed_args.len() != 1 {
         return TokenStream::from(quote! {
-            compile_error!("declare_subcommand takes one argument which the name of the parent command type.\n");
+            compile_error!("declare_subcommand takes one argument which the name of the base command name.\n");
         });
     }
     generate_subcommand_enum(args, input)
@@ -546,9 +605,11 @@ pub fn extend_subcommand(args: TokenStream, input: TokenStream) -> TokenStream {
     let args_clone = args.clone();
     let parsed_args =
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
-    if parsed_args.len() != 1 {
+    if parsed_args.len() != 2 {
         return TokenStream::from(quote! {
-            compile_error!("extend_subcommand takes one argument which the name of the parent command type.\n");
+            compile_error!("extend_subcommand takes two arguments.\n"
+                           "The first one is the base command name.\n"
+                           "The second one is the base command type.\n");
         });
     }
     let mut output = generate_subcommand_enum(args.clone(), input);

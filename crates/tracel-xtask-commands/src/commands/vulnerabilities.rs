@@ -1,7 +1,5 @@
 use anyhow::{anyhow, Ok};
-use clap::Subcommand;
 use std::process::Command as StdCommand;
-use strum::{Display, EnumIter, EnumString};
 
 use crate::{
     commands::CARGO_NIGHTLY_MSG,

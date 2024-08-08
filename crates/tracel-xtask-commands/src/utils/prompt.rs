@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-pub(crate) fn ask_once(prompt: &str) -> bool {
+pub fn ask_once(prompt: &str) -> bool {
     print!("{}\nDo you want to proceed? (yes/no): ", prompt);
     io::stdout().flush().expect("stdout should be flushed");
 

@@ -1,9 +1,9 @@
 use tracel_xtask_commands::prelude::*;
 
 #[macros::declare_command_args(Target)]
-struct FooCmdArgs {}
+struct NewCommandCmdArgs {}
 
-pub fn handle_commands(args: FooCmdArgs) -> anyhow::Result<()> {
+pub fn handle_commands(args: NewCommandCmdArgs) -> anyhow::Result<()> {
     match args.target {
         Target::AllPackages => println!("You chose the target: all-packages"),
         Target::Crates => println!("You chose the target: crates"),

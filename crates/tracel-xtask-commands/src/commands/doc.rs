@@ -1,6 +1,5 @@
 use anyhow::Ok;
-use clap::Subcommand;
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::IntoEnumIterator;
 
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
@@ -20,8 +19,7 @@ pub struct DocCmdArgs {
 }
 
 #[tracel_xtask_macros::declare_subcommand(Doc)]
-pub enum DocCommand {
-}
+pub enum DocCommand {}
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {

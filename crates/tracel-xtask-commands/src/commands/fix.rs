@@ -1,6 +1,5 @@
 use anyhow::{Ok, Result};
-use clap::Subcommand;
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::IntoEnumIterator;
 
 use crate::{
     commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
@@ -38,9 +37,7 @@ pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<
         FixCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
         FixCommand::Typos => run_typos(answer),
         FixCommand::All => {
-            let answer = ask_once(
-                "This will run all the checks with autofix on all members of the workspace.",
-            );
+            let answer = ask_once("This will run all the checks with autofix mode enabled.");
             FixCommand::iter()
                 .filter(|c| *c != FixCommand::All)
                 .try_for_each(|c| {

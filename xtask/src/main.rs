@@ -2,6 +2,9 @@ mod commands;
 
 use tracel_xtask_commands::prelude::*;
 
+#[macro_use]
+extern crate log;
+
 #[macros::commands(
     Bump,
     Check,
@@ -9,23 +12,22 @@ use tracel_xtask_commands::prelude::*;
     Coverage,
     Doc,
     Dependencies,
-    Fix,
     Publish,
     Test,
     Vulnerabilities
 )]
 pub enum Command {
-    /// Example of an additional command
-    Foo(commands::foo::FooCmdArgs),
-    /// Extended Build command
+    /// Example of a new command with support of base Target
+    NewCommand(commands::new_command::NewCommandCmdArgs),
+    /// Example of extended Build command with an additional target called 'Frontend'
     Build(commands::build::ExtendedBuildCmdArgs),
+    /// Comprehensive example of an extended Fix command with an additional target and subcommand
+    Fix(commands::fix::ExtendedFixCmdArgs),
 }
 
 fn main() -> anyhow::Result<()> {
     let args = init_xtask::<Command>()?;
     match args.command {
-        // From common_xtask
-        // You can easily insert specific pre-processing for each command if required by your repository
         Command::Build(args) => commands::build::handle_command(args),
         Command::Bump(args) => base_commands::bump::handle_command(args),
         Command::Check(args) => base_commands::check::handle_command(args),
@@ -33,13 +35,11 @@ fn main() -> anyhow::Result<()> {
         Command::Coverage(args) => base_commands::coverage::handle_command(args),
         Command::Dependencies(args) => base_commands::dependencies::handle_command(args),
         Command::Doc(args) => base_commands::doc::handle_command(args),
-        Command::Fix(args) => base_commands::fix::handle_command(args, None),
+        Command::Fix(args) => commands::fix::handle_command(args, None),
+        Command::NewCommand(args) => commands::new_command::handle_commands(args),
         Command::Publish(args) => base_commands::publish::handle_command(args),
         Command::Test(args) => base_commands::test::handle_command(args),
         Command::Vulnerabilities(args) => base_commands::vulnerabilities::handle_command(args),
-
-        // Implementation of a new command that is not part of xtask-common
-        Command::Foo(args) => commands::foo::handle_commands(args),
     }?;
     Ok(())
 }

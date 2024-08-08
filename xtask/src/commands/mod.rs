@@ -1,2 +1,3 @@
 pub(crate) mod build;
-pub(crate) mod foo;
+pub(crate) mod fix;
+pub(crate) mod new_command;

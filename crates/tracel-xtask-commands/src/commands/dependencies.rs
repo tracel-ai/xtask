@@ -1,6 +1,5 @@
 use anyhow::Ok;
-use clap::Subcommand;
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::IntoEnumIterator;
 
 use crate::{
     commands::CARGO_NIGHTLY_MSG,
@@ -18,8 +17,7 @@ pub struct DependenciesCmdArgs {
 }
 
 #[tracel_xtask_macros::declare_subcommand(Dependencies)]
-pub enum DependencyCommand {
-}
+pub enum DependencyCommand {}
 
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
     match args.command {
