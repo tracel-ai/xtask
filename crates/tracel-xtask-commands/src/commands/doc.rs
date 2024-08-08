@@ -18,7 +18,7 @@ pub struct DocCmdArgs {
     pub command: DocCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Doc)]
+#[tracel_xtask_macros::declare_subcommands(Doc)]
 pub enum DocCommand {}
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {

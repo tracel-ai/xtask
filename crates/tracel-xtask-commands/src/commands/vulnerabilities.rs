@@ -17,7 +17,7 @@ pub struct VulnerabilitiesCmdArgs {
     pub command: VulnerabilitiesCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Vulnerabilities)]
+#[tracel_xtask_macros::declare_subcommands(Vulnerabilities)]
 pub enum VulnerabilitiesCommand {}
 
 pub fn handle_command(args: VulnerabilitiesCmdArgs) -> anyhow::Result<()> {

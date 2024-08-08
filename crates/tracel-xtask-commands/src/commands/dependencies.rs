@@ -16,7 +16,7 @@ pub struct DependenciesCmdArgs {
     pub command: DependencyCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Dependencies)]
+#[tracel_xtask_macros::declare_subcommands(Dependencies)]
 pub enum DependencyCommand {}
 
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {

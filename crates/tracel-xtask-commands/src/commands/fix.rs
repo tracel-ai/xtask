@@ -21,7 +21,7 @@ pub struct FixCmdArgs {
     pub command: FixCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Fix)]
+#[tracel_xtask_macros::declare_subcommands(Fix)]
 pub enum FixCommand {}
 
 pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {

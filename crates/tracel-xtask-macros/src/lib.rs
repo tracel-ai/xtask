@@ -588,7 +588,7 @@ fn generate_subcomand_tryinto(args: TokenStream, input: TokenStream) -> TokenStr
 }
 
 #[proc_macro_attribute]
-pub fn declare_subcommand(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn declare_subcommands(args: TokenStream, input: TokenStream) -> TokenStream {
     let args_clone = args.clone();
     let parsed_args =
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
@@ -601,7 +601,7 @@ pub fn declare_subcommand(args: TokenStream, input: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
-pub fn extend_subcommand(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn extend_subcommands(args: TokenStream, input: TokenStream) -> TokenStream {
     let args_clone = args.clone();
     let parsed_args =
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);

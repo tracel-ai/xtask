@@ -19,7 +19,7 @@ pub struct CheckCmdArgs {
     pub command: CheckCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Check)]
+#[tracel_xtask_macros::declare_subcommands(Check)]
 pub enum CheckCommand {}
 
 pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {

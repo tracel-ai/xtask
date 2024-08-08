@@ -11,7 +11,7 @@ pub struct BumpCmdArgs {
     pub command: BumpCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Bump)]
+#[tracel_xtask_macros::declare_subcommands(Bump)]
 pub enum BumpCommand {}
 
 pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {

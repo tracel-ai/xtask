@@ -16,9 +16,9 @@ pub mod prelude {
     pub mod macros {
         pub use tracel_xtask_macros::commands;
         pub use tracel_xtask_macros::declare_command_args;
-        pub use tracel_xtask_macros::declare_subcommand;
+        pub use tracel_xtask_macros::declare_subcommands;
         pub use tracel_xtask_macros::extend_command_args;
-        pub use tracel_xtask_macros::extend_subcommand;
+        pub use tracel_xtask_macros::extend_subcommands;
         pub use tracel_xtask_macros::extend_targets;
     }
 

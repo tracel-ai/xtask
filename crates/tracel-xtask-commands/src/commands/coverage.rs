@@ -17,7 +17,7 @@ pub struct CoverageCmdArgs {
     pub command: CoverageCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Coverage)]
+#[tracel_xtask_macros::declare_subcommands(Coverage)]
 pub enum CoverageCommand {}
 
 #[derive(Args, Default, Clone, PartialEq)]

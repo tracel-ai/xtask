@@ -18,7 +18,7 @@ pub struct TestCmdArgs {
     pub command: TestCommand,
 }
 
-#[tracel_xtask_macros::declare_subcommand(Test)]
+#[tracel_xtask_macros::declare_subcommands(Test)]
 pub enum TestCommand {}
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {

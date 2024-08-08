@@ -1,5 +1,5 @@
-/// This a comprehensive example on how to extend an existing base command provided by tracel_xtask_commands
-/// This example extends the targets and the sub-commands with custom args.
+// This a comprehensive example on how to extend an existing base command provided by tracel_xtask_commands
+// This example extends the targets and the sub-commands with custom args.
 use strum::IntoEnumIterator;
 use tracel_xtask_commands::prelude::*;
 
@@ -19,7 +19,7 @@ pub struct ExtendedFixCmdArgs {
 }
 
 // Extends the subcommands of fix command by adding a 'new-subcommand' subcommand
-#[macros::extend_subcommand(Fix, FixCommand)]
+#[macros::extend_subcommands(Fix, FixCommand)]
 pub enum ExtendedFixCommand {
     /// An additional subcommand for our extended Fix command.
     NewSubcommand(NewSubcommandArgs),
