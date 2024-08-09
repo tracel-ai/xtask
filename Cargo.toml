@@ -21,7 +21,7 @@ clap = { version = "4.5.9", features = ["derive"] }
 derive_more = { version = "0.99.18", features = ["display"], default-features = false }
 dotenv = "0.15.0"
 env_logger = "0.11.3"
-log = { default-features = false, version = "0.4.22" }
+log = { version = "0.4.22" }
 proc-macro2 = "1.0.86"
 quote = "1.0.36"
 rand = { version = "0.8.5" }

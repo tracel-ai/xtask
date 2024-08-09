@@ -10,7 +10,7 @@ pub fn custom_crates_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Resu
         group!("Custom Build: {}", *c);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        run_process("cargo", &args, &format!("Custom build failed for {}", *c))?;
+        run_process("cargo", &args, None, None, &format!("Custom build failed for {}", *c))?;
         endgroup!();
         Ok(())
     })
@@ -24,7 +24,7 @@ pub fn custom_crates_tests(crates: Vec<&str>, params: Vec<&str>) -> anyhow::Resu
         group!("Custom Tests: {}", *c);
         let mut args = base_args.clone();
         args.extend(vec!["-p", *c]);
-        run_process("cargo", &args, &format!("Custom test failed for {}", *c))?;
+        run_process("cargo", &args, None, None, &format!("Custom test failed for {}", *c))?;
         endgroup!();
         Ok(())
     })
@@ -41,6 +41,8 @@ pub fn custom_crates_doc_build(crates: Vec<&str>, params: Vec<&str>) -> anyhow::
         run_process(
             "cargo",
             &args,
+            None,
+            None,
             &format!("Custom doc build failed for {}", *c),
         )?;
         endgroup!();

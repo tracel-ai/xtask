@@ -84,6 +84,8 @@ fn publish(crate_name: String) -> anyhow::Result<()> {
     run_process(
         "cargo",
         &vec!["publish", "-p", &crate_name, "--dry-run"],
+        None,
+        None,
         &format!("Publish dry run failed for crate '{}'.", &crate_name),
     )?;
 

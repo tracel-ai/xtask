@@ -28,6 +28,8 @@ pub fn ensure_cargo_crate_is_installed(
         run_process(
             "cargo",
             &args,
+            None,
+            None,
             &format!("crate '{}' should be installed", crate_name),
         )?;
         endgroup!();
