@@ -13,14 +13,8 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::declare_command_args(Target)]
-pub struct CheckCmdArgs {
-    #[command(subcommand)]
-    pub command: CheckCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Check)]
-pub enum CheckCommand {}
+#[tracel_xtask_macros::declare_command_args(Target, CheckSubCommand)]
+pub struct CheckCmdArgs {}
 
 pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
@@ -28,12 +22,12 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
     }
 
     match args.command {
-        CheckCommand::Audit => run_audit(),
-        CheckCommand::Format => run_format(&args.target, &args.exclude, &args.only),
-        CheckCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
-        CheckCommand::Typos => run_typos(),
-        CheckCommand::All => CheckCommand::iter()
-            .filter(|c| *c != CheckCommand::All)
+        CheckSubCommand::Audit => run_audit(),
+        CheckSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
+        CheckSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+        CheckSubCommand::Typos => run_typos(),
+        CheckSubCommand::All => CheckSubCommand::iter()
+            .filter(|c| *c != CheckSubCommand::All)
             .try_for_each(|c| {
                 handle_command(CheckCmdArgs {
                     command: c,

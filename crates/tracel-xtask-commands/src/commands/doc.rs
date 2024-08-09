@@ -12,22 +12,16 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::declare_command_args(Target)]
-pub struct DocCmdArgs {
-    #[command(subcommand)]
-    pub command: DocCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Doc)]
-pub enum DocCommand {}
+#[tracel_xtask_macros::declare_command_args(Target, DocSubCommand)]
+pub struct DocCmdArgs {}
 
 pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
     match args.command {
-        DocCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),
-        DocCommand::Tests => run_documentation(&args.target, &args.exclude, &args.only),
+        DocSubCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),
+        DocSubCommand::Tests => run_documentation(&args.target, &args.exclude, &args.only),
     }
 }
 

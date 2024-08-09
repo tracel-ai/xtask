@@ -15,14 +15,8 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::declare_command_args(Target)]
-pub struct FixCmdArgs {
-    #[command(subcommand)]
-    pub command: FixCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Fix)]
-pub enum FixCommand {}
+#[tracel_xtask_macros::declare_command_args(Target, FixSubCommand)]
+pub struct FixCmdArgs {}
 
 pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     if answer.is_none()
@@ -32,14 +26,14 @@ pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<
         warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
     match args.command {
-        FixCommand::Audit => run_audit(answer),
-        FixCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
-        FixCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
-        FixCommand::Typos => run_typos(answer),
-        FixCommand::All => {
+        FixSubCommand::Audit => run_audit(answer),
+        FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
+        FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
+        FixSubCommand::Typos => run_typos(answer),
+        FixSubCommand::All => {
             let answer = ask_once("This will run all the checks with autofix mode enabled.");
-            FixCommand::iter()
-                .filter(|c| *c != FixCommand::All)
+            FixSubCommand::iter()
+                .filter(|c| *c != FixSubCommand::All)
                 .try_for_each(|c| {
                     handle_command(
                         FixCmdArgs {

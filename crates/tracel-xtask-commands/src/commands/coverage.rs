@@ -11,14 +11,8 @@ use crate::{
 
 use super::Profile;
 
-#[tracel_xtask_macros::declare_command_args]
-pub struct CoverageCmdArgs {
-    #[command(subcommand)]
-    pub command: CoverageCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Coverage)]
-pub enum CoverageCommand {}
+#[tracel_xtask_macros::declare_command_args(None, CoverageSubCommand)]
+pub struct CoverageCmdArgs {}
 
 #[derive(Args, Default, Clone, PartialEq)]
 pub struct GenerateCmdArgs {
@@ -38,8 +32,8 @@ pub struct GenerateCmdArgs {
 
 pub fn handle_command(args: CoverageCmdArgs) -> anyhow::Result<()> {
     match args.command {
-        CoverageCommand::Install => install_grcov(),
-        CoverageCommand::Generate(gen_args) => run_grcov(&gen_args),
+        CoverageSubCommand::Install => install_grcov(),
+        CoverageSubCommand::Generate(gen_args) => run_grcov(&gen_args),
     }
 }
 

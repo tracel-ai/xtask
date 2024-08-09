@@ -1,5 +1,8 @@
 use std::{
-    collections::HashMap, io::{BufRead, BufReader}, path::Path, process::{Child, Command, Stdio}
+    collections::HashMap,
+    io::{BufRead, BufReader},
+    path::Path,
+    process::{Child, Command, Stdio},
 };
 
 use anyhow::anyhow;
@@ -10,7 +13,13 @@ use crate::{endgroup, group};
 use crate::{group_info, utils::get_command_line_from_command};
 
 /// Run a process
-pub fn run_process(name: &str, args: &Vec<&str>, envs: Option<HashMap<&str, &str>>, path: Option<&Path>, error_msg: &str) -> anyhow::Result<()> {
+pub fn run_process(
+    name: &str,
+    args: &Vec<&str>,
+    envs: Option<HashMap<&str, &str>>,
+    path: Option<&Path>,
+    error_msg: &str,
+) -> anyhow::Result<()> {
     let joined_args = args.join(" ");
     group_info!("Command line: {} {}", name, &joined_args);
     let mut command = Command::new(name);

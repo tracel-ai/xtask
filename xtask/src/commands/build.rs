@@ -8,7 +8,7 @@ pub enum BuildTarget {
 }
 
 // Define new command arguments struct with an additional --debug argument
-#[macros::extend_command_args(BuildCmdArgs, BuildTarget)]
+#[macros::extend_command_args(BuildCmdArgs, BuildTarget, None)]
 pub struct ExtendedBuildCmdArgs {
     /// Print additional info when set
     #[arg(short, long)]

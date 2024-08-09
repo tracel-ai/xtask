@@ -1,6 +1,6 @@
 use tracel_xtask_commands::prelude::*;
 
-#[macros::declare_command_args(Target)]
+#[macros::declare_command_args(Target, None)]
 struct NewCommandCmdArgs {}
 
 pub fn handle_commands(args: NewCommandCmdArgs) -> anyhow::Result<()> {

@@ -16,7 +16,6 @@ pub mod prelude {
     pub mod macros {
         pub use tracel_xtask_macros::commands;
         pub use tracel_xtask_macros::declare_command_args;
-        pub use tracel_xtask_macros::declare_subcommands;
         pub use tracel_xtask_macros::extend_command_args;
         pub use tracel_xtask_macros::extend_subcommands;
         pub use tracel_xtask_macros::extend_targets;
@@ -25,16 +24,22 @@ pub mod prelude {
     pub use crate::commands as base_commands;
     pub use crate::commands::build::BuildCmdArgs;
     pub use crate::commands::bump::BumpCmdArgs;
+    pub use crate::commands::bump::BumpSubCommand;
     pub use crate::commands::check::CheckCmdArgs;
+    pub use crate::commands::check::CheckSubCommand;
     pub use crate::commands::compile::CompileCmdArgs;
     pub use crate::commands::coverage::CoverageCmdArgs;
     pub use crate::commands::dependencies::DependenciesCmdArgs;
+    pub use crate::commands::dependencies::DependenciesSubCommand;
     pub use crate::commands::doc::DocCmdArgs;
+    pub use crate::commands::doc::DocSubCommand;
     pub use crate::commands::fix::FixCmdArgs;
-    pub use crate::commands::fix::FixCommand;
+    pub use crate::commands::fix::FixSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::test::TestCmdArgs;
+    pub use crate::commands::test::TestSubCommand;
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
+    pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::commands::Target;
     pub use crate::endgroup;
     pub use crate::group;

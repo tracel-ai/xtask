@@ -11,20 +11,14 @@ use crate::{
     },
 };
 
-#[tracel_xtask_macros::declare_command_args]
-pub struct VulnerabilitiesCmdArgs {
-    #[command(subcommand)]
-    pub command: VulnerabilitiesCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Vulnerabilities)]
-pub enum VulnerabilitiesCommand {}
+#[tracel_xtask_macros::declare_command_args(None, VulnerabilitiesSubCommand)]
+pub struct VulnerabilitiesCmdArgs {}
 
 pub fn handle_command(args: VulnerabilitiesCmdArgs) -> anyhow::Result<()> {
     args.command.run()
 }
 
-impl VulnerabilitiesCommand {
+impl VulnerabilitiesSubCommand {
     pub(crate) fn run(&self) -> anyhow::Result<()> {
         match self {
             Self::NightlyChecks => run_cargo_careful(),

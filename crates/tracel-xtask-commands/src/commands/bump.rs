@@ -5,20 +5,14 @@ use crate::{
     utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
-#[tracel_xtask_macros::declare_command_args]
-pub struct BumpCmdArgs {
-    #[command(subcommand)]
-    pub command: BumpCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Bump)]
-pub enum BumpCommand {}
+#[tracel_xtask_macros::declare_command_args(None, BumpSubCommand)]
+pub struct BumpCmdArgs {}
 
 pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {
     bump(&args.command)
 }
 
-fn bump(command: &BumpCommand) -> anyhow::Result<()> {
+fn bump(command: &BumpSubCommand) -> anyhow::Result<()> {
     group!("Bump version: {command}");
     ensure_cargo_crate_is_installed("cargo-edit", None, None, false)?;
     run_process(

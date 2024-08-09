@@ -10,21 +10,15 @@ use crate::{
     },
 };
 
-#[tracel_xtask_macros::declare_command_args]
-pub struct DependenciesCmdArgs {
-    #[command(subcommand)]
-    pub command: DependencyCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Dependencies)]
-pub enum DependencyCommand {}
+#[tracel_xtask_macros::declare_command_args(None, DependenciesSubCommand)]
+pub struct DependenciesCmdArgs {}
 
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
     match args.command {
-        DependencyCommand::Deny => run_cargo_deny(),
-        DependencyCommand::Unused => run_cargo_udeps(),
-        DependencyCommand::All => DependencyCommand::iter()
-            .filter(|c| *c != DependencyCommand::All)
+        DependenciesSubCommand::Deny => run_cargo_deny(),
+        DependenciesSubCommand::Unused => run_cargo_udeps(),
+        DependenciesSubCommand::All => DependenciesSubCommand::iter()
+            .filter(|c| *c != DependenciesSubCommand::All)
             .try_for_each(|c| handle_command(DependenciesCmdArgs { command: c })),
     }
 }
@@ -51,7 +45,13 @@ fn run_cargo_udeps() -> anyhow::Result<()> {
         ensure_cargo_crate_is_installed("cargo-udeps", None, None, false)?;
         // Run cargo udeps
         group!("Cargo: run unused dependencies checks");
-        run_process("cargo", &vec!["udeps"], None, None, "Unused dependencies found!")?;
+        run_process(
+            "cargo",
+            &vec!["udeps"],
+            None,
+            None,
+            "Unused dependencies found!",
+        )?;
         endgroup!();
     } else {
         error!("{}", CARGO_NIGHTLY_MSG);

@@ -11,16 +11,12 @@ pub enum FixTarget {
 }
 
 // Extends the fix command arguments by defining our own subcommands
-#[macros::extend_command_args(FixCmdArgs, FixTarget)]
-pub struct ExtendedFixCmdArgs {
-    /// Extended fix subcommands.
-    #[command(subcommand)]
-    pub command: ExtendedFixCommand,
-}
+#[macros::extend_command_args(FixCmdArgs, FixTarget, ExtendedFixSubCommand)]
+pub struct ExtendedFixCmdArgs {}
 
 // Extends the subcommands of fix command by adding a 'new-subcommand' subcommand
-#[macros::extend_subcommands(Fix, FixCommand)]
-pub enum ExtendedFixCommand {
+#[macros::extend_subcommands(FixSubCommand)]
+pub enum ExtendedFixSubCommand {
     /// An additional subcommand for our extended Fix command.
     NewSubcommand(NewSubcommandArgs),
 }
@@ -37,13 +33,13 @@ pub struct NewSubcommandArgs {
 pub fn handle_command(args: ExtendedFixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     // we need to handle both the new subcommand 'new-subcommand' and the 'all' subcommand
     match args.command {
-        ExtendedFixCommand::NewSubcommand(ref subcmd_args) => {
+        ExtendedFixSubCommand::NewSubcommand(ref subcmd_args) => {
             run_new_subcommand_fix(args.clone(), subcmd_args, answer)
         }
-        ExtendedFixCommand::All => {
+        ExtendedFixSubCommand::All => {
             let answer = ask_once("This will run all the checks with autofix mode enabled.");
-            ExtendedFixCommand::iter()
-                .filter(|c| *c != ExtendedFixCommand::All)
+            ExtendedFixSubCommand::iter()
+                .filter(|c| *c != ExtendedFixSubCommand::All)
                 .try_for_each(|c| {
                     handle_command(
                         ExtendedFixCmdArgs {

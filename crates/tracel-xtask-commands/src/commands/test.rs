@@ -12,24 +12,18 @@ use crate::{
 
 use super::Target;
 
-#[tracel_xtask_macros::declare_command_args(Target)]
-pub struct TestCmdArgs {
-    #[command(subcommand)]
-    pub command: TestCommand,
-}
-
-#[tracel_xtask_macros::declare_subcommands(Test)]
-pub enum TestCommand {}
+#[tracel_xtask_macros::declare_command_args(Target, TestSubCommand)]
+pub struct TestCmdArgs {}
 
 pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
     match args.command {
-        TestCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
-        TestCommand::Integration => run_integration(&args.target, &args.exclude, &args.only),
-        TestCommand::All => TestCommand::iter()
-            .filter(|c| *c != TestCommand::All)
+        TestSubCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
+        TestSubCommand::Integration => run_integration(&args.target, &args.exclude, &args.only),
+        TestSubCommand::All => TestSubCommand::iter()
+            .filter(|c| *c != TestSubCommand::All)
             .try_for_each(|c| {
                 handle_command(TestCmdArgs {
                     command: c,
