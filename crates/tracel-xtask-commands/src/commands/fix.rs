@@ -18,55 +18,52 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, FixSubCommand)]
 pub struct FixCmdArgs {}
 
-pub fn handle_command(args: FixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
-    if answer.is_none()
-        && args.target == Target::Workspace
-        && (!args.exclude.is_empty() || !args.only.is_empty())
-    {
-        warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
-    }
-    match args.command {
-        FixSubCommand::Audit => run_audit(answer),
-        FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only, answer),
-        FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, answer),
-        FixSubCommand::Typos => run_typos(answer),
-        FixSubCommand::All => {
-            let answer = ask_once("This will run all the checks with autofix mode enabled.");
-            FixSubCommand::iter()
-                .filter(|c| *c != FixSubCommand::All)
-                .try_for_each(|c| {
-                    handle_command(
-                        FixCmdArgs {
-                            command: c,
-                            target: args.target.clone(),
-                            exclude: args.exclude.clone(),
-                            only: args.only.clone(),
-                        },
-                        Some(answer),
-                    )
-                })
+pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Result<()> {
+    if answer.is_none() {
+        if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty())
+        {
+            warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
         }
+        answer = Some(ask_once("This will run the check with autofix mode enabled."));
+    };
+    if answer.unwrap() {
+        match args.command {
+            FixSubCommand::Audit => run_audit(),
+            FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only, ),
+            FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, ),
+            FixSubCommand::Typos => run_typos(),
+            FixSubCommand::All => {
+                FixSubCommand::iter()
+                    .filter(|c| *c != FixSubCommand::All)
+                    .try_for_each(|c| {
+                        handle_command(
+                            FixCmdArgs {
+                                command: c,
+                                target: args.target.clone(),
+                                exclude: args.exclude.clone(),
+                                only: args.only.clone(),
+                            },
+                            answer,
+                        )
+                    })
+            }
+        }
+    } else {
+        Ok(())
     }
 }
 
-pub(crate) fn run_audit(mut answer: Option<bool>) -> anyhow::Result<()> {
-    if answer.is_none() {
-        answer = Some(ask_once(
-            "This will run the audit check with autofix mode enabled.",
-        ));
-    };
-    if answer.unwrap() {
-        ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
-        group!("Audit Rust Dependencies");
-        run_process(
-            "cargo",
-            &vec!["audit", "-q", "--color", "always", "fix"],
-            None,
-            None,
-            "Audit check execution failed",
-        )?;
-        endgroup!();
-    }
+pub(crate) fn run_audit() -> anyhow::Result<()> {
+    ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
+    group!("Audit Rust Dependencies");
+    run_process(
+        "cargo",
+        &vec!["audit", "-q", "--color", "always", "fix"],
+        None,
+        None,
+        "Audit check execution failed",
+    )?;
+    endgroup!();
     Ok(())
 }
 
@@ -74,27 +71,19 @@ fn run_format(
     target: &Target,
     excluded: &Vec<String>,
     only: &Vec<String>,
-    mut answer: Option<bool>,
 ) -> Result<()> {
     match target {
         Target::Workspace => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run format with auto-fix on the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                group!("Format Workspace");
-                run_process_for_workspace(
-                    "cargo",
-                    vec!["fmt"],
-                    &[],
-                    "Workspace compilation failed",
-                    None,
-                    None,
-                )?;
-                endgroup!();
-            }
+            group!("Format Workspace");
+            run_process_for_workspace(
+                "cargo",
+                vec!["fmt"],
+                &[],
+                "Workspace compilation failed",
+                None,
+                None,
+            )?;
+            endgroup!();
         }
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -102,46 +91,25 @@ fn run_format(
                 Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
                 _ => unreachable!(),
             };
-
-            if answer.is_none() {
-                answer = Some(ask_once(&format!(
-                    "This will run format with auto-fix on all {} of the workspace.",
-                    if *target == Target::Crates {
-                        "crates"
-                    } else {
-                        "examples"
-                    }
-                )));
-            }
-
-            if answer.unwrap() {
-                for member in members {
-                    group!("Format: {}", member.name);
-                    run_process_for_package(
-                        "cargo",
-                        &member.name,
-                        &vec!["fmt", "-p", &member.name],
-                        excluded,
-                        only,
-                        &format!("Format check execution failed for {}", &member.name),
-                        None,
-                        None,
-                    )?;
-                    endgroup!();
-                }
+            for member in members {
+                group!("Format: {}", member.name);
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec!["fmt", "-p", &member.name],
+                    excluded,
+                    only,
+                    &format!("Format check execution failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
+                endgroup!();
             }
         }
         Target::AllPackages => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run format check with auto-fix on all packages of the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                Target::iter()
-                    .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                    .try_for_each(|t| run_format(&t, excluded, only, answer))?;
-            }
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_format(&t, excluded, only))?;
         }
     }
     Ok(())
@@ -151,37 +119,29 @@ fn run_lint(
     target: &Target,
     excluded: &Vec<String>,
     only: &Vec<String>,
-    mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run lint with auto-fix on the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                group!("Lint Workspace");
-                run_process_for_workspace(
-                    "cargo",
-                    vec![
-                        "clippy",
-                        "--no-deps",
-                        "--fix",
-                        "--allow-dirty",
-                        "--allow-staged",
-                        "--color=always",
-                        "--",
-                        "--deny",
-                        "warnings",
-                    ],
-                    &[],
-                    "Workspace lint failed",
-                    None,
-                    None,
-                )?;
-                endgroup!();
-            }
+            group!("Lint Workspace");
+            run_process_for_workspace(
+                "cargo",
+                vec![
+                    "clippy",
+                    "--no-deps",
+                    "--fix",
+                    "--allow-dirty",
+                    "--allow-staged",
+                    "--color=always",
+                    "--",
+                    "--deny",
+                    "warnings",
+                ],
+                &[],
+                "Workspace lint failed",
+                None,
+                None,
+            )?;
+            endgroup!();
         }
         Target::Crates | Target::Examples => {
             let members = match target {
@@ -189,80 +149,52 @@ fn run_lint(
                 Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
                 _ => unreachable!(),
             };
-
-            if answer.is_none() {
-                answer = Some(ask_once(&format!(
-                    "This will run lint with auto-fix on all {} of the workspace.",
-                    if *target == Target::Crates {
-                        "crates"
-                    } else {
-                        "examples"
-                    }
-                )));
-            }
-
-            if answer.unwrap() {
-                for member in members {
-                    group!("Lint: {}", member.name);
-                    run_process_for_package(
-                        "cargo",
+            for member in members {
+                group!("Lint: {}", member.name);
+                run_process_for_package(
+                    "cargo",
+                    &member.name,
+                    &vec![
+                        "clippy",
+                        "--no-deps",
+                        "--fix",
+                        "--allow-dirty",
+                        "--allow-staged",
+                        "--color=always",
+                        "-p",
                         &member.name,
-                        &vec![
-                            "clippy",
-                            "--no-deps",
-                            "--fix",
-                            "--allow-dirty",
-                            "--allow-staged",
-                            "--color=always",
-                            "-p",
-                            &member.name,
-                            "--",
-                            "--deny",
-                            "warnings",
-                        ],
-                        excluded,
-                        only,
-                        &format!("Lint fix execution failed for {}", &member.name),
-                        None,
-                        None,
-                    )?;
-                    endgroup!();
-                }
+                        "--",
+                        "--deny",
+                        "warnings",
+                    ],
+                    excluded,
+                    only,
+                    &format!("Lint fix execution failed for {}", &member.name),
+                    None,
+                    None,
+                )?;
+                endgroup!();
             }
         }
         Target::AllPackages => {
-            if answer.is_none() {
-                answer = Some(ask_once(
-                    "This will run lint check with auto-fix on all packages of the workspace.",
-                ));
-            }
-            if answer.unwrap() {
-                Target::iter()
-                    .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                    .try_for_each(|t| run_lint(&t, excluded, only, answer))?;
-            }
+            Target::iter()
+                .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
+                .try_for_each(|t| run_lint(&t, excluded, only))?;
         }
     }
     Ok(())
 }
 
-pub(crate) fn run_typos(mut answer: Option<bool>) -> anyhow::Result<()> {
-    if answer.is_none() {
-        answer = Some(ask_once(
-            "This will look for typos in the source code check and auto-fix them.",
-        ));
-    };
-    if answer.unwrap() {
-        ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
-        group!("Typos");
-        run_process(
-            "typos",
-            &vec!["--write-changes", "--color", "always"],
-            None,
-            None,
-            "Some typos have been found and cannot be fixed.",
-        )?;
-        endgroup!();
-    }
+pub(crate) fn run_typos() -> anyhow::Result<()> {
+    ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+    group!("Typos");
+    run_process(
+        "typos",
+        &vec!["--write-changes", "--color", "always"],
+        None,
+        None,
+        "Some typos have been found and cannot be fixed.",
+    )?;
+    endgroup!();
     Ok(())
 }
