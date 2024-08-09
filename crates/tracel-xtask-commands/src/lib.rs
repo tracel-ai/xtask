@@ -46,6 +46,7 @@ pub mod prelude {
     pub use crate::group_info;
     pub use crate::init_xtask;
     pub use crate::utils::prompt::ask_once;
+    pub use crate::utils::process::run_process;
 }
 
 use crate::logging::init_logger;
