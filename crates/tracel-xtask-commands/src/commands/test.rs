@@ -35,7 +35,7 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-pub(crate) fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result<()> {
+pub fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
@@ -109,7 +109,7 @@ fn run_unit_test(
     Ok(())
 }
 
-pub(crate) fn run_integration(
+pub fn run_integration(
     target: &Target,
     excluded: &[String],
     only: &[String],

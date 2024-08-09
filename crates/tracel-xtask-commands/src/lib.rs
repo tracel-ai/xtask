@@ -45,8 +45,11 @@ pub mod prelude {
     pub use crate::group;
     pub use crate::group_info;
     pub use crate::init_xtask;
-    pub use crate::utils::prompt::ask_once;
+    pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
+    pub use crate::utils::cargo::is_current_toolchain_nightly;
     pub use crate::utils::process::run_process;
+    pub use crate::utils::prompt::ask_once;
+    pub use crate::utils::time::format_duration;
 }
 
 use crate::logging::init_logger;

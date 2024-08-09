@@ -49,7 +49,7 @@ fn is_cargo_crate_installed(crate_name: &str) -> bool {
 }
 
 /// Returns true if the current toolchain is the nightly
-pub(crate) fn is_current_toolchain_nightly() -> bool {
+pub fn is_current_toolchain_nightly() -> bool {
     let output = Command::new("rustup")
         .arg("show")
         .output()
