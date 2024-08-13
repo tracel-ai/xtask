@@ -200,6 +200,23 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
 // Command arguments
 // =================
 
+fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStream> {
+    HashMap::from([
+        (
+            "TestCmdArgs",
+            quote! {
+                #[doc = r"Maximum number of parallel test."]
+                #[arg(
+                    long = " --test-threads",
+                    value_name = "NUMBER OF THREADS",
+                    required = false
+                )]
+                pub threads: Option<u16>,
+            },
+        ),
+    ])
+}
+
 fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
@@ -280,6 +297,12 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
             quote! {}
         };
 
+        let additional_cmd_args_map = get_additional_cmd_args_map();
+        let addtional_fields = match additional_cmd_args_map.get(struct_name.to_string().as_str()) {
+            Some(fields) => fields.clone(),
+            None => quote! {},
+        };
+
         let subcommand_field = if let Some(subcommand) = subcommand_type.clone() {
             quote! {
                 #[command(subcommand)]
@@ -293,6 +316,7 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
             #[derive(clap::Args, Clone)]
             pub struct #struct_name {
                 #target_fields
+                #addtional_fields
                 #subcommand_field
                 #(#original_fields,)*
             }

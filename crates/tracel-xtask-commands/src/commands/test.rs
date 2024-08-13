@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -20,8 +20,8 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
     match args.command {
-        TestSubCommand::Unit => run_unit(&args.target, &args.exclude, &args.only),
-        TestSubCommand::Integration => run_integration(&args.target, &args.exclude, &args.only),
+        TestSubCommand::Unit => run_unit(&args.target, &args),
+        TestSubCommand::Integration => run_integration(&args.target, &args),
         TestSubCommand::All => TestSubCommand::iter()
             .filter(|c| *c != TestSubCommand::All)
             .try_for_each(|c| {
@@ -30,12 +30,13 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
                     only: args.only.clone(),
+                    threads: args.threads,
                 })
             }),
     }
 }
 
-pub fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result<()> {
+pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
@@ -50,7 +51,7 @@ pub fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result
                     "--color",
                     "always",
                 ],
-                excluded,
+                &args.exclude,
                 "Workspace Unit Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Unit Tests"),
@@ -64,16 +65,16 @@ pub fn run_unit(target: &Target, excluded: &[String], only: &[String]) -> Result
             };
 
             for member in members {
-                run_unit_test(&member, excluded, only)?;
+                run_unit_test(&member, &args.exclude, &args.only)?;
             }
         }
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_unit(&t, excluded, only))?;
+                .try_for_each(|t| run_unit(&t, &args))?;
         }
     }
-    Ok(())
+    anyhow::Ok(())
 }
 
 fn run_unit_test(
@@ -106,14 +107,10 @@ fn run_unit_test(
         )),
     )?;
     endgroup!();
-    Ok(())
+    anyhow::Ok(())
 }
 
-pub fn run_integration(
-    target: &Target,
-    excluded: &[String],
-    only: &[String],
-) -> anyhow::Result<()> {
+pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Integration Tests");
@@ -127,7 +124,7 @@ pub fn run_integration(
                     "--color",
                     "always",
                 ],
-                excluded,
+                &args.exclude,
                 "Workspace Integration Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Integration Tests"),
@@ -141,38 +138,40 @@ pub fn run_integration(
             };
 
             for member in members {
-                run_integration_test(&member, excluded, only)?;
+                run_integration_test(&member, args)?;
             }
         }
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_integration(&t, excluded, only))?;
+                .try_for_each(|t| run_integration(&t, &args))?;
         }
     }
-    Ok(())
+    anyhow::Ok(())
 }
 
-fn run_integration_test(
-    member: &WorkspaceMember,
-    excluded: &[String],
-    only: &[String],
-) -> Result<()> {
+fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<()> {
     group!("Integration Tests: {}", &member.name);
+    let mut cmd_args = vec![
+        "test",
+        "--test",
+        "test_*",
+        "-p",
+        &member.name,
+        "--color",
+        "always",
+    ];
+    let threads_str: String;
+    if let Some(threads) = &args.threads {
+        threads_str = threads.to_string();
+        cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
+    }
     run_process_for_package(
         "cargo",
         &member.name,
-        &vec![
-            "test",
-            "--test",
-            "test_*",
-            "-p",
-            &member.name,
-            "--color",
-            "always",
-        ],
-        excluded,
-        only,
+        &cmd_args,
+        &args.exclude,
+        &args.only,
         &format!("Failed to execute integration test for '{}'", &member.name),
         Some("no test target matches pattern"),
         Some(&format!(
@@ -181,5 +180,5 @@ fn run_integration_test(
         )),
     )?;
     endgroup!();
-    Ok(())
+    anyhow::Ok(())
 }
