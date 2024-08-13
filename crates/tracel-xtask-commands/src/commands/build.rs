@@ -34,6 +34,8 @@ pub(crate) fn run_build(
                 "cargo",
                 vec!["build", "--workspace", "--color", "always"],
                 excluded,
+                None,
+                None,
                 "Workspace build failed",
                 None,
                 None,

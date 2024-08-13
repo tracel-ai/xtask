@@ -34,6 +34,8 @@ pub(crate) fn run_compile(
                 "cargo",
                 vec!["check", "--workspace"],
                 excluded,
+                None,
+                None,
                 "Workspace compilation failed",
                 None,
                 None,

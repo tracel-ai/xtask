@@ -37,6 +37,8 @@ fn run_documentation_build(
                 "cargo",
                 vec!["doc", "--workspace", "--no-deps", "--color=always"],
                 excluded,
+                None,
+                None,
                 "Workspace documentation build failed",
                 None,
                 None,
@@ -86,9 +88,11 @@ pub(crate) fn run_documentation(
                 "cargo",
                 vec!["test", "--workspace", "--doc", "--color", "always"],
                 excluded,
-                "Workspace documentation test failed",
                 Some(r"Doc-tests (\w+)"),
                 Some("Doc Tests"),
+                "Workspace documentation test failed",
+                None,
+                None,
             )?;
             endgroup!();
         }

@@ -58,9 +58,11 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
                 "cargo",
                 cmd_args,
                 &args.exclude,
-                "Workspace Unit Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Unit Tests"),
+                "Workspace Unit Tests failed",
+                Some("no library targets found"),
+                Some("No library found to test for in workspace."),
             )?;
         }
         Target::Crates | Target::Examples => {
@@ -110,7 +112,7 @@ fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), any
         &format!("Failed to execute unit test for '{}'", &member.name),
         Some("no library targets found"),
         Some(&format!(
-            "No library found to test for in the crate '{}'",
+            "No library found to test for in the crate '{}'.",
             &member.name
         )),
     )?;
@@ -139,9 +141,11 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
                 "cargo",
                 cmd_args,
                 &args.exclude,
-                "Workspace Integration Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Integration Tests"),
+                "Workspace Integration Tests failed",
+                Some("no test target matches pattern"),
+                Some("No tests found matching the pattern `test_*` in workspace."),
             )?;
         }
         Target::Crates | Target::Examples => {
@@ -189,7 +193,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
         &format!("Failed to execute integration test for '{}'", &member.name),
         Some("no test target matches pattern"),
         Some(&format!(
-            "No tests found matching the pattern `test_*` for '{}'",
+            "No tests found matching the pattern `test_*` for '{}'.",
             &member.name
         )),
     )?;

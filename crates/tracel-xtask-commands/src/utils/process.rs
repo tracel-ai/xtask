@@ -45,15 +45,18 @@ pub fn run_process(
 
 /// Run a process for workspace
 /// regexp must have one capture group if defined
+#[allow(clippy::too_many_arguments)]
 pub fn run_process_for_workspace<'a>(
     name: &str,
     mut args: Vec<&'a str>,
     excluded: &'a [String],
-    error_msg: &str,
     group_regexp: Option<&str>,
     group_name: Option<&str>,
+    error_msg: &str,
+    ignore_log: Option<&str>,
+    ignore_msg: Option<&str>,
 ) -> anyhow::Result<()> {
-    let re: Option<Regex> = group_regexp.map(|r| Regex::new(r).unwrap());
+    let group_rx: Option<Regex> = group_regexp.map(|r| Regex::new(r).unwrap());
     excluded
         .iter()
         .for_each(|ex| args.extend(["--exclude", ex]));
@@ -71,12 +74,14 @@ pub fn run_process_for_workspace<'a>(
             ))
         })?;
 
+    let mut ignore_error = false;
     let mut close_group = false;
     if let Some(stderr) = child.stderr.take() {
         let reader = BufReader::new(stderr);
         reader.lines().for_each(|line| {
+            let mut skip_line = false;
             if let Ok(line) = line {
-                if let Some(rx) = &re {
+                if let Some(rx) = &group_rx {
                     let cleaned_line = standardize_slashes(&remove_ansi_codes(&line));
                     if let Some(caps) = rx.captures(&cleaned_line) {
                         let crate_name = &caps[1];
@@ -86,7 +91,18 @@ pub fn run_process_for_workspace<'a>(
                         group!("{}: {}", group_name.unwrap_or("Group"), crate_name);
                     }
                 }
-                eprintln!("{}", line);
+                if let Some(log) = ignore_log {
+                    if line.contains(log) {
+                        if let Some(msg) = ignore_msg {
+                            warn!("{}", msg);
+                        }
+                        ignore_error = true;
+                        skip_line = true;
+                    }
+                }
+                if !skip_line {
+                    eprintln!("{}", line);
+                }
                 close_group = true;
             }
         });
@@ -97,7 +113,7 @@ pub fn run_process_for_workspace<'a>(
     let status = child
         .wait()
         .expect("Should be able to wait for the process to finish.");
-    if status.success() {
+    if status.success() || ignore_error {
         anyhow::Ok(())
     } else {
         Err(anyhow!("{}", error_msg))
