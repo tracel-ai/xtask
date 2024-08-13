@@ -14,6 +14,7 @@ extern crate log;
     Dependencies,
     Publish,
     Test,
+    Validate,
     Vulnerabilities
 )]
 pub enum Command {
@@ -39,6 +40,7 @@ fn main() -> anyhow::Result<()> {
         Command::NewCommand(args) => commands::new_command::handle_commands(args),
         Command::Publish(args) => base_commands::publish::handle_command(args),
         Command::Test(args) => base_commands::test::handle_command(args),
+        Command::Validate => commands::validate::handle_command(),
         Command::Vulnerabilities(args) => base_commands::vulnerabilities::handle_command(args),
     }?;
     Ok(())
