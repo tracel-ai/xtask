@@ -71,22 +71,19 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
             };
 
             for member in members {
-                run_unit_test(&member, &args)?;
+                run_unit_test(&member, args)?;
             }
         }
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_unit(&t, &args))?;
+                .try_for_each(|t| run_unit(&t, args))?;
         }
     }
     anyhow::Ok(())
 }
 
-fn run_unit_test(
-    member: &WorkspaceMember,
-    args: &TestCmdArgs,
-) -> Result<(), anyhow::Error> {
+fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     let mut cmd_args = vec![
         "test",
@@ -161,7 +158,7 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_integration(&t, &args))?;
+                .try_for_each(|t| run_integration(&t, args))?;
         }
     }
     anyhow::Ok(())
@@ -199,4 +196,3 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     endgroup!();
     anyhow::Ok(())
 }
-

@@ -20,33 +20,32 @@ pub struct FixCmdArgs {}
 
 pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Result<()> {
     if answer.is_none() {
-        if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty())
-        {
+        if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
             warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
         }
-        answer = Some(ask_once("This will run the check with autofix mode enabled."));
+        answer = Some(ask_once(
+            "This will run the check with autofix mode enabled.",
+        ));
     };
     if answer.unwrap() {
         match args.command {
             FixSubCommand::Audit => run_audit(),
-            FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only, ),
-            FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only, ),
+            FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
+            FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
             FixSubCommand::Typos => run_typos(),
-            FixSubCommand::All => {
-                FixSubCommand::iter()
-                    .filter(|c| *c != FixSubCommand::All)
-                    .try_for_each(|c| {
-                        handle_command(
-                            FixCmdArgs {
-                                command: c,
-                                target: args.target.clone(),
-                                exclude: args.exclude.clone(),
-                                only: args.only.clone(),
-                            },
-                            answer,
-                        )
-                    })
-            }
+            FixSubCommand::All => FixSubCommand::iter()
+                .filter(|c| *c != FixSubCommand::All)
+                .try_for_each(|c| {
+                    handle_command(
+                        FixCmdArgs {
+                            command: c,
+                            target: args.target.clone(),
+                            exclude: args.exclude.clone(),
+                            only: args.only.clone(),
+                        },
+                        answer,
+                    )
+                }),
         }
     } else {
         Ok(())
@@ -67,11 +66,7 @@ pub(crate) fn run_audit() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_format(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> Result<()> {
+fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Result<()> {
     match target {
         Target::Workspace => {
             group!("Format Workspace");
@@ -115,11 +110,7 @@ fn run_format(
     Ok(())
 }
 
-fn run_lint(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
+fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Lint Workspace");

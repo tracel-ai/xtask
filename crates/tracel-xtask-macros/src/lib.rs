@@ -201,20 +201,18 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
 // =================
 
 fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStream> {
-    HashMap::from([
-        (
-            "TestCmdArgs",
-            quote! {
-                #[doc = r"Maximum number of parallel test."]
-                #[arg(
-                    long = " --test-threads",
-                    value_name = "NUMBER OF THREADS",
-                    required = false
-                )]
-                pub threads: Option<u16>,
-            },
-        ),
-    ])
+    HashMap::from([(
+        "TestCmdArgs",
+        quote! {
+            #[doc = r"Maximum number of parallel test."]
+            #[arg(
+                long = " --test-threads",
+                value_name = "NUMBER OF THREADS",
+                required = false
+            )]
+            pub threads: Option<u16>,
+        },
+    )])
 }
 
 fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -246,21 +244,21 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
         if args.len() == 2 {
             // from declare_command_args
             let ty = args.get(0).unwrap();
-            if ty.path().get_ident().unwrap().to_string() != "None" {
+            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
                 target_type = Some(ty.clone());
             }
             let ty = args.get(1).unwrap();
-            if ty.path().get_ident().unwrap().to_string() != "None" {
+            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
                 subcommand_type = Some(ty.clone());
             }
         } else if args.len() == 3 {
             // from extend_command_args
             let ty = args.get(1).unwrap();
-            if ty.path().get_ident().unwrap().to_string() != "None" {
+            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
                 target_type = Some(ty.clone());
             }
             let ty = args.get(2).unwrap();
-            if ty.path().get_ident().unwrap().to_string() != "None" {
+            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
                 subcommand_type = Some(ty.clone());
             }
         } else {
@@ -298,7 +296,8 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
         };
 
         let additional_cmd_args_map = get_additional_cmd_args_map();
-        let addtional_fields = match additional_cmd_args_map.get(struct_name.to_string().as_str()) {
+        let additional_fields = match additional_cmd_args_map.get(struct_name.to_string().as_str())
+        {
             Some(fields) => fields.clone(),
             None => quote! {},
         };
@@ -316,7 +315,7 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
             #[derive(clap::Args, Clone)]
             pub struct #struct_name {
                 #target_fields
-                #addtional_fields
+                #additional_fields
                 #subcommand_field
                 #(#original_fields,)*
             }
@@ -600,7 +599,9 @@ fn generate_subcomand_tryinto(
 ) -> TokenStream {
     let variant_map = get_subcommand_variant_map();
     // check if variants exist is done by the caller
-    let variants = variant_map.get(base_subcommand.to_string().as_str()).unwrap();
+    let variants = variant_map
+        .get(base_subcommand.to_string().as_str())
+        .unwrap();
     // parse the variant and look for a default attribute so that we add the default derive if required
     let variants_tokens = TokenStream::from(variants.clone());
     let parsed_variants =
@@ -643,7 +644,7 @@ pub fn extend_subcommands(args: TokenStream, input: TokenStream) -> TokenStream 
     let original_variants = &item.variants;
 
     let variant_map = get_subcommand_variant_map();
-    if variant_map.get(base_subcommand_string.as_str()).is_none() {
+    if !variant_map.contains_key(base_subcommand_string.as_str()) {
         let err_msg = format!(
             "Unknown command: {}\nPossible commands are:\n  {}",
             base_subcommand_string,
