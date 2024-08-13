@@ -40,17 +40,23 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
+            let mut cmd_args = vec![
+                "test",
+                "--workspace",
+                "--lib",
+                "--bins",
+                "--examples",
+                "--color",
+                "always",
+            ];
+            let threads_str: String;
+            if let Some(threads) = &args.threads {
+                threads_str = threads.to_string();
+                cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
+            };
             run_process_for_workspace(
                 "cargo",
-                vec![
-                    "test",
-                    "--workspace",
-                    "--lib",
-                    "--bins",
-                    "--examples",
-                    "--color",
-                    "always",
-                ],
+                cmd_args,
                 &args.exclude,
                 "Workspace Unit Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
@@ -65,7 +71,7 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
             };
 
             for member in members {
-                run_unit_test(&member, &args.exclude, &args.only)?;
+                run_unit_test(&member, &args)?;
             }
         }
         Target::AllPackages => {
@@ -79,26 +85,31 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
 
 fn run_unit_test(
     member: &WorkspaceMember,
-    excluded: &[String],
-    only: &[String],
+    args: &TestCmdArgs,
 ) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
+    let mut cmd_args = vec![
+        "test",
+        "--lib",
+        "--bins",
+        "--examples",
+        "-p",
+        &member.name,
+        "--color=always",
+        "--",
+        "--color=always",
+    ];
+    let threads_str: String;
+    if let Some(threads) = &args.threads {
+        threads_str = threads.to_string();
+        cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
+    };
     run_process_for_package(
         "cargo",
         &member.name,
-        &vec![
-            "test",
-            "--lib",
-            "--bins",
-            "--examples",
-            "-p",
-            &member.name,
-            "--color=always",
-            "--",
-            "--color=always",
-        ],
-        excluded,
-        only,
+        &cmd_args,
+        &args.exclude,
+        &args.only,
         &format!("Failed to execute unit test for '{}'", &member.name),
         Some("no library targets found"),
         Some(&format!(
@@ -114,16 +125,22 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
     match target {
         Target::Workspace => {
             info!("Workspace Integration Tests");
+            let mut cmd_args = vec![
+                "test",
+                "--workspace",
+                "--test",
+                "test_*",
+                "--color",
+                "always",
+            ];
+            let threads_str: String;
+            if let Some(threads) = &args.threads {
+                threads_str = threads.to_string();
+                cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
+            };
             run_process_for_workspace(
                 "cargo",
-                vec![
-                    "test",
-                    "--workspace",
-                    "--test",
-                    "test_*",
-                    "--color",
-                    "always",
-                ],
+                cmd_args,
                 &args.exclude,
                 "Workspace Integration Tests failed",
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
@@ -165,7 +182,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     if let Some(threads) = &args.threads {
         threads_str = threads.to_string();
         cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
-    }
+    };
     run_process_for_package(
         "cargo",
         &member.name,
@@ -182,3 +199,4 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     endgroup!();
     anyhow::Ok(())
 }
+
