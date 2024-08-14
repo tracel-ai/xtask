@@ -7,7 +7,7 @@ pub fn rustup_add_target(target: &str) -> anyhow::Result<()> {
     group!("Rustup: add target {}", target);
     run_process(
         "rustup",
-        &vec!["add", target],
+        &vec!["target", "add", target],
         None,
         None,
         &format!("Failed to add target {target}"),
@@ -21,7 +21,7 @@ pub fn rustup_add_component(component: &str) -> anyhow::Result<()> {
     group!("Rustup: add component {}", component);
     run_process(
         "rustup",
-        &vec!["add", component],
+        &vec!["component", "add", component],
         None,
         None,
         &format!("Failed to add component {component}"),
