@@ -62,9 +62,23 @@ extern crate log;
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
 #[strum(serialize_all = "lowercase")]
+pub enum Environment {
+    #[default]
+    /// Development environment.
+    Development,
+    /// Staging environment.
+    Staging,
+    /// Production environment.
+    Production,
+}
+
+#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
+#[strum(serialize_all = "lowercase")]
 pub enum ExecutionEnvironment {
     #[strum(to_string = "no-std")]
+    /// Set the execution environment to no-std (no Rust standard library available).
     NoStd,
+    /// Set the execution environment to std (Rust standard library is available).
     #[default]
     Std,
 }
@@ -72,11 +86,14 @@ pub enum ExecutionEnvironment {
 #[derive(clap::Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct XtaskArgs<C: clap::Subcommand> {
-    /// Enable code coverage.
+    /// Enable code coverage for Rust code if availabe (see coverage command for more info).
     #[arg(short = 'c', long)]
     pub enable_coverage: bool,
-    /// Set execution environment.
-    #[arg(short = 'e', long, default_value_t = ExecutionEnvironment::Std)]
+    /// Set environment (for commands that support it).
+    #[arg(short = 'e', long, default_value_t = Environment::Development)]
+    pub environment: Environment,
+    /// Set execution environment (for commands that support it).
+    #[arg(short = 'E', long, default_value_t = ExecutionEnvironment::Std)]
     pub execution_environment: ExecutionEnvironment,
     #[command(subcommand)]
     pub command: C,
