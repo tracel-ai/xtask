@@ -1,6 +1,6 @@
 mod commands;
 
-use tracel_xtask::{prelude::*, XtaskArgs};
+use tracel_xtask::prelude::*;
 
 #[macro_use]
 extern crate log;
