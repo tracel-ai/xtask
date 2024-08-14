@@ -87,7 +87,7 @@ fn generate_dispatch_function(
         }
     }).collect();
     let func = quote! {
-        fn dispatch_base_command(args: XtaskArgs<Command>) -> anyhow::Result<()> {
+        fn dispatch_base_commands(args: XtaskArgs<Command>) -> anyhow::Result<()> {
             match args.command {
                 #(#arms)*
                 _ => Err(anyhow::anyhow!("Unknown command")),
@@ -98,7 +98,7 @@ fn generate_dispatch_function(
 }
 
 #[proc_macro_attribute]
-pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let item = parse_macro_input!(input as ItemEnum);
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);

@@ -14,7 +14,7 @@ pub mod prelude {
     pub use tracing_subscriber;
 
     pub mod macros {
-        pub use tracel_xtask_macros::commands;
+        pub use tracel_xtask_macros::base_commands;
         pub use tracel_xtask_macros::declare_command_args;
         pub use tracel_xtask_macros::extend_command_args;
         pub use tracel_xtask_macros::extend_subcommands;
