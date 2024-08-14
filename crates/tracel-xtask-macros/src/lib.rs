@@ -68,6 +68,30 @@ pub fn extend_targets(args: TokenStream, input: TokenStream) -> TokenStream {
 // Commands
 // ========
 
+fn generate_dispatch_function(enum_ident: &syn::Ident, args: &Punctuated<Meta, Comma>) -> TokenStream {
+    let arms: Vec<proc_macro2::TokenStream> = args.iter().filter_map(|meta| {
+        let cmd_ident = meta.path().get_ident().unwrap();
+        let cmd_ident_string = cmd_ident.to_string();
+        let module_ident = syn::Ident::new(cmd_ident_string.to_lowercase().as_str(), cmd_ident.span());
+        if cmd_ident_string != "Validate" {
+            Some(quote! {
+                #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args),
+            })
+        } else {
+            None
+        }
+    }).collect();
+    let func = quote! {
+        fn dispatch_base_command(args: XtaskArgs<Command>) -> anyhow::Result<()> {
+            match args.command {
+                #(#arms)*
+                _ => Err(anyhow::anyhow!("Unknown command")),
+            }
+        }
+    };
+    TokenStream::from(func)
+}
+
 #[proc_macro_attribute]
 pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
@@ -160,7 +184,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate the corresponding enum variant
     let mut variants = vec![];
-    for arg in args {
+    for arg in &args {
         if let Meta::Path(path) = arg {
             if let Some(ident) = path.get_ident() {
                 let ident_string = ident.to_string();
@@ -187,14 +211,15 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Generate the xtask commands enum
     let enum_name = &item.ident;
     let other_variants = &item.variants;
-    let expanded = quote! {
+    let mut output = TokenStream::from(quote! {
         #[derive(clap::Subcommand)]
         pub enum #enum_name {
             #(#variants,)*
             #other_variants
         }
-    };
-    TokenStream::from(expanded)
+    });
+    output.extend(generate_dispatch_function(enum_name, &args));
+    output
 }
 
 // Command arguments
