@@ -25,7 +25,7 @@ cargo build
 In the `main.rs` file declare a `Command` struct and select the commands you want to use using `tracel_xtask_macros::commands` macro:
 
 ```rust
-use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask::{anyhow, clap, commands::*, init_xtask};
 
 #[tracel_xtask_macros::commands(
     Build,
@@ -155,7 +155,7 @@ To add specific new commands, first add new variants to the `Command` enum:
 ```rust
 mod commands;
 
-use tracel_xtask_commands::{anyhow, clap, commands::*, init_xtask};
+use tracel_xtask::{anyhow, clap, commands::*, init_xtask};
 
 #[tracel_xtask_macros::commands(
     Build,
@@ -200,7 +200,7 @@ Note that `xtask-macros` provides a macro to easily add common arguments to the 
 exclusion of crates with `--exclusion` etc... In this case we will just add the `--target` argument:
 
 ```rust
-use tracel_xtask_commands::{commands::Target, anyhow::{self, Ok}, clap};
+use tracel_xtask::{commands::Target, anyhow::{self, Ok}, clap};
 
 #[tracel_xtask_macros::arguments(target::Target)]
 struct MyCommandCmdArgs {}
@@ -237,9 +237,9 @@ To extend the `build` command for instance we can just create a custom command c
 Then inside the `handle_command` function we can call the implement provided by `xtask-common` like so:
 
 ```rust
-pub fn handle_commands(mut args: tracel_xtask_commands::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
+pub fn handle_commands(mut args: tracel_xtask::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
     // do some stuff before like tweaking the arguments or performinig setup
-    tracel_xtask_commands::commands::build::handle_command(args)?;
+    tracel_xtask::commands::build::handle_command(args)?;
     // do some stuff after like cleaning state etc...
     Ok(())
 }
@@ -257,17 +257,17 @@ For instance we can extend the `build` command using the `Extend an existing xta
 build additional crates with custom features or build targets:
 
 ```rust
-pub fn handle_commands(mut args: tracel_xtask_commands::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
+pub fn handle_commands(mut args: tracel_xtask::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
     // regular execution of the build command
-    tracel_xtask_commands::commands::build::handle_command(args)?;
+    tracel_xtask::commands::build::handle_command(args)?;
 
     // additional crate builds
     // build 'my-crate' with all the features
-    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"])?;
     // build 'my-crate' with specific features
-    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"])?;
     // build 'my-crate' with a different target than the default one
-    tracel_xtask_commands::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"])?;
     Ok(())
 }
 ```
@@ -325,19 +325,19 @@ Here is a simple example to perform all checks, build and test:
 
 ```rust
 pub fn handle_command() -> anyhow::Result<()> {
-    let target = tracel_xtask_commands::commands::Target::Workspace;
+    let target = tracel_xtask::commands::Target::Workspace;
     let exclude = vec![];
     let only = vec![];
     // checks
     [
-        tracel_xtask_commands::commands::check::CheckCommand::Audit,
-        tracel_xtask_commands::commands::check::CheckCommand::Format,
-        tracel_xtask_commands::commands::check::CheckCommand::Lint,
-        tracel_xtask_commands::commands::check::CheckCommand::Typos,
+        tracel_xtask::commands::check::CheckCommand::Audit,
+        tracel_xtask::commands::check::CheckCommand::Format,
+        tracel_xtask::commands::check::CheckCommand::Lint,
+        tracel_xtask::commands::check::CheckCommand::Typos,
     ]
     .iter()
     .try_for_each(|c| {
-        tracel_xtask_commands::commands::check::handle_command(tracel_xtask_commands::commands::check::CheckCmdArgs {
+        tracel_xtask::commands::check::handle_command(tracel_xtask::commands::check::CheckCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
@@ -346,8 +346,8 @@ pub fn handle_command() -> anyhow::Result<()> {
     })?;
 
     // build
-    tracel_xtask_commands::commands::build::handle_command(
-        tracel_xtask_commands::commands::build::BuildCmdArgs {
+    tracel_xtask::commands::build::handle_command(
+        tracel_xtask::commands::build::BuildCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
@@ -355,12 +355,12 @@ pub fn handle_command() -> anyhow::Result<()> {
     )?;
 
     // tests
-    tracel_xtask_commands::commands::test::handle_command(
-        tracel_xtask_commands::commands::test::TestCmdArgs {
+    tracel_xtask::commands::test::handle_command(
+        tracel_xtask::commands::test::TestCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
-            command: tracel_xtask_commands::commands::test::TestCommand::All,
+            command: tracel_xtask::commands::test::TestCommand::All,
         },
     )?;
 }

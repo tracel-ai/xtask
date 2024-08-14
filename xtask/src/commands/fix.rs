@@ -1,7 +1,7 @@
-// This a comprehensive example on how to extend an existing base command provided by tracel_xtask_commands
+// This a comprehensive example on how to extend an existing base command provided by tracel_xtask
 // This example extends the targets and the sub-commands with custom args.
 use strum::IntoEnumIterator;
-use tracel_xtask_commands::prelude::*;
+use tracel_xtask::prelude::*;
 
 // Extends the available target for the fix command by adding a 'ci' target
 #[macros::extend_targets]

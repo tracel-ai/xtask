@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 strum = { workspace = true }
 log = { workspace = true }
-tracel-xtask-commands = { path = "../crates/tracel-xtask-commands" }
+tracel-xtask = { path = "../crates/tracel-xtask" }

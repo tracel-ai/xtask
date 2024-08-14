@@ -37,14 +37,14 @@ fn generate_target_tryinto(_args: TokenStream, input: TokenStream) -> TokenStrea
     let item = parse_macro_input!(input as ItemEnum);
     let item_ident = &item.ident;
     let tryinto = quote! {
-        impl std::convert::TryInto<tracel_xtask_commands::commands::Target> for #item_ident {
+        impl std::convert::TryInto<tracel_xtask::commands::Target> for #item_ident {
             type Error = anyhow::Error;
-            fn try_into(self) -> Result<tracel_xtask_commands::commands::Target, Self::Error> {
+            fn try_into(self) -> Result<tracel_xtask::commands::Target, Self::Error> {
                 match self {
-                    #item_ident::AllPackages => Ok(tracel_xtask_commands::commands::Target::AllPackages),
-                    #item_ident::Crates => Ok(tracel_xtask_commands::commands::Target::Crates),
-                    #item_ident::Examples => Ok(tracel_xtask_commands::commands::Target::Examples),
-                    #item_ident::Workspace => Ok(tracel_xtask_commands::commands::Target::Workspace),
+                    #item_ident::AllPackages => Ok(tracel_xtask::commands::Target::AllPackages),
+                    #item_ident::Crates => Ok(tracel_xtask::commands::Target::Crates),
+                    #item_ident::Examples => Ok(tracel_xtask::commands::Target::Examples),
+                    #item_ident::Workspace => Ok(tracel_xtask::commands::Target::Workspace),
                     _ => Err(anyhow::anyhow!("{} target is not supported.", self))
                 }
             }
@@ -80,70 +80,70 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Build",
         quote! {
             #[doc = r"Build the code."]
-            Build(tracel_xtask_commands::commands::build::BuildCmdArgs)
+            Build(tracel_xtask::commands::build::BuildCmdArgs)
         },
     );
     variant_map.insert(
         "Bump",
         quote! {
             #[doc = r"Bump the version of all crates to be published."]
-            Bump(tracel_xtask_commands::commands::bump::BumpCmdArgs)
+            Bump(tracel_xtask::commands::bump::BumpCmdArgs)
         },
     );
     variant_map.insert(
         "Fix",
         quote! {
             #[doc = r"Fix issues found with the 'check' command."]
-            Fix(tracel_xtask_commands::commands::fix::FixCmdArgs)
+            Fix(tracel_xtask::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(
         "Check",
         quote! {
             #[doc = r"Run checks like formatting, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
-            Check(tracel_xtask_commands::commands::check::CheckCmdArgs)
+            Check(tracel_xtask::commands::check::CheckCmdArgs)
         },
     );
     variant_map.insert(
         "Compile",
         quote! {
             #[doc = r"Compile check the code (does not write binaries to disk)."]
-            Compile(tracel_xtask_commands::commands::compile::CompileCmdArgs)
+            Compile(tracel_xtask::commands::compile::CompileCmdArgs)
         },
     );
     variant_map.insert(
         "Coverage",
         quote! {
             #[doc = r"Install and run coverage tools."]
-            Coverage(tracel_xtask_commands::commands::coverage::CoverageCmdArgs)
+            Coverage(tracel_xtask::commands::coverage::CoverageCmdArgs)
         },
     );
     variant_map.insert(
         "Doc",
         quote! {
             #[doc = r"Build documentation."]
-            Doc(tracel_xtask_commands::commands::doc::DocCmdArgs)
+            Doc(tracel_xtask::commands::doc::DocCmdArgs)
         },
     );
     variant_map.insert(
         "Dependencies",
         quote! {
             #[doc = r"Run the specified dependencies check locally."]
-            Dependencies(tracel_xtask_commands::commands::dependencies::DependenciesCmdArgs)
+            Dependencies(tracel_xtask::commands::dependencies::DependenciesCmdArgs)
         },
     );
     variant_map.insert(
         "Publish",
         quote! {
             #[doc = r"Publish a crate to crates.io."]
-            Publish(tracel_xtask_commands::commands::publish::PublishCmdArgs)
+            Publish(tracel_xtask::commands::publish::PublishCmdArgs)
         },
     );
     variant_map.insert(
         "Test",
         quote! {
             #[doc = r"Runs tests."]
-            Test(tracel_xtask_commands::commands::test::TestCmdArgs)
+            Test(tracel_xtask::commands::test::TestCmdArgs)
         },
     );
     variant_map.insert(
@@ -155,7 +155,7 @@ pub fn commands(args: TokenStream, input: TokenStream) -> TokenStream {
     );
     variant_map.insert("Vulnerabilities", quote! {
         #[doc = r"Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'."]
-        Vulnerabilities(tracel_xtask_commands::commands::vulnerabilities::VulnerabilitiesCmdArgs)
+        Vulnerabilities(tracel_xtask::commands::vulnerabilities::VulnerabilitiesCmdArgs)
     });
 
     // Generate the corresponding enum variant

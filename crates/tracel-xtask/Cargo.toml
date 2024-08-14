@@ -1,5 +1,5 @@
 [package]
-name = "tracel-xtask-commands"
+name = "tracel-xtask"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

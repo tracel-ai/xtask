@@ -1,4 +1,4 @@
-use tracel_xtask_commands::prelude::*;
+use tracel_xtask::prelude::*;
 
 // Define a new target enum with an additional Frontend target
 #[macros::extend_targets]

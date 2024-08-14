@@ -1,4 +1,4 @@
-use tracel_xtask_commands::prelude::*;
+use tracel_xtask::prelude::*;
 
 use super::build::{BuildTarget, ExtendedBuildCmdArgs};
 
