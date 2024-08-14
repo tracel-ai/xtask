@@ -1,30 +1,16 @@
 use std::process::{Command, Stdio};
 
-use crate::{endgroup, group, utils::process::handle_child_process};
-
-use super::Params;
-
-/// Run rustup command
-pub fn rustup(command: &str, params: Params, expected: &str) -> anyhow::Result<()> {
-    info!("rustup {} {}\n", command, params);
-    // Run rustup
-    let mut rustup = Command::new("rustup");
-    rustup
-        .arg(command)
-        .args(params.params)
-        .stdout(Stdio::inherit()) // Send stdout directly to terminal
-        .stderr(Stdio::inherit()); // Send stderr directly to terminal
-    let cargo_process = rustup.spawn().expect(expected);
-    handle_child_process(cargo_process, "Failed to wait for rustup child process")
-}
+use crate::{endgroup, group, utils::process::run_process};
 
 /// Add a Rust target
 pub fn rustup_add_target(target: &str) -> anyhow::Result<()> {
     group!("Rustup: add target {}", target);
-    rustup(
-        "target",
-        Params::from(["add", target]),
-        "Target should be added",
+    run_process(
+        "rustup",
+        &vec!["add", target],
+        None,
+        None,
+        &format!("Failed to add target {target}"),
     )?;
     endgroup!();
     Ok(())
@@ -33,10 +19,12 @@ pub fn rustup_add_target(target: &str) -> anyhow::Result<()> {
 /// Add a Rust component
 pub fn rustup_add_component(component: &str) -> anyhow::Result<()> {
     group!("Rustup: add component {}", component);
-    rustup(
-        "component",
-        Params::from(["add", component]),
-        "Component should be added",
+    run_process(
+        "rustup",
+        &vec!["add", component],
+        None,
+        None,
+        &format!("Failed to add component {component}"),
     )?;
     endgroup!();
     Ok(())

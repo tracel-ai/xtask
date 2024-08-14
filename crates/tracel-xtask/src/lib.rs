@@ -49,7 +49,6 @@ pub mod prelude {
     pub use crate::init_xtask;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::cargo::is_current_toolchain_nightly;
-    pub use crate::utils::mdbook;
     pub use crate::utils::helpers;
     pub use crate::utils::process::run_process;
     pub use crate::utils::process::run_process_for_package;
