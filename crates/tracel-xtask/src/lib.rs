@@ -21,6 +21,8 @@ pub mod prelude {
         pub use tracel_xtask_macros::extend_targets;
     }
 
+    pub use crate::Environment;
+    pub use crate::ExecutionEnvironment;
     pub use crate::commands as base_commands;
     pub use crate::commands::build::BuildCmdArgs;
     pub use crate::commands::bump::BumpCmdArgs;
@@ -47,7 +49,12 @@ pub mod prelude {
     pub use crate::init_xtask;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::cargo::is_current_toolchain_nightly;
+    pub use crate::utils::mdbook;
+    pub use crate::utils::helpers;
     pub use crate::utils::process::run_process;
+    pub use crate::utils::process::run_process_for_package;
+    pub use crate::utils::process::run_process_for_workspace;
+    pub use crate::utils::process::random_port;
     pub use crate::utils::prompt::ask_once;
     pub use crate::utils::time::format_duration;
 }
