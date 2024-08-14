@@ -48,13 +48,16 @@ pub mod prelude {
     pub use crate::group_info;
     pub use crate::init_xtask;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
-    pub use crate::utils::cargo::is_current_toolchain_nightly;
     pub use crate::utils::helpers;
     pub use crate::utils::process::run_process;
     pub use crate::utils::process::run_process_for_package;
     pub use crate::utils::process::run_process_for_workspace;
     pub use crate::utils::process::random_port;
     pub use crate::utils::prompt::ask_once;
+    pub use crate::utils::rustup::is_current_toolchain_nightly;
+    pub use crate::utils::rustup::rustup_add_component;
+    pub use crate::utils::rustup::rustup_add_target;
+    pub use crate::utils::rustup::rustup_get_installed_targets;
     pub use crate::utils::time::format_duration;
 }
 

@@ -5,9 +5,9 @@ use crate::{
     commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
     utils::{
-        cargo::{ensure_cargo_crate_is_installed, is_current_toolchain_nightly},
+        cargo::ensure_cargo_crate_is_installed,
         process::run_process,
-        rustup::{rustup_add_component, rustup_get_installed_targets},
+        rustup::{rustup_add_component, rustup_get_installed_targets, is_current_toolchain_nightly},
     },
 };
 
