@@ -47,4 +47,3 @@ pub fn is_cargo_crate_installed(crate_name: &str) -> bool {
     let output_str = String::from_utf8_lossy(&output.stdout);
     output_str.lines().any(|line| line.contains(crate_name))
 }
-

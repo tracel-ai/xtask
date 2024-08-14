@@ -5,8 +5,7 @@ use crate::{
     commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
     utils::{
-        cargo::ensure_cargo_crate_is_installed,
-        process::run_process,
+        cargo::ensure_cargo_crate_is_installed, process::run_process,
         rustup::is_current_toolchain_nightly,
     },
 };

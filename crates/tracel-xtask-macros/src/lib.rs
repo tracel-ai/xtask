@@ -68,17 +68,22 @@ pub fn extend_targets(args: TokenStream, input: TokenStream) -> TokenStream {
 // Commands
 // ========
 
-fn generate_dispatch_function(enum_ident: &syn::Ident, args: &Punctuated<Meta, Comma>) -> TokenStream {
+fn generate_dispatch_function(
+    enum_ident: &syn::Ident,
+    args: &Punctuated<Meta, Comma>,
+) -> TokenStream {
     let arms: Vec<proc_macro2::TokenStream> = args.iter().filter_map(|meta| {
         let cmd_ident = meta.path().get_ident().unwrap();
         let cmd_ident_string = cmd_ident.to_string();
         let module_ident = syn::Ident::new(cmd_ident_string.to_lowercase().as_str(), cmd_ident.span());
-        if cmd_ident_string != "Validate" {
-            Some(quote! {
+        match cmd_ident_string.as_str() {
+            "Validate" => None,
+            "Fix" => Some(quote! {
+                #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args, None),
+            }),
+            _ => Some(quote! {
                 #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args),
             })
-        } else {
-            None
         }
     }).collect();
     let func = quote! {

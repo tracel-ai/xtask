@@ -7,7 +7,9 @@ use crate::{
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         process::run_process,
-        rustup::{rustup_add_component, rustup_get_installed_targets, is_current_toolchain_nightly},
+        rustup::{
+            is_current_toolchain_nightly, rustup_add_component, rustup_get_installed_targets,
+        },
     },
 };
 

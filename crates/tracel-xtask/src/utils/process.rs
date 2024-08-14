@@ -9,8 +9,8 @@ use anyhow::anyhow;
 use rand::Rng;
 use regex::Regex;
 
-use crate::{endgroup, group};
 use crate::group_info;
+use crate::{endgroup, group};
 
 /// Run a process
 pub fn run_process(
