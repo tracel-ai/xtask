@@ -17,7 +17,7 @@ pub struct CoverageCmdArgs {}
 #[derive(Args, Default, Clone, PartialEq)]
 pub struct GenerateCmdArgs {
     /// Build profile to use.
-    #[arg(short, long, value_enum, default_value_t = Profile::Debug)]
+    #[arg(short, long, value_enum, default_value_t = Profile::default())]
     profile: Profile,
     /// Comma-separated list of excluded crates.
     #[arg(

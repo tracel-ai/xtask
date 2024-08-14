@@ -270,7 +270,7 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
         let target_fields = if let Some(target) = target_type {
             quote! {
                 #[doc = r"The target on which executing the command."]
-                #[arg(short, long, value_enum, default_value_t = #target::Workspace)]
+                #[arg(short, long, value_enum, default_value_t = #target::default())]
                 pub target: #target,
                 #[doc = r"Comma-separated list of excluded crates."]
                 #[arg(

@@ -99,10 +99,10 @@ pub struct XtaskArgs<C: clap::Subcommand> {
     #[arg(short = 'c', long)]
     pub enable_coverage: bool,
     /// Set environment (for commands that support it).
-    #[arg(short = 'e', long, default_value_t = Environment::Development)]
+    #[arg(short = 'e', long, default_value_t = Environment::default())]
     pub environment: Environment,
     /// Set execution environment (for commands that support it).
-    #[arg(short = 'E', long, default_value_t = ExecutionEnvironment::Std)]
+    #[arg(short = 'E', long, default_value_t = ExecutionEnvironment::default())]
     pub execution_environment: ExecutionEnvironment,
     #[command(subcommand)]
     pub command: C,
