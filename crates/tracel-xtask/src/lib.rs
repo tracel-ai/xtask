@@ -85,6 +85,8 @@ pub enum Environment {
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum ExecutionEnvironment {
+    /// Set the execution environment to all
+    All,
     #[strum(to_string = "no-std")]
     /// Set the execution environment to no-std (no Rust standard library available).
     NoStd,
