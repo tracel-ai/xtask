@@ -245,10 +245,19 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
     )])
 }
 
-fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(input as ItemStruct);
-    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
-
+// Returns a tuple where 0 is the actual struct and 1 is additional implementations
+fn generate_command_args_struct(
+    args: TokenStream,
+    input: TokenStream,
+) -> (TokenStream, TokenStream) {
+    let item = match syn::parse::<ItemStruct>(input) {
+        Ok(data) => data,
+        Err(e) => return (TokenStream::from(e.to_compile_error()), TokenStream::new()),
+    };
+    let args = match syn::parse::Parser::parse(Punctuated::<Meta, Comma>::parse_terminated, args) {
+        Ok(data) => data,
+        Err(e) => return (TokenStream::from(e.to_compile_error()), TokenStream::new()),
+    };
     let struct_name = &item.ident;
     let original_fields = item.fields.iter().map(|f| {
         let attrs = &f.attrs;
@@ -262,12 +271,13 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
     });
 
     if args.is_empty() {
-        TokenStream::from(quote! {
+        let struct_output = TokenStream::from(quote! {
             #[derive(clap::Args, Clone)]
             pub struct #struct_name {
                 #(#original_fields,)*
             }
-        })
+        });
+        (struct_output, TokenStream::new())
     } else {
         let mut target_type: Option<Meta> = None;
         let mut subcommand_type: Option<Meta> = None;
@@ -292,9 +302,12 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
                 subcommand_type = Some(ty.clone());
             }
         } else {
-            return TokenStream::from(quote! {
-                compile_error!("Error expanding macro.");
-            });
+            return (
+                TokenStream::from(quote! {
+                    compile_error!("Error expanding macro.");
+                }),
+                TokenStream::new(),
+            );
         };
 
         let target_fields = if let Some(target) = target_type {
@@ -332,16 +345,26 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
             None => quote! {},
         };
 
-        let subcommand_field = if let Some(subcommand) = subcommand_type.clone() {
-            quote! {
-                #[command(subcommand)]
-                pub command: #subcommand,
-            }
+        let (subcommand_field, subcommand_impl) = if let Some(subcommand) = subcommand_type.clone()
+        {
+            (
+                quote! {
+                    #[command(subcommand)]
+                    pub command: Option<#subcommand>,
+                },
+                quote! {
+                    impl #struct_name {
+                        pub fn get_command(&self) -> #subcommand {
+                            self.command.clone().unwrap_or_default()
+                        }
+                    }
+                },
+            )
         } else {
-            quote! {}
+            (quote! {}, quote! {})
         };
 
-        let mut output = TokenStream::from(quote! {
+        let struct_output = TokenStream::from(quote! {
             #[derive(clap::Args, Clone)]
             pub struct #struct_name {
                 #target_fields
@@ -350,20 +373,23 @@ fn generate_command_args_struct(args: TokenStream, input: TokenStream) -> TokenS
                 #(#original_fields,)*
             }
         });
-        // generate the subcommand enum
+        let mut additional_output = TokenStream::from(quote! {
+            #subcommand_impl
+        });
+        // generate the subcommand enum only when it is declared
         if args.len() == 2 {
             if let Some(subcommand) = subcommand_type {
                 let subcommand_ident = subcommand.path().get_ident().unwrap();
                 let subcommand_string = subcommand_ident.to_string();
                 let original_variants = Punctuated::<Variant, Comma>::new();
-                output.extend(generate_subcommand_enum(
+                additional_output.extend(generate_subcommand_enum(
                     subcommand_string,
                     subcommand_ident,
                     &original_variants,
                 ));
             }
         }
-        output
+        (struct_output, additional_output)
     }
 }
 
@@ -395,12 +421,17 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     } else {
         quote! {}
     };
-    let subcommand = if has_subcommand {
-        quote! {
-            command: self.command.try_into()?,
-        }
+    let (subcommand_let, subcommand_assign) = if has_subcommand {
+        (
+            quote! {
+                let cmd = self.get_command().try_into()?;
+            },
+            quote! {
+                command: Some(cmd),
+            },
+        )
     } else {
-        quote! {}
+        (quote! {}, quote! {})
     };
     let fields: Vec<_> = item
         .fields
@@ -421,9 +452,10 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
         impl std::convert::TryInto<#base_type> for #item_ident {
             type Error = anyhow::Error;
             fn try_into(self) -> Result<#base_type, Self::Error> {
+                #subcommand_let
                 Ok(#base_type {
                     #target
-                    #subcommand
+                    #subcommand_assign
                     #(#fields)*
                 })
             }
@@ -438,7 +470,11 @@ pub fn declare_command_args(args: TokenStream, input: TokenStream) -> TokenStrea
     let parsed_args =
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
     if parsed_args.len() == 2 {
-        generate_command_args_struct(args, input)
+        let mut output: TokenStream = quote! {}.into();
+        let (struct_output, additional_output) = generate_command_args_struct(args, input);
+        output.extend(struct_output);
+        output.extend(additional_output);
+        output
     } else {
         let error_msg = r#"declare_commands_args macro takes 2 arguments.
  First argument is the target type (None if there is no target).
@@ -459,8 +495,11 @@ pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream
  Third argument is the subcommand type (None if there is no subcommand)"#;
         return TokenStream::from(quote! {compile_error!(#error_msg);});
     }
-    let mut output = generate_command_args_struct(args.clone(), input);
-    let tryinto = generate_command_args_tryinto(args, output.clone());
+    let mut output: TokenStream = quote! {}.into();
+    let (struct_output, additional_output) = generate_command_args_struct(args.clone(), input);
+    let tryinto = generate_command_args_tryinto(args, struct_output.clone());
+    output.extend(struct_output);
+    output.extend(additional_output);
     output.extend(tryinto);
     output
 }
@@ -477,6 +516,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Major,
                 #[doc = r"Run integration tests."]
                 Minor,
+                #[default]
                 #[doc = r"Run documentation tests."]
                 Patch,
             },
@@ -498,11 +538,12 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
+            // note: default is manually implemented for this subcommand as the default variant is not a unit variant.
             "CoverageSubCommand",
             quote! {
                 #[doc = r"Install grcov and its dependencies."]
                 Install,
-                #[doc = r"Generate lcov.info file."]
+                #[doc = r"Generate lcov.info file. [default with default debug profile]"]
                 Generate(GenerateCmdArgs),
             },
         ),
@@ -512,7 +553,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 #[doc = r"Run all dependency checks."]
                 #[default]
                 All,
-                #[doc = r"Run cargo-deny Lint dependency graph to ensure all dependencies meet requirements `<https://crates.io/crates/cargo-deny>`"]
+                #[doc = r"Run cargo-deny Lint dependency graph to ensure all dependencies meet requirements `<https://crates.io/crates/cargo-deny>`. [default]"]
                 Deny,
                 #[doc = r"Run cargo-udeps to find unused dependencies `<https://crates.io/crates/cargo-udeps>`"]
                 Unused,
@@ -560,7 +601,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             "VulnerabilitiesSubCommand",
             quote! {
                 #[default]
-                #[doc = r"Run all most useful vulnerability checks."]
+                #[doc = r"Run all most useful vulnerability checks. [default]"]
                 All,
                 #[doc = r"Run Address sanitizer (memory error detector)"]
                 AddressSanitizer,

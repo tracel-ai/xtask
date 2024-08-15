@@ -21,7 +21,6 @@ pub mod prelude {
         pub use tracel_xtask_macros::extend_targets;
     }
 
-    pub use crate::XtaskArgs;
     pub use crate::commands as base_commands;
     pub use crate::commands::build::BuildCmdArgs;
     pub use crate::commands::bump::BumpCmdArgs;
@@ -60,6 +59,7 @@ pub mod prelude {
     pub use crate::utils::time::format_duration;
     pub use crate::Environment;
     pub use crate::ExecutionEnvironment;
+    pub use crate::XtaskArgs;
 }
 
 use crate::logging::init_logger;

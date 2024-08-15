@@ -14,6 +14,12 @@ use super::Profile;
 #[tracel_xtask_macros::declare_command_args(None, CoverageSubCommand)]
 pub struct CoverageCmdArgs {}
 
+impl Default for CoverageSubCommand {
+    fn default() -> Self {
+        CoverageSubCommand::Generate(GenerateCmdArgs::default())
+    }
+}
+
 #[derive(Args, Default, Clone, PartialEq)]
 pub struct GenerateCmdArgs {
     /// Build profile to use.
@@ -31,7 +37,7 @@ pub struct GenerateCmdArgs {
 }
 
 pub fn handle_command(args: CoverageCmdArgs) -> anyhow::Result<()> {
-    match args.command {
+    match args.get_command() {
         CoverageSubCommand::Install => install_grcov(),
         CoverageSubCommand::Generate(gen_args) => run_grcov(&gen_args),
     }

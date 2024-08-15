@@ -32,7 +32,7 @@ pub struct NewSubcommandArgs {
 // Handle function processing the extended command arguments struct with extended subcommands
 pub fn handle_command(args: ExtendedFixCmdArgs, answer: Option<bool>) -> anyhow::Result<()> {
     // we need to handle both the new subcommand 'new-subcommand' and the 'all' subcommand
-    match args.command {
+    match args.get_command() {
         ExtendedFixSubCommand::NewSubcommand(ref subcmd_args) => {
             run_new_subcommand_fix(args.clone(), subcmd_args, answer)
         }
@@ -43,7 +43,7 @@ pub fn handle_command(args: ExtendedFixCmdArgs, answer: Option<bool>) -> anyhow:
                 .try_for_each(|c| {
                     handle_command(
                         ExtendedFixCmdArgs {
-                            command: c,
+                            command: Some(c),
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),

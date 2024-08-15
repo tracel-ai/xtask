@@ -19,7 +19,7 @@ pub fn handle_command(args: DocCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
-    match args.command {
+    match args.get_command() {
         DocSubCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),
         DocSubCommand::Tests => run_documentation(&args.target, &args.exclude, &args.only),
     }

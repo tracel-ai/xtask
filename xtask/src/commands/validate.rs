@@ -20,7 +20,7 @@ pub fn handle_command() -> anyhow::Result<()> {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
-            command: c.clone(),
+            command: Some(c.clone()),
         })
     })?;
 
@@ -39,7 +39,7 @@ pub fn handle_command() -> anyhow::Result<()> {
         exclude: exclude.clone(),
         only: only.clone(),
         threads: None,
-        command: TestSubCommand::All,
+        command: Some(TestSubCommand::All),
     })?;
 
     Ok(())

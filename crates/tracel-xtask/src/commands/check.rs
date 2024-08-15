@@ -21,7 +21,7 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
         warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
 
-    match args.command {
+    match args.get_command() {
         CheckSubCommand::Audit => run_audit(),
         CheckSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CheckSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
@@ -30,7 +30,7 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
             .filter(|c| *c != CheckSubCommand::All)
             .try_for_each(|c| {
                 handle_command(CheckCmdArgs {
-                    command: c,
+                    command: Some(c),
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
                     only: args.only.clone(),

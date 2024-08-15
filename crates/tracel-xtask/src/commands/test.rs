@@ -19,14 +19,14 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
-    match args.command {
+    match args.get_command() {
         TestSubCommand::Unit => run_unit(&args.target, &args),
         TestSubCommand::Integration => run_integration(&args.target, &args),
         TestSubCommand::All => TestSubCommand::iter()
             .filter(|c| *c != TestSubCommand::All)
             .try_for_each(|c| {
                 handle_command(TestCmdArgs {
-                    command: c,
+                    command: Some(c),
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
                     only: args.only.clone(),

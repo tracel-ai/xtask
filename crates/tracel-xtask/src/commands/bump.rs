@@ -9,7 +9,7 @@ use crate::{
 pub struct BumpCmdArgs {}
 
 pub fn handle_command(args: BumpCmdArgs) -> anyhow::Result<()> {
-    bump(&args.command)
+    bump(&args.get_command())
 }
 
 fn bump(command: &BumpSubCommand) -> anyhow::Result<()> {

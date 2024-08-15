@@ -14,12 +14,12 @@ use crate::{
 pub struct DependenciesCmdArgs {}
 
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
-    match args.command {
+    match args.get_command() {
         DependenciesSubCommand::Deny => run_cargo_deny(),
         DependenciesSubCommand::Unused => run_cargo_udeps(),
         DependenciesSubCommand::All => DependenciesSubCommand::iter()
             .filter(|c| *c != DependenciesSubCommand::All)
-            .try_for_each(|c| handle_command(DependenciesCmdArgs { command: c })),
+            .try_for_each(|c| handle_command(DependenciesCmdArgs { command: Some(c) })),
     }
 }
 

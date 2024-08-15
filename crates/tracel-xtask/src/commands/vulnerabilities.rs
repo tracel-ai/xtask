@@ -17,7 +17,7 @@ use crate::{
 pub struct VulnerabilitiesCmdArgs {}
 
 pub fn handle_command(args: VulnerabilitiesCmdArgs) -> anyhow::Result<()> {
-    args.command.run()
+    args.get_command().run()
 }
 
 impl VulnerabilitiesSubCommand {

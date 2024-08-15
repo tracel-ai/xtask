@@ -28,7 +28,7 @@ pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Res
         ));
     };
     if answer.unwrap() {
-        match args.command {
+        match args.get_command() {
             FixSubCommand::Audit => run_audit(),
             FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
             FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
@@ -38,7 +38,7 @@ pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Res
                 .try_for_each(|c| {
                     handle_command(
                         FixCmdArgs {
-                            command: c,
+                            command: Some(c),
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),
