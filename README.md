@@ -825,11 +825,7 @@ Commands:
 [1]: https://github.com/matklad/cargo-xtask
 [2]: https://github.com/clap-rs/clap
 [3]: https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html
-
-
-
-
-[3]: https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests
-[4]: https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests
-[5]: https://embarkstudios.github.io/cargo-deny/
-[6]: https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html
+[4]: https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests
+[5]: https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests
+[6]: https://embarkstudios.github.io/cargo-deny/
+[7]: https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html
