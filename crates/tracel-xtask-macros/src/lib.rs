@@ -1,4 +1,4 @@
-// TODO: Check if it is possibe to refactor all the macros using an inventory: https://crates.io/crates/inventory
+// TODO: Check if it is possible to refactor all the macros using an inventory: https://crates.io/crates/inventory
 // The idea would be to discover and register all the fields of base commands and all the variants of subcommand.
 // If this is possible this should allow to generalize the command extension mechanism and make it even more useful.
 extern crate proc_macro;

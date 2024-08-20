@@ -7,7 +7,7 @@ of code duplication, boilerplate and considerably lower the burden maintenance. 
 all of our repositories.
 
 These commands are not specific to Tracel repositories and they should be pretty much usable in any Rust repositories with
-a cargo workpsace as well as other repositories where Rust is not necessarily the only language. The commands can be easily
+a cargo workspace as well as other repositories where Rust is not necessarily the only language. The commands can be easily
 extended using handy proc macros and by following some patterns described in this README.
 
 ## Getting Started
@@ -97,7 +97,7 @@ cargo xtask --help
 
 #### Cargo Alias
 
-Invoking the xtask binary with cargo is very verbose and not really usable as is. Hapilly we can create a
+Invoking the xtask binary with cargo is very verbose and not really usable as is. Happily we can create a
 cargo alias to make it really effortless to invoke it.
 
 Create a new file `.cargo/config.toml` in your repository with the following contents:
@@ -511,7 +511,7 @@ For this one we create a new command called `extended-check-subcommands`.
 use tracel_xtask::prelude::*;
 
 #[macros::extend_command_args(CheckCmdArgs, Target, ExtendedCheckSubcommand)]
-pub struct ExtendedCheckdArgsCmdArgs {}
+pub struct ExtendedCheckedArgsCmdArgs {}
 ```
 
 3. Implement the `ExtendedCheckSubcommand` enum by extending the `CheckSubcommand` base enum with the macro `extend_subcommands`.
@@ -530,7 +530,7 @@ pub enum ExtendedCheckSubcommand {
 ```rust
 use strum::IntoEnumIterator;
 
-pub fn handle_command(args: ExtendedCheckdArgsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(args: ExtendedCheckedArgsCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
         ExtendedCheckSubcommand::MySubcommand => run_my_subcommand(args.clone()),
         ExtendedCheckSubcommand::All => {
@@ -538,7 +538,7 @@ pub fn handle_command(args: ExtendedCheckdArgsCmdArgs) -> anyhow::Result<()> {
                 .filter(|c| *c != ExtendedCheckSubcommand::All)
                 .try_for_each(|c| {
                     handle_command(
-                        ExtendedCheckdArgsCmdArgs {
+                        ExtendedCheckedArgsCmdArgs {
                             command: Some(c),
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
@@ -551,7 +551,7 @@ pub fn handle_command(args: ExtendedCheckdArgsCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-fn run_my_subcommand(_args: ExtendedCheckdArgsCmdArgs) -> Result<(), anyhow::Error> {
+fn run_my_subcommand(_args: ExtendedCheckedArgsCmdArgs) -> Result<(), anyhow::Error> {
     println!("Executing new subcommand");
     Ok(())
 }
@@ -572,7 +572,7 @@ use tracel_xtask::prelude::*;
     Test,
 )]
 pub enum Command {
-    ExtendedCheckSubcommand(commands::extended_check_subcommands::ExtendedCheckdArgsCmdArgs),
+    ExtendedCheckSubcommand(commands::extended_check_subcommands::ExtendedCheckedArgsCmdArgs),
 }
 
 fn main() -> anyhow::Result<()> {

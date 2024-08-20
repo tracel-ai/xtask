@@ -27,7 +27,7 @@ pub enum Command {
         commands::extended_build_new_sub_commands::ExtendedBuildSubCommandsCmdArgs,
     ),
     /// Example of a new command which extends a base command sub commands
-    ExtendedCheckSubcommands(commands::extended_check_sub_commands::ExtendedCheckdArgsCmdArgs),
+    ExtendedCheckSubcommands(commands::extended_check_sub_commands::ExtendedCheckedArgsCmdArgs),
     /// Example of a new command which extendeds target
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
     /// Comprehensive example of an extended Fix command with an additional target and subcommand

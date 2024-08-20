@@ -4,7 +4,7 @@ use strum::IntoEnumIterator;
 use tracel_xtask::prelude::*;
 
 #[macros::extend_command_args(CheckCmdArgs, Target, ExtendedCheckSubcommand)]
-pub struct ExtendedCheckdArgsCmdArgs {}
+pub struct ExtendedCheckedArgsCmdArgs {}
 
 #[macros::extend_subcommands(CheckSubCommand)]
 pub enum ExtendedCheckSubcommand {
@@ -12,13 +12,13 @@ pub enum ExtendedCheckSubcommand {
     MySubcommand,
 }
 
-pub fn handle_command(args: ExtendedCheckdArgsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(args: ExtendedCheckedArgsCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
         ExtendedCheckSubcommand::MySubcommand => run_my_subcommand(args.clone()),
         ExtendedCheckSubcommand::All => ExtendedCheckSubcommand::iter()
             .filter(|c| *c != ExtendedCheckSubcommand::All)
             .try_for_each(|c| {
-                handle_command(ExtendedCheckdArgsCmdArgs {
+                handle_command(ExtendedCheckedArgsCmdArgs {
                     command: Some(c),
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
@@ -29,7 +29,7 @@ pub fn handle_command(args: ExtendedCheckdArgsCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-fn run_my_subcommand(_args: ExtendedCheckdArgsCmdArgs) -> Result<(), anyhow::Error> {
+fn run_my_subcommand(_args: ExtendedCheckedArgsCmdArgs) -> Result<(), anyhow::Error> {
     println!("Executing new subcommand");
     Ok(())
 }
