@@ -1,3 +1,6 @@
+// TODO: Check if it is possibe to refactor all the macros using an inventory: https://crates.io/crates/inventory
+// The idea would be to discover and register all the fields of base commands and all the variants of subcommand.
+// If this is possible this should allow to generalize the command extension mechanism and make it even more useful.
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -396,6 +399,7 @@ fn generate_command_args_struct(
 fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
     let base_type = args.get(0).unwrap();
+    let base_type_string = base_type.path().get_ident().unwrap().to_string();
     let item = parse_macro_input!(input as ItemStruct);
     let item_ident = &item.ident;
     let has_target = item.fields.iter().any(|f| {
@@ -405,13 +409,17 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
             false
         }
     });
-    let has_subcommand = item.fields.iter().any(|f| {
-        if let Some(ident) = &f.ident {
-            *ident == "command"
-        } else {
-            false
-        }
-    });
+    // check if the base command has subcommands
+    let subcommand_variant_map = get_subcommand_variant_map();
+    let base_subcommand_type_string = base_type_string.replace("CmdArgs", "SubCommand");
+    let has_subcommand = subcommand_variant_map.contains_key(base_subcommand_type_string.as_str())
+        && item.fields.iter().any(|f| {
+            if let Some(ident) = &f.ident {
+                *ident == "command"
+            } else {
+                false
+            }
+        });
 
     // expand
     let target = if has_target {
