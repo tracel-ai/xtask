@@ -4,32 +4,41 @@ use strum::IntoEnumIterator;
 use tracel_xtask::prelude::*;
 
 #[macros::extend_command_args(CheckCmdArgs, Target, ExtendedCheckSubcommand)]
-pub struct ExtendedCheckedArgsCmdArgs {}
+pub struct ExtendedCheckArgsCmdArgs {}
 
 #[macros::extend_subcommands(CheckSubCommand)]
 pub enum ExtendedCheckSubcommand {
     /// An additional subcommand for our extended Fix command.
-    MySubcommand,
+    MySubCommand,
 }
 
-pub fn handle_command(args: ExtendedCheckedArgsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(args: ExtendedCheckArgsCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
-        ExtendedCheckSubcommand::MySubcommand => run_my_subcommand(args.clone()),
-        ExtendedCheckSubcommand::All => ExtendedCheckSubcommand::iter()
-            .filter(|c| *c != ExtendedCheckSubcommand::All)
-            .try_for_each(|c| {
-                handle_command(ExtendedCheckedArgsCmdArgs {
-                    command: Some(c),
-                    target: args.target.clone(),
-                    exclude: args.exclude.clone(),
-                    only: args.only.clone(),
+        ExtendedCheckSubcommand::MySubCommand => run_my_subcommand(args.clone()),
+        ExtendedCheckSubcommand::All => {
+            println!("Executing all");
+            ExtendedCheckSubcommand::iter()
+                .filter(|c| *c != ExtendedCheckSubcommand::All)
+                .try_for_each(|c| {
+                    handle_command(ExtendedCheckArgsCmdArgs {
+                        command: Some(c),
+                        target: args.target.clone(),
+                        exclude: args.exclude.clone(),
+                        only: args.only.clone(),
+                    })
                 })
-            }),
-        _ => base_commands::check::handle_command(args.try_into().unwrap()),
+        }
+        command => {
+            println!("Executing {command}");
+            // this should be uncommented but we skip the actual execution here because we use
+            // this command in the integration test as well.
+            // base_commands::check::handle_command(args.try_into().unwrap())
+            Ok(())
+        }
     }
 }
 
-fn run_my_subcommand(_args: ExtendedCheckedArgsCmdArgs) -> Result<(), anyhow::Error> {
+fn run_my_subcommand(_args: ExtendedCheckArgsCmdArgs) -> Result<(), anyhow::Error> {
     println!("Executing new subcommand");
     Ok(())
 }

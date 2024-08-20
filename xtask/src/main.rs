@@ -18,16 +18,14 @@ extern crate log;
     Vulnerabilities
 )]
 pub enum Command {
-    /// Example of extended Build command with an additional target called 'Frontend'
-    Build(commands::build::ExtendedBuildCmdArgs),
     /// Example of a new command which extends a base command arguments
     ExtendedBuildArgs(commands::extended_build_args::ExtendedBuildArgsCmdArgs),
     /// Example of a new command which extends a base command arguments
     ExtendedBuildNewSubCommands(
         commands::extended_build_new_sub_commands::ExtendedBuildSubCommandsCmdArgs,
     ),
-    /// Example of a new command which extends a base command sub commands
-    ExtendedCheckSubcommands(commands::extended_check_sub_commands::ExtendedCheckedArgsCmdArgs),
+    /// Example of a new command which extends sub commands of a base command.
+    ExtendedCheckSubCommands(commands::extended_check_sub_commands::ExtendedCheckArgsCmdArgs),
     /// Example of a new command which extendeds target
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
     /// Comprehensive example of an extended Fix command with an additional target and subcommand
@@ -35,7 +33,7 @@ pub enum Command {
     /// Example of a new command with support of base Target
     MyCommand(commands::my_command::MyCommandCmdArgs),
     /// Example of a new command with subcommands
-    MyCommandWithSubcommand(
+    MyCommandWithSubCommand(
         commands::my_command_with_sub_commands::MyCommandWithSubCommandsCmdArgs,
     ),
 }
@@ -43,18 +41,17 @@ pub enum Command {
 fn main() -> anyhow::Result<()> {
     let args = init_xtask::<Command>()?;
     match args.command {
-        Command::Build(args) => commands::build::handle_command(args),
         Command::ExtendedBuildArgs(args) => commands::extended_build_args::handle_command(args),
         Command::ExtendedBuildNewSubCommands(args) => {
             commands::extended_build_new_sub_commands::handle_command(args)
         }
-        Command::ExtendedCheckSubcommands(args) => {
+        Command::ExtendedCheckSubCommands(args) => {
             commands::extended_check_sub_commands::handle_command(args)
         }
         Command::ExtendedTarget(args) => commands::extended_target::handle_command(args),
         Command::Fix(args) => commands::fix::handle_command(args, None),
         Command::MyCommand(args) => commands::my_command::handle_command(args),
-        Command::MyCommandWithSubcommand(args) => {
+        Command::MyCommandWithSubCommand(args) => {
             commands::my_command_with_sub_commands::handle_command(args)
         }
         Command::Validate => commands::validate::handle_command(),

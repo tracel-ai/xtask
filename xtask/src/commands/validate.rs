@@ -1,7 +1,5 @@
 use tracel_xtask::prelude::*;
 
-use super::build::{BuildTarget, ExtendedBuildCmdArgs};
-
 pub fn handle_command() -> anyhow::Result<()> {
     let target = Target::Workspace;
     let exclude = vec![];
@@ -22,15 +20,6 @@ pub fn handle_command() -> anyhow::Result<()> {
             only: only.clone(),
             command: Some(c.clone()),
         })
-    })?;
-
-    // build
-    let build_target = BuildTarget::Workspace;
-    super::build::handle_command(ExtendedBuildCmdArgs {
-        target: build_target.clone(),
-        exclude: exclude.clone(),
-        only: only.clone(),
-        debug: false,
     })?;
 
     // tests

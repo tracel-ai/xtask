@@ -9,7 +9,9 @@ pub struct ExtendedBuildArgsCmdArgs {
 
 pub fn handle_command(args: ExtendedBuildArgsCmdArgs) -> anyhow::Result<()> {
     if args.debug {
-        println!("Debug is enabled");
+        println!("debug enabled");
+    } else {
+        println!("debug disabled");
     }
     base_commands::build::handle_command(args.try_into().unwrap())
 }
