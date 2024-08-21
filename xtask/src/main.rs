@@ -7,6 +7,7 @@ extern crate log;
 
 #[macros::base_commands(
     Bump,
+    Build,
     Check,
     Compile,
     Coverage,
