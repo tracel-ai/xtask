@@ -1,0 +1,48 @@
+name: CI
+
+env:
+  TYPOS_LINK: "https://github.com/crate-ci/typos/releases/download"
+  TYPOS_VERSION: "1.23.4"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Rust
+        uses: tracel-ai/github-actions/actions/setup-rust@v1
+        with:
+          rust-toolchain: stable
+          cache-key: stable-linux
+      # --------------------------------------------------------------------------------
+      - name: Audit
+        run: cargo xtask check audit
+      # --------------------------------------------------------------------------------
+      - name: Format
+        shell: bash
+        env:
+          # work around for colors
+          # see: https://github.com/rust-lang/rustfmt/issues/3385
+          TERM: xterm-256color
+        run: cargo xtask check format
+      # --------------------------------------------------------------------------------
+      - name: Lint
+        run: cargo xtask check lint
+      # --------------------------------------------------------------------------------
+      - name: Typos
+        uses: tracel-ai/github-actions/actions/check-typos@v1
+      # --------------------------------------------------------------------------------
+      - name: Unit Tests
+        run: cargo xtask test unit
+      # --------------------------------------------------------------------------------
+      - name: Integration Tests
+        run: cargo xtask test integration
+      # --------------------------------------------------------------------------------
+      - name: Documentation Tests
+        run: cargo xtask doc tests
+
