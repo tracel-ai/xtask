@@ -1,0 +1,21 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish-tracel-xtask-macros:
+    uses: tracel-ai/github-actions/workflows/publish-crate.yml@v1
+    with:
+      crate: tracel-xtask-macros
+    secrets: inherit
+  # --------------------------------------------------------------------------------
+  publish-tracel-xtask:
+        uses: tracel-ai/github-actions/workflows/publish-crate.yml@v1
+    with:
+      crate: tracel-xtask
+    needs:
+      - tracel-xtask-macros
+    secrets: inherit
