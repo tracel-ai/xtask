@@ -38,15 +38,14 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
 }
 
 fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
+    // cargo options
     if let Some(jobs) = &args.jobs {
         cmd_args.extend(vec!["--jobs".to_string(), jobs.to_string()]);
     };
+    // test harness options
+    cmd_args.extend(vec!["--".to_string(), "--color=always".to_string()]);
     if let Some(threads) = &args.threads {
-        cmd_args.extend(vec![
-            "--".to_string(),
-            "--test-threads".to_string(),
-            threads.to_string(),
-        ]);
+        cmd_args.extend(vec!["--test-threads".to_string(), threads.to_string()]);
     };
 }
 

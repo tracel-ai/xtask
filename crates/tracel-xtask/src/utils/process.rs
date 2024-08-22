@@ -3,9 +3,11 @@ use std::{
     io::{BufRead, BufReader},
     path::Path,
     process::{Command, Stdio},
+    sync::mpsc,
+    thread,
 };
 
-use anyhow::anyhow;
+use anyhow;
 use rand::Rng;
 use regex::Regex;
 
@@ -30,7 +32,7 @@ pub fn run_process(
         command.envs(&envs);
     }
     let status = command.args(args).status().map_err(|e| {
-        anyhow!(
+        anyhow::anyhow!(
             "Failed to execute {} {}: {}",
             name,
             args.first().unwrap(),
@@ -38,7 +40,7 @@ pub fn run_process(
         )
     })?;
     if !status.success() {
-        return Err(anyhow!("{}", error_msg));
+        return Err(anyhow::anyhow!("{}", error_msg));
     }
     anyhow::Ok(())
 }
@@ -61,13 +63,14 @@ pub fn run_process_for_workspace<'a>(
         .iter()
         .for_each(|ex| args.extend(["--exclude", ex]));
     group_info!("Command line: cargo {}", args.join(" "));
+    // process
     let mut child = Command::new(name)
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
-            anyhow!(format!(
+            anyhow::anyhow!(format!(
                 "Failed to start {} {}: {}",
                 name,
                 args.first().unwrap(),
@@ -75,57 +78,80 @@ pub fn run_process_for_workspace<'a>(
             ))
         })?;
 
+    // handle stdout and stderr in dedicated threads using a MPSC channel for synchronization
+    let (tx, rx) = mpsc::channel();
+    // stdout processing thread
+    if let Some(stdout) = child.stdout.take() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                tx.send((line, false)).unwrap();
+            }
+        });
+    }
+    // stderr processing thread
+    if let Some(stderr) = child.stderr.take() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                tx.send((line, true)).unwrap();
+            }
+        });
+    }
+    // Drop the sender once all the logs have been processed to close the channel
+    drop(tx);
+
+    // Process the stdout to inject log groups
     let mut ignore_error = false;
     let mut close_group = false;
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
-        reader.lines().for_each(|line| {
-            if let Ok(line) = line {
+    for (line, is_stderr) in rx.iter() {
+        let mut skip_line = false;
+
+        if let Some(rx) = &group_rx {
+            let cleaned_line = standardize_slashes(&remove_ansi_codes(&line));
+            if let Some(caps) = rx.captures(&cleaned_line) {
+                let crate_name = &caps[1];
+                if close_group {
+                    endgroup!();
+                }
+                close_group = true;
+                group!("{}: {}", group_name.unwrap_or("Group"), crate_name);
+            }
+        }
+
+        if let Some(log) = ignore_log {
+            if line.contains(log) {
+                if let Some(msg) = ignore_msg {
+                    warn!("{}", msg);
+                }
+                ignore_error = true;
+                skip_line = true;
+            }
+        }
+
+        if !skip_line {
+            if is_stderr {
+                eprintln!("{}", line);
+            } else {
                 println!("{}", line);
             }
-        });
+        }
     }
-    if let Some(stderr) = child.stderr.take() {
-        let reader = BufReader::new(stderr);
-        reader.lines().for_each(|line| {
-            let mut skip_line = false;
-            if let Ok(line) = line {
-                if let Some(rx) = &group_rx {
-                    let cleaned_line = standardize_slashes(&remove_ansi_codes(&line));
-                    if let Some(caps) = rx.captures(&cleaned_line) {
-                        let crate_name = &caps[1];
-                        if close_group {
-                            endgroup!();
-                        }
-                        close_group = true;
-                        group!("{}: {}", group_name.unwrap_or("Group"), crate_name);
-                    }
-                }
-                if let Some(log) = ignore_log {
-                    if line.contains(log) {
-                        if let Some(msg) = ignore_msg {
-                            warn!("{}", msg);
-                        }
-                        ignore_error = true;
-                        skip_line = true;
-                    }
-                }
-                if !skip_line {
-                    eprintln!("{}", line);
-                }
-            }
-        });
-    }
+
     if close_group {
         endgroup!();
     }
+
     let status = child
         .wait()
         .expect("Should be able to wait for the process to finish.");
+
     if status.success() || ignore_error {
         anyhow::Ok(())
     } else {
-        Err(anyhow!("{}", error_msg))
+        Err(anyhow::anyhow!("{}", error_msg))
     }
 }
 
@@ -152,7 +178,7 @@ pub fn run_process_for_package(
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
-        .map_err(|e| anyhow!("Failed to execute process for '{}': {}", name, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute process for '{}': {}", name, e))?;
 
     if output.status.success() {
         return anyhow::Ok(());
@@ -166,7 +192,7 @@ pub fn run_process_for_package(
             return anyhow::Ok(());
         }
     }
-    Err(anyhow!("{}", error_msg))
+    Err(anyhow::anyhow!("{}", error_msg))
 }
 
 /// Return a random port between 3000 and 9999
