@@ -63,6 +63,7 @@ pub fn run_process_for_workspace<'a>(
     group_info!("Command line: cargo {}", args.join(" "));
     let mut child = Command::new(name)
         .args(&args)
+        .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
@@ -76,6 +77,14 @@ pub fn run_process_for_workspace<'a>(
 
     let mut ignore_error = false;
     let mut close_group = false;
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        reader.lines().for_each(|line| {
+            if let Ok(line) = line {
+                println!("{}", line);
+            }
+        });
+    }
     if let Some(stderr) = child.stderr.take() {
         let reader = BufReader::new(stderr);
         reader.lines().for_each(|line| {

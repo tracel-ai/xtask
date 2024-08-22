@@ -334,6 +334,7 @@ mod tests {
     fn test_is_target_supported(#[case] installed_targets: Vec<String>, #[case] expected: bool) {
         let mock_retriever = MockTargetRetriever::new(installed_targets);
         let sanitizer = Sanitizer::Memory;
+        // std::thread::sleep(std::time::Duration::from_secs(1));
         assert_eq!(sanitizer.is_target_supported(&mock_retriever), expected);
     }
 
@@ -350,6 +351,7 @@ mod tests {
             Target::X8664UnknownFreebsd,
             Target::X8664UnknownLinuxGnu,
         ];
+        // std::thread::sleep(std::time::Duration::from_secs(1));
         for variant in variants {
             let variant_str = format!("{}", variant);
             let parsed_variant = Target::from_str(&variant_str);
