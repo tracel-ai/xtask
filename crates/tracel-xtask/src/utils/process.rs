@@ -88,6 +88,7 @@ pub fn run_process_for_workspace<'a>(
                         if close_group {
                             endgroup!();
                         }
+                        close_group = true;
                         group!("{}: {}", group_name.unwrap_or("Group"), crate_name);
                     }
                 }
@@ -103,7 +104,6 @@ pub fn run_process_for_workspace<'a>(
                 if !skip_line {
                     eprintln!("{}", line);
                 }
-                close_group = true;
             }
         });
     }
