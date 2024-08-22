@@ -140,6 +140,8 @@ pub fn run_process_for_package(
     group_info!("Command line: cargo {}", &joined_args);
     let output = Command::new("cargo")
         .args(args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .output()
         .map_err(|e| anyhow!("Failed to execute process for '{}': {}", name, e))?;
 

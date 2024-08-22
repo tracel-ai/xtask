@@ -108,8 +108,6 @@ fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), any
         "-p",
         &member.name,
         "--color=always",
-        "--",
-        "--color=always",
     ]
     .into_iter()
     .map(|s| s.to_string())
