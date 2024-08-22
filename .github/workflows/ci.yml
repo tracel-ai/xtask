@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Rust
-        uses: tracel-ai/github-actions/actions/setup-rust@v1
+        uses: tracel-ai/github-actions/setup-rust@v1
         with:
           rust-toolchain: stable
           cache-key: stable-linux
@@ -35,7 +35,7 @@ jobs:
         run: cargo xtask check lint
       # --------------------------------------------------------------------------------
       - name: Typos
-        uses: tracel-ai/github-actions/actions/check-typos@v1
+        uses: tracel-ai/github-actions/check-typos@v1
       # --------------------------------------------------------------------------------
       - name: Unit Tests
         run: cargo xtask test unit
