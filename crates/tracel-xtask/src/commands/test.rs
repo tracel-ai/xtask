@@ -31,9 +31,19 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
                     exclude: args.exclude.clone(),
                     only: args.only.clone(),
                     threads: args.threads,
+                    jobs: args.jobs,
                 })
             }),
     }
+}
+
+fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
+    if let Some(jobs) = &args.jobs {
+        cmd_args.extend(vec!["--jobs".to_string(), jobs.to_string()]);
+    };
+    if let Some(threads) = &args.threads {
+        cmd_args.extend(vec!["--".to_string(), "--test-threads".to_string(), threads.to_string()]);
+    };
 }
 
 pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
@@ -48,15 +58,11 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
                 "--examples",
                 "--color",
                 "always",
-            ];
-            let threads_str: String;
-            if let Some(threads) = &args.threads {
-                threads_str = threads.to_string();
-                cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
-            };
+            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+            push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
-                cmd_args,
+                cmd_args.iter().map(String::as_str).collect(),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Unit Tests"),
@@ -97,16 +103,12 @@ fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), any
         "--color=always",
         "--",
         "--color=always",
-    ];
-    let threads_str: String;
-    if let Some(threads) = &args.threads {
-        threads_str = threads.to_string();
-        cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
-    };
+    ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+    push_optional_args(&mut cmd_args, args);
     run_process_for_package(
         "cargo",
         &member.name,
-        &cmd_args,
+        &cmd_args.iter().map(String::as_str).collect(),
         &args.exclude,
         &args.only,
         &format!("Failed to execute unit test for '{}'", &member.name),
@@ -131,15 +133,11 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
                 "test_*",
                 "--color",
                 "always",
-            ];
-            let threads_str: String;
-            if let Some(threads) = &args.threads {
-                threads_str = threads.to_string();
-                cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
-            };
+            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+            push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
-                cmd_args,
+                cmd_args.iter().map(String::as_str).collect(),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Integration Tests"),
@@ -178,16 +176,12 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
         &member.name,
         "--color",
         "always",
-    ];
-    let threads_str: String;
-    if let Some(threads) = &args.threads {
-        threads_str = threads.to_string();
-        cmd_args.extend(vec!["--", "--test-threads", &threads_str]);
-    };
+    ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+    push_optional_args(&mut cmd_args, args);
     run_process_for_package(
         "cargo",
         &member.name,
-        &cmd_args,
+        &cmd_args.iter().map(String::as_str).collect(),
         &args.exclude,
         &args.only,
         &format!("Failed to execute integration test for '{}'", &member.name),

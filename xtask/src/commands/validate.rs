@@ -28,6 +28,7 @@ pub fn handle_command() -> anyhow::Result<()> {
         exclude: exclude.clone(),
         only: only.clone(),
         threads: None,
+        jobs: None,
         command: Some(TestSubCommand::All),
     })?;
 

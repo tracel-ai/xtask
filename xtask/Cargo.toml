@@ -7,7 +7,6 @@ edition = "2021"
 strum = { workspace = true }
 log = { workspace = true }
 tracel-xtask = { path = "../crates/tracel-xtask" }
-rstest.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }

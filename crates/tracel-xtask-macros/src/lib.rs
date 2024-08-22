@@ -237,9 +237,16 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
     HashMap::from([(
         "TestCmdArgs",
         quote! {
-            #[doc = r"Maximum number of parallel test."]
+            #[doc = r"Maximum number of parallel test crate compilations."]
             #[arg(
-                long = " --test-threads",
+                long = "compilation-jobs",
+                value_name = "NUMBER OF THREADS",
+                required = false
+            )]
+            pub jobs: Option<u16>,
+            #[doc = r"Maximum number of parallel test within a test crate execution."]
+            #[arg(
+                long = "test-threads",
                 value_name = "NUMBER OF THREADS",
                 required = false
             )]
