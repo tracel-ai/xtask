@@ -13,6 +13,7 @@ extern crate log;
     Coverage,
     Doc,
     Dependencies,
+    Fix,
     Publish,
     Test,
     Validate,
@@ -30,7 +31,7 @@ pub enum Command {
     /// Example of a new command which extendeds target
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
     /// Comprehensive example of an extended Fix command with an additional target and subcommand
-    Fix(commands::fix::ExtendedFixCmdArgs),
+    ExtendedFix(commands::fix::ExtendedFixCmdArgs),
     /// Example of a new command with support of base Target
     MyCommand(commands::my_command::MyCommandCmdArgs),
     /// Example of a new command with subcommands
@@ -49,8 +50,8 @@ fn main() -> anyhow::Result<()> {
         Command::ExtendedCheckSubCommands(args) => {
             commands::extended_check_sub_commands::handle_command(args)
         }
+        Command::ExtendedFix(args) => commands::fix::handle_command(args, None),
         Command::ExtendedTarget(args) => commands::extended_target::handle_command(args),
-        Command::Fix(args) => commands::fix::handle_command(args, None),
         Command::MyCommand(args) => commands::my_command::handle_command(args),
         Command::MyCommandWithSubCommand(args) => {
             commands::my_command_with_sub_commands::handle_command(args)

@@ -42,7 +42,11 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
         cmd_args.extend(vec!["--jobs".to_string(), jobs.to_string()]);
     };
     if let Some(threads) = &args.threads {
-        cmd_args.extend(vec!["--".to_string(), "--test-threads".to_string(), threads.to_string()]);
+        cmd_args.extend(vec![
+            "--".to_string(),
+            "--test-threads".to_string(),
+            threads.to_string(),
+        ]);
     };
 }
 
@@ -58,7 +62,10 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
                 "--examples",
                 "--color",
                 "always",
-            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
             push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
@@ -103,7 +110,10 @@ fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), any
         "--color=always",
         "--",
         "--color=always",
-    ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+    ]
+    .into_iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<String>>();
     push_optional_args(&mut cmd_args, args);
     run_process_for_package(
         "cargo",
@@ -133,7 +143,10 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
                 "test_*",
                 "--color",
                 "always",
-            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
             push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
@@ -176,7 +189,10 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
         &member.name,
         "--color",
         "always",
-    ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+    ]
+    .into_iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<String>>();
     push_optional_args(&mut cmd_args, args);
     run_process_for_package(
         "cargo",

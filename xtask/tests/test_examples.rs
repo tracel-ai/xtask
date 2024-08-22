@@ -25,8 +25,8 @@ use rstest::rstest;
 #[case::extend_base_command_with_sub_commands_by_adding_variants_lint(&["extended-check-sub-commands", "lint"], "Executing lint")]
 #[case::extend_base_command_with_sub_commands_by_adding_variants_typos(&["extended-check-sub-commands", "typos"], "Executing typos")]
 #[case::extend_base_command_with_sub_commands_by_adding_variants_new_variant(&["extended-check-sub-commands", "my-sub-command"], "Executing new subcommand")]
-#[case::extend_base_command_advanced_example(&["fix", "--target", "ci", "new-sub-command"], "Executing new subcommand on CI.")]
-#[case::extend_base_command_advanced_example_default_target(&["fix", "new-sub-command"], "Executing new subcommand on workspace.")]
+#[case::extend_base_command_advanced_example(&["extended-fix", "--target", "ci", "new-sub-command"], "Executing new subcommand on CI.")]
+#[case::extend_base_command_advanced_example_default_target(&["extended-fix", "new-sub-command"], "Executing new subcommand on workspace.")]
 fn test_xtask_example_status_success_and_returns_expected_output(
     #[case] cargo_args: &[&str],
     #[case] expected_output: String,
