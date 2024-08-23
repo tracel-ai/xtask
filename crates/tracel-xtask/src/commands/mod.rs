@@ -8,6 +8,7 @@ pub mod doc;
 pub mod fix;
 pub mod publish;
 pub mod test;
+pub mod validate;
 pub mod vulnerabilities;
 
 // use crate::declare_target;

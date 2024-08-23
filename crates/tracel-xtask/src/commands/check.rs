@@ -22,6 +22,12 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
     }
 
     match args.get_command() {
+        CheckSubCommand::Audit if args.ignore_audit => {
+            if run_audit().is_err() {
+                warn!("Ignoring audit error because of '--ignore-audit' flag.");
+            }
+            Ok(())
+        }
         CheckSubCommand::Audit => run_audit(),
         CheckSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CheckSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
@@ -34,6 +40,7 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
                     target: args.target.clone(),
                     exclude: args.exclude.clone(),
                     only: args.only.clone(),
+                    ignore_audit: args.ignore_audit,
                 })
             }),
     }

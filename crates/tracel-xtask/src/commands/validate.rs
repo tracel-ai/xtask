@@ -1,6 +1,13 @@
-use tracel_xtask::prelude::*;
+use super::{
+    check::{CheckCmdArgs, CheckSubCommand},
+    test::{TestCmdArgs, TestSubCommand},
+    Target,
+};
 
-pub fn handle_command() -> anyhow::Result<()> {
+#[tracel_xtask_macros::declare_command_args(None, None)]
+struct ValidateCmdArgs {}
+
+pub fn handle_command(args: ValidateCmdArgs) -> anyhow::Result<()> {
     let target = Target::Workspace;
     let exclude = vec![];
     let only = vec![];
@@ -14,16 +21,17 @@ pub fn handle_command() -> anyhow::Result<()> {
     ]
     .iter()
     .try_for_each(|c| {
-        base_commands::check::handle_command(CheckCmdArgs {
+        super::check::handle_command(CheckCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
             command: Some(c.clone()),
+            ignore_audit: args.ignore_audit,
         })
     })?;
 
     // tests
-    base_commands::test::handle_command(TestCmdArgs {
+    super::test::handle_command(TestCmdArgs {
         target: target.clone(),
         exclude: exclude.clone(),
         only: only.clone(),

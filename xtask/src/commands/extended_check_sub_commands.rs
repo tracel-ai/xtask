@@ -25,6 +25,7 @@ pub fn handle_command(args: ExtendedCheckArgsCmdArgs) -> anyhow::Result<()> {
                         target: args.target.clone(),
                         exclude: args.exclude.clone(),
                         only: args.only.clone(),
+                        ignore_audit: args.ignore_audit,
                     })
                 })
         }

@@ -1,4 +1,4 @@
-// TODO: Check if it is possible to refactor all the macros using an inventory: https://crates.io/crates/inventory
+// TODO Check if it is possible to refactor all the macros using an inventory: https://crates.io/crates/inventory
 // The idea would be to discover and register all the fields of base commands and all the variants of subcommand.
 // If this is possible this should allow to generalize the command extension mechanism and make it even more useful.
 extern crate proc_macro;
@@ -75,18 +75,17 @@ fn generate_dispatch_function(
     enum_ident: &syn::Ident,
     args: &Punctuated<Meta, Comma>,
 ) -> TokenStream {
-    let arms: Vec<proc_macro2::TokenStream> = args.iter().filter_map(|meta| {
+    let arms: Vec<proc_macro2::TokenStream> = args.iter().map(|meta| {
         let cmd_ident = meta.path().get_ident().unwrap();
         let cmd_ident_string = cmd_ident.to_string();
         let module_ident = syn::Ident::new(cmd_ident_string.to_lowercase().as_str(), cmd_ident.span());
         match cmd_ident_string.as_str() {
-            "Validate" => None,
-            "Fix" => Some(quote! {
+            "Fix" => quote! {
                 #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args, None),
-            }),
-            _ => Some(quote! {
+            },
+            _ => quote! {
                 #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args),
-            })
+            }
         }
     }).collect();
     let func = quote! {
@@ -182,7 +181,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Validate",
         quote! {
             #[doc = r"Validate the code base by running all the relevant checks and tests. Use this command before creating a new pull-request."]
-            Validate
+            Validate(tracel_xtask::commands::validate::ValidateCmdArgs)
         },
     );
     variant_map.insert("Vulnerabilities", quote! {
@@ -234,25 +233,43 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
 // =================
 
 fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStream> {
-    HashMap::from([(
-        "TestCmdArgs",
-        quote! {
-            #[doc = r"Maximum number of parallel test crate compilations."]
-            #[arg(
-                long = "compilation-jobs",
-                value_name = "NUMBER OF THREADS",
-                required = false
-            )]
-            pub jobs: Option<u16>,
-            #[doc = r"Maximum number of parallel test within a test crate execution."]
-            #[arg(
-                long = "test-threads",
-                value_name = "NUMBER OF THREADS",
-                required = false
-            )]
-            pub threads: Option<u16>,
-        },
-    )])
+    HashMap::from([
+        (
+            "CheckCmdArgs",
+            quote! {
+                #[doc = r"Ignore audit errors."]
+                #[arg(long = "ignore-audit", required = false)]
+                pub ignore_audit: bool,
+            },
+        ),
+        (
+            "TestCmdArgs",
+            quote! {
+                #[doc = r"Maximum number of parallel test crate compilations."]
+                #[arg(
+                    long = "compilation-jobs",
+                    value_name = "NUMBER OF THREADS",
+                    required = false
+                )]
+                pub jobs: Option<u16>,
+                #[doc = r"Maximum number of parallel test within a test crate execution."]
+                #[arg(
+                    long = "test-threads",
+                    value_name = "NUMBER OF THREADS",
+                    required = false
+                )]
+                pub threads: Option<u16>,
+            },
+        ),
+        (
+            "ValidateCmdArgs",
+            quote! {
+                #[doc = r"Ignore audit errors."]
+                #[arg(long = "ignore-audit", required = false)]
+                pub ignore_audit: bool,
+            },
+        ),
+    ])
 }
 
 // Returns a tuple where 0 is the actual struct and 1 is additional implementations
@@ -349,8 +366,11 @@ fn generate_command_args_struct(
         };
 
         let additional_cmd_args_map = get_additional_cmd_args_map();
-        let additional_fields = match additional_cmd_args_map.get(struct_name.to_string().as_str())
-        {
+        let mut base_command_type = struct_name.to_string();
+        if args.len() == 3 {
+            base_command_type = args.get(0).unwrap().path().get_ident().unwrap().to_string();
+        }
+        let additional_fields = match additional_cmd_args_map.get(base_command_type.as_str()) {
             Some(fields) => fields.clone(),
             None => quote! {},
         };
@@ -454,7 +474,15 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
         .filter_map(|f| {
             f.ident.as_ref().map(|ident| {
                 let ident_str = ident.to_string();
-                if ident_str != "target" && (ident_str == "exclude" || ident_str == "only") {
+                // TODO this hardcoded predicates are awful, they should be unneccesarry if
+                // we can use an inventory (see TODO at the top of the file)
+                if ident_str != "target"
+                    && (ident_str == "exclude"
+                        || ident_str == "only"
+                        || ident_str == "ignore_audit"
+                        || ident_str == "jobs"
+                        || ident_str == "threads")
+                {
                     quote! { #ident: self.#ident, }
                 } else {
                     quote! {}

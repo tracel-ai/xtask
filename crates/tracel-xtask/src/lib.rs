@@ -38,6 +38,7 @@ pub mod prelude {
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::test::TestSubCommand;
+    pub use crate::commands::validate::ValidateCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::commands::Target;
