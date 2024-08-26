@@ -607,11 +607,11 @@ pub fn handle_command(mut args: tracel_xtask::commands::build::BuildCmdArgs)  ->
 
     // additional crate builds
     // build 'my-crate' with all the features
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"], None, None, "all features")?;
     // build 'my-crate' with specific features
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"], None, None, "myfeature1,myfeature2")?;
     // build 'my-crate' with a different target than the default one
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"])?;
+    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"], None, None, "thumbv7m-none-eabi target")?;
     Ok(())
 }
 ```
