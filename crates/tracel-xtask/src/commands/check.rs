@@ -9,6 +9,7 @@ use crate::{
         process::{run_process, run_process_for_package, run_process_for_workspace},
         workspace::{get_workspace_members, WorkspaceMemberType},
     },
+    versions::TYPOS_VERSION,
 };
 
 use super::Target;
@@ -171,6 +172,9 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
 }
 
 fn run_typos() -> anyhow::Result<()> {
+    if std::env::var("CI").is_err() {
+        ensure_cargo_crate_is_installed("typos-cli", None, Some(TYPOS_VERSION), false)?;
+    }
     group!("Typos");
     run_process(
         "typos",
