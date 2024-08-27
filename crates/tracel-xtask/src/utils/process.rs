@@ -50,7 +50,7 @@ pub fn run_process(
 #[allow(clippy::too_many_arguments)]
 pub fn run_process_for_workspace<'a>(
     name: &str,
-    mut args: Vec<&'a str>,
+    args: Vec<&'a str>,
     excluded: &'a [String],
     group_regexp: Option<&str>,
     group_name: Option<&str>,
@@ -59,13 +59,18 @@ pub fn run_process_for_workspace<'a>(
     ignore_msg: Option<&str>,
 ) -> anyhow::Result<()> {
     let group_rx: Option<Regex> = group_regexp.map(|r| Regex::new(r).unwrap());
+    // split the args between cargo args and binary args so that we can extend the cargo args
+    // and then append the binary args back.
+    let (cargo_args, binary_args) = split_vector(&args, "--");
+    let mut cmd_args = cargo_args.to_owned();
     excluded
         .iter()
-        .for_each(|ex| args.extend(["--exclude", ex]));
-    group_info!("Command line: cargo {}", args.join(" "));
+        .for_each(|ex| cmd_args.extend(["--exclude", ex]));
+    cmd_args.extend(binary_args);
+    group_info!("Command line: cargo {}", cmd_args.join(" "));
     // process
     let mut child = Command::new(name)
-        .args(&args)
+        .args(&cmd_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -73,7 +78,7 @@ pub fn run_process_for_workspace<'a>(
             anyhow::anyhow!(format!(
                 "Failed to start {} {}: {}",
                 name,
-                args.first().unwrap(),
+                cmd_args.first().unwrap(),
                 e
             ))
         })?;
@@ -208,4 +213,80 @@ fn remove_ansi_codes(s: &str) -> String {
 
 fn standardize_slashes(s: &str) -> String {
     s.replace('\\', "/")
+}
+
+/// Split given VEC into a left and right vectors where SPLIT belongs to the right vector.
+/// If SPLIT does not exist in VEC then left is a VEC slice and right is empty.
+fn split_vector<T: PartialEq>(vec: &[T], split: T) -> (&[T], &[T]) {
+    let mut left = vec;
+    let mut right = &vec[vec.len()..];
+    if let Some(pos) = vec.iter().position(|e| *e == split) {
+        left = &vec[..pos];
+        right = &vec[pos..];
+    }
+    (left, right)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    fn test_random_port_in_range() {
+        for _ in 0..10000 {
+            let port = random_port();
+            assert!(
+                (3000..=9999).contains(&port),
+                "Port should be between 3000 and 9999, got {}",
+                port
+            );
+        }
+    }
+
+    #[rstest]
+    #[case::simple_escape_code("\x1b[31mRed Text\x1b[0m", "Red Text")]
+    #[case::complex_escape_code("\x1b[1;34mBold Blue Text\x1b[0m", "Bold Blue Text")]
+    #[case::no_escape_code("No ANSI Codes", "No ANSI Codes")]
+    fn test_remove_ansi_codes(#[case] input: &str, #[case] expected: &str) {
+        let result = remove_ansi_codes(input);
+        assert_eq!(
+            result, expected,
+            "Expected '{}', but got '{}'",
+            expected, result
+        );
+    }
+
+    #[rstest]
+    #[case::windows_path(r"C:\path\to\file", "C:/path/to/file")]
+    #[case::network_path(r"\\network\share\file", "//network/share/file")]
+    #[case::already_standard_path("/already/standard/path", "/already/standard/path")]
+    fn test_standardize_slashes(#[case] input: &str, #[case] expected: &str) {
+        let result = standardize_slashes(input);
+        assert_eq!(
+            result, expected,
+            "Expected '{}', but got '{}'",
+            expected, result
+        );
+    }
+
+    #[rstest]
+    #[case::element_found(vec!["a", "b", "c", "d", "e", "f"], "d", vec!["a", "b", "c"], vec!["d", "e", "f"])]
+    #[case::element_not_found(vec!["a", "b", "c", "d", "e", "f"], "z", vec!["a", "b", "c", "d", "e", "f"], vec![])]
+    #[case::element_at_start(vec!["a", "b", "c", "d", "e", "f"], "a", vec![], vec!["a", "b", "c", "d", "e", "f"])]
+    #[case::element_at_end(vec!["a", "b", "c", "d", "e", "f"], "f", vec!["a", "b", "c", "d", "e"], vec!["f"])]
+    #[case::empty_vector(vec![], "x", vec![], vec![])]
+    #[case::cargo_with_binary_args(vec!["cargo", "build", "--exclude", "crate", "--workpspace", "--", "--color", "always"], "--", vec!["cargo", "build", "--exclude", "crate", "--workpspace"], vec!["--", "--color", "always"])]
+    #[case::cargo_without_binary_args(vec!["cargo", "build", "--exclude", "crate", "--workpspace"], "--", vec!["cargo", "build", "--exclude", "crate", "--workpspace"], vec![])]
+    fn test_split_vector(
+        #[case] vec: Vec<&str>,
+        #[case] split_elem: &str,
+        #[case] expected_left: Vec<&str>,
+        #[case] expected_right: Vec<&str>,
+    ) {
+        let (left, right) = split_vector(&vec, split_elem);
+
+        assert_eq!(left, &expected_left);
+        assert_eq!(right, &expected_right);
+    }
 }
