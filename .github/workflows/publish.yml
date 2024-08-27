@@ -6,7 +6,7 @@ on:
       - "v*"
 
 jobs:
-  publish-tracel-xtask-macros:
+  tracel-xtask-macros:
     uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
     with:
       crate: tracel-xtask-macros
@@ -14,11 +14,11 @@ jobs:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
   # --------------------------------------------------------------------------------
-  publish-tracel-xtask:
+  tracel-xtask:
     uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
     with:
       crate: tracel-xtask
     needs:
-      - publish-tracel-xtask-macros
+      - tracel-xtask-macros
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
