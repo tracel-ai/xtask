@@ -137,7 +137,7 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
                 "test",
                 "--workspace",
                 "--test",
-                "test_*",
+                "*",
                 "--color",
                 "always",
             ]
@@ -181,7 +181,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     let mut cmd_args = vec![
         "test",
         "--test",
-        "test_*",
+        "*",
         "-p",
         &member.name,
         "--color",

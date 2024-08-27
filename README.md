@@ -736,8 +736,9 @@ cargo xtask fix all
 
 Testing is a crucial part of development, and the `test` command is designed to make this process easy.
 
-This commands makes the distinction between unit tests and integrations tests. [Unit tests][4] are inline tests under the
-`src` directory of a crate. [Integration tests][3] are files starting with `test_` under the `tests` directory of a crate.
+This command makes the distinction between unit tests and integrations tests. [Unit tests][4] are inline tests under the
+`src` directory of a crate. [Integration tests][3] are tests defined in files under the `tests` directory of a crate besides
+the `src` directory.
 
 Usage:
 ```sh
