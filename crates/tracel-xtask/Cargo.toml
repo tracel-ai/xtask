@@ -7,7 +7,7 @@ edition.workspace = true
 license.workspace = true
 name = "tracel-xtask"
 readme.workspace = true
-repository = "https://github.com/tracel-ai/xtask"
+repository = "https://github.com/tracel-ai/xtask/crates/tracel-xtask"
 version.workspace = true
 rust-version = "1.79"
 
