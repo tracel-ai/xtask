@@ -661,52 +661,54 @@ jobs:
 
 ## Special command 'validate'
 
-The command `Validate` can been added via the macro `tracel_xtask_macros::commands`, this command has no implementations in `xtask_common` though.
+By convention this command is responsible to run all the checks, builds, and/or tests that validate the code
+before opening a pull request or merge request.
 
-This is a special command that you can implement in your repository to perform all the checks and tests needed to validate your code base.
+The command `Validate` can been added via the macro `tracel_xtask_macros::commands` like the other commands.
 
-Here is a simple example to perform all checks, build and test:
+By default all the checks from the `check` command are run as well as both unit and integration tests from
+the `test` command.
+
+You can make your own `handle_command` function if you need to perform more validations. Ideally this function
+should only call the other commands `handle_command` functions.
+
+For quick reference here is a simple example to perform all checks and test against the workspace:
 
 ```rust
-pub fn handle_command() -> anyhow::Result<()> {
-    let target = tracel_xtask::commands::Target::Workspace;
+pub fn handle_command(args: ValidateCmdArgs) -> anyhow::Result<()> {
+    let target = Target::Workspace;
     let exclude = vec![];
     let only = vec![];
+
     // checks
     [
-        tracel_xtask::commands::check::CheckCommand::Audit,
-        tracel_xtask::commands::check::CheckCommand::Format,
-        tracel_xtask::commands::check::CheckCommand::Lint,
-        tracel_xtask::commands::check::CheckCommand::Typos,
+        CheckSubCommand::Audit,
+        CheckSubCommand::Format,
+        CheckSubCommand::Lint,
+        CheckSubCommand::Typos,
     ]
     .iter()
     .try_for_each(|c| {
-        tracel_xtask::commands::check::handle_command(tracel_xtask::commands::check::CheckCmdArgs {
+        super::check::handle_command(CheckCmdArgs {
             target: target.clone(),
             exclude: exclude.clone(),
             only: only.clone(),
-            command: c.clone(),
+            command: Some(c.clone()),
+            ignore_audit: args.ignore_audit,
         })
     })?;
 
-    // build
-    tracel_xtask::commands::build::handle_command(
-        tracel_xtask::commands::build::BuildCmdArgs {
-            target: target.clone(),
-            exclude: exclude.clone(),
-            only: only.clone(),
-        },
-    )?;
-
     // tests
-    tracel_xtask::commands::test::handle_command(
-        tracel_xtask::commands::test::TestCmdArgs {
-            target: target.clone(),
-            exclude: exclude.clone(),
-            only: only.clone(),
-            command: tracel_xtask::commands::test::TestCommand::All,
-        },
-    )?;
+    super::test::handle_command(TestCmdArgs {
+        target: target.clone(),
+        exclude: exclude.clone(),
+        only: only.clone(),
+        threads: None,
+        jobs: None,
+        command: Some(TestSubCommand::All),
+    })?;
+
+    Ok(())
 }
 ```
 
