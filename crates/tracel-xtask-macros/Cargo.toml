@@ -1,6 +1,6 @@
 [package]
 authors = ["Tracel Technologies Inc."]
-categories = ["Command-line interface", "Command line utilities", "Development tools"]
+categories = ["command-line-interface", "command-line-utilities", "development-tools", "development-tools::cargo-plugins"]
 description = "Macros for tracel-xtask crate."
 keywords = ["xtask", "macros"]
 edition.workspace = true
