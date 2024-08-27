@@ -133,17 +133,10 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
     match target {
         Target::Workspace => {
             info!("Workspace Integration Tests");
-            let mut cmd_args = vec![
-                "test",
-                "--workspace",
-                "--test",
-                "*",
-                "--color",
-                "always",
-            ]
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
+            let mut cmd_args = vec!["test", "--workspace", "--test", "*", "--color", "always"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>();
             push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
