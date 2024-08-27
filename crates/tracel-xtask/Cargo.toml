@@ -2,7 +2,7 @@
 authors = ["Tracel Technologies Inc."]
 categories = ["Command-line interface", "Command line utilities", "Development tools"]
 description = "Reusable and Extensible xtask commands to manage repositories."
-keywords = ["xtask", "ci", "cicd", "cli", "cargo", "extensible"]
+keywords = ["xtask", "cli", "cargo", "extensible"]
 edition.workspace = true
 license.workspace = true
 name = "tracel-xtask"

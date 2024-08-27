@@ -2,7 +2,7 @@
 authors = ["Tracel Technologies Inc."]
 categories = ["Command-line interface", "Command line utilities", "Development tools"]
 description = "Macros for tracel-xtask crate."
-keywords = ["xtask", "ci", "cicd", "cli", "cargo", "extensible", "macros"]
+keywords = ["xtask", "macros"]
 edition.workspace = true
 license.workspace = true
 name = "tracel-xtask-macros"
