@@ -6,6 +6,7 @@ keywords = ["xtask", "macros"]
 edition.workspace = true
 license.workspace = true
 name = "tracel-xtask-macros"
+readme = "README.md"
 repository = "https://github.com/tracel-ai/xtask/crates/tracel-xtask-macros"
 version.workspace = true
 rust-version = "1.79"
