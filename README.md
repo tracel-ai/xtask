@@ -1,4 +1,18 @@
-# Tracel Xtask
+<div align="center">
+<img src="https://raw.githubusercontent.com/tracel-ai/xtask/update_readme/assets/xtask.png" width="256px"/>
+
+<h1>Tracel Xtask</h1>
+
+[![Discord](https://img.shields.io/discord/1038839012602941528.svg?color=7289da&&logo=discord)](https://discord.gg/uPEBbYYDB6)
+[![Current Crates.io Version](https://img.shields.io/crates/v/tracel-xtask)](https://crates.io/crates/tracel-xtask)
+[![Minimum Supported Rust Version](https://img.shields.io/crates/msrv/tracel-xtask)](https://crates.io/crates/tracel-xtask)
+[![Test Status](https://github.com/tracel-ai/xtask/actions/workflows/ci.yml/badge.svg)](https://github.com/tracel-ai/xtask/actions/workflows/ci.yml)
+![license](https://shields.io/badge/license-MIT%2FApache--2.0-blue)
+
+---
+
+<br/>
+</div>
 
 A collection of easy to use and extend commands to be used in your [xtask CLI][1] based on [clap][2].
 
