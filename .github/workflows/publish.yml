@@ -17,5 +17,5 @@ jobs:
     with:
       crate: tracel-xtask
     needs:
-      - tracel-xtask-macros
+      - publish-tracel-xtask-macros
     secrets: inherit
