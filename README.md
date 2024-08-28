@@ -775,7 +775,7 @@ cargo xtask bump <COMMAND>
 
 ### Publishing Crates
 
-This is a command reserved for repository maintainers and is mainly used by the `publish` workflow.
+This is a command reserved for repository maintainers and is mainly in `publish` GitHub workflows.
 
 This command automates the process of publishing crates to `crates.io`, the Rust package registry.
 By specifying the name of the crate, `xtask` handles the publication process, ensuring that the crate is available for others to use.
@@ -783,6 +783,36 @@ By specifying the name of the crate, `xtask` handles the publication process, en
 Usage:
 ```sh
 cargo xtask publish <NAME>
+```
+
+It is typical to use this command in a GitHub workflow that calls Tracel's reusable [publish-crate][8] workflow.
+Here is a simple example with a workflow that publishes two crates A and B with A depending on B.
+
+```yaml
+name: publish all crates
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish-B:
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    with:
+      crate: B
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+
+  # --------------------------------------------------------------------------------
+  publish-A:
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    with:
+      crate: A
+    needs:
+      - publish-B
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 ```
 
 ### Coverage
@@ -832,3 +862,4 @@ Commands:
 [5]: https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests
 [6]: https://embarkstudios.github.io/cargo-deny/
 [7]: https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html
+[8]: https://github.com/tracel-ai/github-actions/blob/main/.github/workflows/publish-crate.yml
