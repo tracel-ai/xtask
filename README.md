@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/tracel-ai/xtask/update_readme/assets/xtask.png" width="256px"/>
+<img src="https://raw.githubusercontent.com/tracel-ai/xtask/main/assets/xtask.png" width="256px"/>
 
 <h1>Tracel Xtask</h1>
 
