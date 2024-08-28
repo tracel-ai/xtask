@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use anyhow::Ok;
+use regex::Regex;
 
 use crate::{endgroup, group, utils::process::run_process};
 
@@ -46,4 +47,33 @@ pub fn is_cargo_crate_installed(crate_name: &str) -> bool {
         .expect("Should get the list of installed cargo commands");
     let output_str = String::from_utf8_lossy(&output.stdout);
     output_str.lines().any(|line| line.contains(crate_name))
+}
+
+pub fn parse_cargo_search_output(output: &str) -> Option<(&str, &str)> {
+    let re = Regex::new(r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+)""#)
+        .expect("should compile regex");
+    if let Some(captures) = re.captures(output) {
+        if let (Some(name), Some(version)) = (captures.name("name"), captures.name("version")) {
+            return Some((name.as_str(), version.as_str()));
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case::valid_input("tracel-xtask-macros = \"1.0.1\"", Some(("tracel-xtask-macros", "1.0.1")))]
+    #[case::missing_version("tracel-xtask-macros =", None)]
+    #[case::invalid_format("tracel-xtask-macros: \"1.0.1\"", None)]
+    #[case::extra_whitespace("   tracel-xtask-macros    =    \"1.0.1\"  ", Some(("tracel-xtask-macros", "1.0.1")))]
+    #[case::no_quotes("tracel-xtask-macros = 1.0.1", None)]
+    #[case::wrong_version_format("tracel-xtask-macros = \"1.0\"", None)]
+    fn test_parse_cargo_search_output(#[case] input: &str, #[case] expected: Option<(&str, &str)>) {
+        let result = parse_cargo_search_output(input);
+        assert_eq!(result, expected);
+    }
 }

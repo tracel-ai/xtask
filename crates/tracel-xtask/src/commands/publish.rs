@@ -2,7 +2,10 @@ use std::{env, process::Command, str};
 
 use anyhow::{anyhow, Ok};
 
-use crate::{endgroup, group, utils::process::run_process};
+use crate::{
+    endgroup, group,
+    utils::{cargo::parse_cargo_search_output, process::run_process},
+};
 
 // Crates.io API token
 const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
@@ -56,7 +59,7 @@ fn local_version(crate_name: &str) -> anyhow::Result<String> {
     Ok(local_version.trim_end().to_string())
 }
 
-// Obtain remote crate version
+// Obtain the crate version from crates.io
 fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
     // Obtain remote crate version contained in cargo search data
     let cargo_search_output = Command::new("cargo")
@@ -64,19 +67,19 @@ fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
         .output()
         .map_err(|e| anyhow!("Failed to execute cargo search: {}", e))?;
     // Cargo search returns an empty string in case of a crate not present on crates.io
-    if cargo_search_output.stdout.is_empty() {
-        Ok(None)
-    } else {
+    if !cargo_search_output.stdout.is_empty() {
+        let output_str = str::from_utf8(&cargo_search_output.stdout).unwrap();
         // Convert cargo search output into a str
-        let remote_version_str = str::from_utf8(&cargo_search_output.stdout)
-            .expect("Failed to convert cargo search output into a str");
-
-        // Extract only the remote crate version from str
-        Ok(remote_version_str
-            .split_once('=')
-            .and_then(|(_, second)| second.trim_start().split_once(' '))
-            .map(|(s, _)| s.trim_matches('"').to_string()))
+        // as cargo search does not support exact match only we need to make sure that the
+        // result returned by cargo search is indeed the crate that we are looking for and not
+        // a crate whose name contains the name of the crate we are looking for.
+        if let Some((name, version)) = parse_cargo_search_output(output_str) {
+            if name == crate_name {
+                return Ok(Some(version.to_string()));
+            }
+        }
     }
+    Ok(None)
 }
 
 fn publish(crate_name: String) -> anyhow::Result<()> {
