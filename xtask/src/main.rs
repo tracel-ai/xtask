@@ -20,7 +20,7 @@ extern crate log;
     Vulnerabilities
 )]
 pub enum Command {
-    /// Example of a new command which extends a base command arguments
+    /// Example of a new command which extends a base command arguments which has no subcommand.
     ExtendedBuildArgs(commands::extended_build_args::ExtendedBuildArgsCmdArgs),
     /// Example of a new command which extends a base command arguments
     ExtendedBuildNewSubCommands(
@@ -30,6 +30,8 @@ pub enum Command {
     ExtendedCheckSubCommands(commands::extended_check_sub_commands::ExtendedCheckArgsCmdArgs),
     /// Example of a new command which extendeds target
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
+    /// Example of a new command which extends a base command arguments which has subcommands.
+    ExtendedTestArgs(commands::extended_test_args::ExtendedTestArgsCmdArgs),
     /// Comprehensive example of an extended Fix command with an additional target and subcommand
     ExtendedFix(commands::fix::ExtendedFixCmdArgs),
     /// Example of a new command with support of base Target
@@ -50,6 +52,7 @@ fn main() -> anyhow::Result<()> {
         Command::ExtendedCheckSubCommands(args) => {
             commands::extended_check_sub_commands::handle_command(args)
         }
+        Command::ExtendedTestArgs(args) => commands::extended_test_args::handle_command(args),
         Command::ExtendedFix(args) => commands::fix::handle_command(args, None),
         Command::ExtendedTarget(args) => commands::extended_target::handle_command(args),
         Command::MyCommand(args) => commands::my_command::handle_command(args),

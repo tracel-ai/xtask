@@ -1,5 +1,6 @@
 use tracel_xtask::prelude::*;
 
+// BuildCmdArgs has no subcommand so we pass None as third argument
 #[macros::extend_command_args(BuildCmdArgs, Target, None)]
 pub struct ExtendedBuildArgsCmdArgs {
     /// Print additional debug info when set
