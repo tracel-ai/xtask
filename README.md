@@ -14,10 +14,10 @@
 <br/>
 </div>
 
-A collection of easy to use and extend commands to be used in your [xtask CLI][1] based on [clap][2].
+A collection of easy-to-use and extensible commands to be used in your [xtask CLI][1] based on [clap][2].
 
-These commands are used in our Tracel repositories. By centralizing all of our redundant commands we can save a big amount
-of code duplication, boilerplate and considerably lower the burden maintenance. It also provides a unified interface across
+We rely on these commands in each of our Tracel repositories. By centralizing our redundant commands we save a big amount
+of code duplication, boilerplate and considerably lower their maintenance cost. This also provides a unified interface across
 all of our repositories.
 
 These commands are not specific to Tracel repositories and they should be pretty much usable in any Rust repositories with
@@ -56,7 +56,7 @@ In the `xtask/Cargo.toml` file, add the following under `[dependencies]`:
 
 ```toml
 [dependencies]
-tracel-xtask = "1.0.0"
+tracel-xtask = "~1.0"
 ```
 
 5. **Build the workspace:**
@@ -65,13 +65,12 @@ tracel-xtask = "1.0.0"
  cargo build
  ```
 
-Your workspace is now set up with a `xtask` binary crate that depends on `tracel-xtask` version 1.0.0.
+Your workspace is now set up with a `xtask` binary crate that depends on `tracel-xtask` version 1.0.x.
 
 ### Bootstrap main.rs
 
-1. In the `main.rs` file of the newly created `xtask` crate, import the `tracel_xtask prelude` and then declare
-   a `Command` enum along with the `macros::base_commands` attribute to select the base commands you want to use from
-   the collection:
+1. In the `main.rs` file of the newly created `xtask` crate, import the `tracel_xtask` prelude moduel and then declare
+   a `Command` enum. Select the base commands you want to use by adding the `macros::base_commands` attribute:
 
 ```rust
 use tracel_xtask::prelude::*;
@@ -97,11 +96,10 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-3. Build the workspace with `cargo build` at the root of the repository to verify everything is fine before
-   proceeding to the next section.
+3. Build the workspace with `cargo build` at the root of the repository to verify that everything is.
 
 
-3. You should now be able to display the main help screen which lists the commands you selected previously:
+4. You should now be able to display the main help screen which lists the commands you selected previously:
 
 ```sh
 cargo xtask --help
@@ -121,8 +119,7 @@ Create a new file `.cargo/config.toml` in your repository with the following con
 xtask = "run --target-dir target/xtask --package xtask --bin xtask --"
 ```
 
-This saves quite a few characters to type :-) You can now invoke `xtask` like this at the root of your
-repository:
+This saves quite a few characters to type as you can now invoke `xtask` direclty like this:
 
 ```sh
 cargo xtask
@@ -194,26 +191,29 @@ Try it with `cx --help` at the root of the repository.
 All our repositories follow the same directory hierarchy:
 - a `crates` directory which contains all the crates of the workspace
 - an `examples` directory which holds all the examples crates
-- a `xtask` directory which is binary crate of the CLI using `xtask-common`
+- a `xtask` directory which is the binary crate for our xtask CLI using `tracel-xtask`
 
-### Integration tests
+### About tests
 
-[Integration tests][3] are tests usually contained in a `tests` directory. `tracel-xtask` test command expects all
-the integration file names to be prefixed with `test_`. If a file in the `tests` directory of a crate does not start
-with `test_` then it will be ignored when running the `cargo xtask test integration` command.
+As per Cargo convention, [Integration tests][3] are tests contained in a `tests` directory of a crate besides its `src` directory.
+
+Inline tests in `src` directory are called [Unit tests][4].
+
+`tracel-xtask` allow to easily execute them separately using the `test` command.
 
 ## Interface generalities
 
 ### Target
 
-There are 4 default targets provided by the tracel-xtask command line interface:
-- `workspace` which targets the whole workspace, this is the default target
+There are 4 default targets provided by `tracel-xtask`:
+- `workspace` which targets the cargo workspace, this is the default target
 - `crates` are all the binary crates and library crates
 - `examples` are all the example crates
 - `all-packages` are both `crates` and `examples` targets
 
 `workspace` and `all-packages` are different because `workspace` uses the `--workspace` flag of cargo whereas `all-packages`
-relies on `crates` and `examples` targets which use the `--package` flag.
+relies on `crates` and `examples` targets which use the `--package` flag. So `all-packages` executes a command for each crate
+or example individually.
 
 Here are some examples:
 
@@ -230,7 +230,7 @@ cargo xtask build
 
 ### Global options
 
-The following options are global and must be used before the actual command on the command line, for instance:
+The following options are global and precede the actual command on the command line:
 
 - Environment (`-e`, `--environment`):
 
@@ -254,16 +254,16 @@ to inform your custom commands or dispatch functions about the targeted executio
 
 - Coverage (`-c`, `--enable-coverage`):
 
-`-c` or `--enabled-coverage` which setup Rust toolchain to generate coverage information.
+`-c` or `--enabled-coverage` setups the Rust toolchain to generate coverage information.
 
 ## Anatomy of a base command
 
-We use the derive API of clap which is based on struct, enum and attribute proc macros. Each base command is a
-submodule of the `base_commands` module. If the command has arguments there is a struct named `<command>CmdArgs` which
-declare the options, arguments and subcommands. In the case of subcommands a corresponding enum named `<command>SubCommand`
+We use the derive API of clap which is based on structs, enums and attribute proc macros. Each base command is a
+submodule of the `base_commands` module. If the command accepts arguments there is a corresponding struct named `<command>CmdArgs`
+which declare the options, arguments and subcommands. In the case of subcommands a corresponding enum named `<command>SubCommand`
 is defined.
 
-Here is an example for a `foo` command:
+Here is an example with a `foo` command:
 
 ```rust
 #[macros::declare_command_args(Target, FooSubCommand)]
@@ -279,7 +279,7 @@ Note that it is possible to have an arbitrary level of nested subcommands but de
 in other words, only the first level of subcommands can be extended. If possible, try to design commands with only one
 level of subcommands to keep the interface simple.
 
-In the following sections we will see how to create completely new commands as well how to extend existing bae commands.
+In the following sections we will see how to create completely new commands as well how to extend existing base commands.
 
 ## Customization
 
@@ -288,11 +288,11 @@ In the following sections we will see how to create completely new commands as w
 1. First, we organize commands by creating a `commands` module. Create a file `xtask/src/commands/mycommand.rs` as well
    as the corresponding `mod.rs` file to declare the module contents.
 
-2. Then, in `mycommand.rs` define the arguments struct with the `declare_command_args` macro and the handle_command function.
-   The `declare_command_args` takes two parameters, the first is the type of the target enum and the second is the type of
-   the subcommand enum if any. If the command has no target r no subcommand then put `None` for each argument respectively.
-   `Target` is the default target type provided by `tracel-xtask` as it is described in the Generalities section. You can
-   create your type from scratch or even extend `Target` as we will see in a later section.
+2. Then, in `mycommand.rs` define the arguments struct with the `declare_command_args` macro and define the `handle_command`
+   function. The `declare_command_args` macro takes two parameters, the first is the type of the target enum and the second
+   is the type of the subcommand enum if any. If the command has no target or no subcommand then put `None` for each argument
+   respectively. `Target` is the default target type provided by `tracel-xtask`. This type can be extended to support more
+   targets as we will see in a later section.
 
 ```rust
 use tracel_xtask::prelude::*;
@@ -330,7 +330,7 @@ pub enum Command {
 }
 ```
 
-5. And dispatch to our command implementation module:
+5. And dispatch its handling to our new command module:
 
 ```rust
 fn main() -> anyhow::Result<()> {
@@ -352,9 +352,9 @@ cargo xtask my-command
 
 ### Extend the default Target enum
 
-Let's implement a new commands called `extended-target` to illustrate how to extend the default Target enum.
+Let's implement a new command called `extended-target` to illustrate how to extend the default `Target` enum.
 
-1. Create the `commands/extended_target.rs` file and update the `mod.rs` file as we saw in the previous section.
+1. Create a `commands/extended_target.rs` file and update the `mod.rs` file as we saw in the previous section.
 
 2. We also need to add a new `strum` dependency to our `Cargo.toml` file:
 
@@ -364,7 +364,8 @@ strum = {version = "0.26.3", features = ["derive"]}
 ```
 
 3. Then we can extend the `Target` enum with the `macros::extend_targets` attribute in our `extended_target.rs` file.
-   Here we choose to add a new target called `frontend` which targets a frontend we could find in a monorepo:
+   Here we choose to add a new target called `frontend` which targets the frontend component we could find for instance
+   in a monorepo:
 
 ```rust
 use tracel_xtask::prelude::*;
@@ -376,7 +377,7 @@ pub enum MyTarget {
 }
 ```
 
-4. Then we define our command arguments by referencing our newly created `MyTarget` enum:
+4. Then we define our command arguments by referencing our newly created `MyTarget` enum in the `declare_command_args` attribute:
 
 ```rust
 #[macros::declare_command_args(MyTarget, None)]
@@ -443,21 +444,21 @@ To extend an existing command we use the `macros::extend_command_args` attribute
 - second argument is the target type (or `None` if there is no target),
 - third argument is the subcommand type (or `None` if there is no subcommand).
 
-Let's use two examples to illustrate this, the first is a commands that extends the `build` base commande with
-a new `--debug` argument, and the second is a new command that extends the subcommands of the `check` base command
+Let's use two examples to illustrate this, the first is a command to extend the `build` base command with
+a new `--debug` argument; and the second is a new command to extend the subcommands of the `check` base command
 to add a new `my-check` subcommand.
 
-You can find more examples in the `xtask` crate of this repository.
+Note that you can find more examples in the `xtask` crate of this repository.
 
 #### Extend the arguments of a base command
 
-We create a new command called `extended-build-args` which has an additional arguments `--debug`.
+We create a new command called `extended-build-args` which will have an additional argument called `--debug`.
 
 1. Create the `commands/extended_build_args.rs` file and update the `mod.rs` file as we saw in the previous section.
 
-2. Extend the `BuildCommandArgs` struct using macro `macros::extend_command_args` and define the `handle_command` function.
+2. Extend the `BuildCommandArgs` struct using the attribute `macros::extend_command_args` and define the `handle_command` function.
    Note that the macro automatically implements the `TryInto` trait which makes it easy to dispatch back to the base command
-   own `handle_command` function. Also note that if the base command requires a target they you need to provide one as well
+   own `handle_command` function. Also note that if the base command requires a target then you need to provide a target as well
    in your extension, i.e. the target parameter of the macro cannot be `None` if the base command has a `Target`.
 
 ```rust
@@ -478,7 +479,7 @@ pub fn handle_command(args: ExtendedBuildArgsCmdArgs) -> anyhow::Result<()> {
 }
 ```
 
-3. Register the new command the usual way by adding it to our `Command` enum and dispatch it
+3. Register the new command the usual way by adding it to the `Command` enum and dispatch it
    in the `main` function:
 
 ```rust
@@ -515,11 +516,11 @@ cargo xtask extended-build-args --debug
 
 #### Extend the subcommands of a base command
 
-For this one we create a new command called `extended-check-subcommands`.
+For this one we create a new command called `extended-check-subcommands` which will have an additional subcommand.
 
-1. Create the `commands/extended_check_subcommands.rs` file and update the `mod.rs` file as we saw in the previous section.
+1. Create a `commands/extended_check_subcommands.rs` file and update the `mod.rs` file as we saw in the previous section.
 
-2. Extend the `CheckCommandArgs` struct using macro `macros::extend_command_args`:
+2. Extend the `CheckCommandArgs` struct using the attribute `macros::extend_command_args`:
 
 ```rust
 use tracel_xtask::prelude::*;
@@ -539,7 +540,7 @@ pub enum ExtendedCheckSubcommand {
 }
 ```
 
-4. Implement the `handle_command` function to handle the new subcommand. Note that we also must handle the `All` variant:
+4. Implement the `handle_command` function to handle the new subcommand. Note that we must handle the `All` subcommand as well:
 
 ```rust
 use strum::IntoEnumIterator;
@@ -571,7 +572,7 @@ fn run_my_subcommand(_args: ExtendedCheckedArgsCmdArgs) -> Result<(), anyhow::Er
 }
 ```
 
-5. Register the new command the usual way by adding it to our `Command` enum and dispatch it
+5. Register the new command the usual way by adding it to the `Command` enum and dispatch it
    in the `main` function:
 
 ```rust
@@ -608,11 +609,10 @@ cargo xtask extended-check-subcommands my-check
 
 ## Custom builds and tests
 
-`xtask-common` provides helper functions to easily execute custom builds or tests with specific features or build target (do not confuse
-Rust build targets which is an argument of the `cargo build` command with the xtask target we introduced here).
+`tracel-xtask` provides helper functions to easily execute custom builds or tests with specific features or build targets (do not confuse
+Rust build targets which is an argument of the `cargo build` command with the xtask target we introduced previously).
 
-For instance we can extend the `build` command using the `Extend an existing xtask-common command` section and use the helper function to
-build additional crates with custom features or build targets:
+For instance we can extend the `build` command to build additional crates with custom features or build targets using the helper function:
 
 ```rust
 pub fn handle_command(mut args: tracel_xtask::commands::build::BuildCmdArgs)  -> anyhow::Result<()> {
@@ -686,7 +686,7 @@ the `test` command.
 You can make your own `handle_command` function if you need to perform more validations. Ideally this function
 should only call the other commands `handle_command` functions.
 
-For quick reference here is a simple example to perform all checks and test against the workspace:
+For quick reference here is a simple example to perform all checks and tests against the workspace:
 
 ```rust
 pub fn handle_command(args: ValidateCmdArgs) -> anyhow::Result<()> {
@@ -730,19 +730,22 @@ pub fn handle_command(args: ValidateCmdArgs) -> anyhow::Result<()> {
 
 ### Check and Fix
 
-`check` and `fix` contains the same subcommands to audit, format, lint or proofread a code base.
-
-While the `check` command only reports issues the `fix` command attempt to fix them as they are encountered.
-
 The `check` and `fix` commands are designed to help you maintain code quality during development.
 They run various checks and fix issues, ensuring that your code is clean and follows best practices.
 
-Each test can be executed separately or all of them can be executed sequentially using `all`.
+`check` and `fix` contains the same subcommands to audit, format, lint or proofread a code base.
+
+While the `check` command only reports issues, the `fix` command attempts to fix them as they are encountered.
+
+Each check can be executed separately or all of them can be executed sequentially using `all`.
 
 Usage to lint the code base:
+
 ```sh
 cargo xtask check lint
+
 cargo xtask fix lint
+
 cargo xtask fix all
 ```
 
@@ -764,7 +767,7 @@ cargo xtask test integration
 cargo xtask test all
 ```
 
-Note that documentation tests support is under the `doc` command.
+Note that documentation tests are supported by the `doc` command.
 
 ### Documentation
 
@@ -774,7 +777,7 @@ Command to build and test the documentation in a workspace.
 
 This is a command reserved for repository maintainers.
 
-The `bump` command is used to update the version numbers of all crates in the repository.
+The `bump` command is used to update the version numbers of all first-party crates in the repository.
 This is particularly useful when you're preparing for a new release and need to ensure that all crates have the correct version.
 
 You can bump the version by major, minor, or patch levels, depending on the changes made.
@@ -784,12 +787,12 @@ For bug fixes, bump the patch version.
 
 Usage:
 ```sh
-cargo xtask bump <COMMAND>
+cargo xtask bump <SUBCOMMAND>
 ```
 
 ### Publishing Crates
 
-This is a command reserved for repository maintainers and is mainly in `publish` GitHub workflows.
+This is a command reserved for repository maintainers and is tipically used in `publish` GitHub workflows.
 
 This command automates the process of publishing crates to `crates.io`, the Rust package registry.
 By specifying the name of the crate, `xtask` handles the publication process, ensuring that the crate is available for others to use.
@@ -799,7 +802,8 @@ Usage:
 cargo xtask publish <NAME>
 ```
 
-It is typical to use this command in a GitHub workflow that calls Tracel's reusable [publish-crate][8] workflow.
+As mentioned, this command is often used in a GitHub workflow.
+We provide a Tracel's reusable [publish-crate][8] workflow that makes use of this command.
 Here is a simple example with a workflow that publishes two crates A and B with A depending on B.
 
 ```yaml
@@ -831,12 +835,12 @@ jobs:
 
 ### Coverage
 
-This command provide a subcommands to install the necessary dependencies for performing code coverage and a subcommand to generate the
-coverage info file that can then be uploaded to codecov for instance. See dedicated section `Enable and generate coverage information`.
+This command provide a subcommand to install the necessary dependencies for performing code coverage and a subcommand to generate the
+coverage info file that can then be uploaded to a service provider like codecov. See dedicated section `Enable and generate coverage information`.
 
 ### Dependencies
 
-Various additional commands about dependencies.
+Various additional subcommands about dependencies.
 
 `deny` make sure that all dependencies meet requirements using [cargo-deny][5].
 
@@ -844,7 +848,7 @@ Various additional commands about dependencies.
 
 ### Vulnerabilities
 
-This command make it easier to execute sanitizers as described in [the Rust unstable book][6].
+This command makes it easier to execute sanitizers as described in [the Rust unstable book][6].
 
 These sanitizers require a nightly toolchain.
 
