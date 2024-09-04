@@ -145,15 +145,14 @@ pub fn run_process_for_workspace<'a>(
         }
     }
 
-    if close_group {
-        endgroup!();
-    }
-
     let status = child
         .wait()
         .expect("Should be able to wait for the process to finish.");
 
     if status.success() || ignore_error {
+        if close_group {
+            endgroup!();
+        }
         anyhow::Ok(())
     } else {
         Err(anyhow::anyhow!("{}", error_msg))
