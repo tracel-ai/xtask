@@ -69,7 +69,7 @@ Your workspace is now set up with a `xtask` binary crate that depends on `tracel
 
 ### Bootstrap main.rs
 
-1. In the `main.rs` file of the newly created `xtask` crate, import the `tracel_xtask` prelude moduel and then declare
+1. In the `main.rs` file of the newly created `xtask` crate, import the `tracel_xtask` prelude module and then declare
    a `Command` enum. Select the base commands you want to use by adding the `macros::base_commands` attribute:
 
 ```rust
@@ -119,7 +119,7 @@ Create a new file `.cargo/config.toml` in your repository with the following con
 xtask = "run --target-dir target/xtask --package xtask --bin xtask --"
 ```
 
-This saves quite a few characters to type as you can now invoke `xtask` direclty like this:
+This saves quite a few characters to type as you can now invoke `xtask` directly like this:
 
 ```sh
 cargo xtask
@@ -792,7 +792,7 @@ cargo xtask bump <SUBCOMMAND>
 
 ### Publishing Crates
 
-This is a command reserved for repository maintainers and is tipically used in `publish` GitHub workflows.
+This is a command reserved for repository maintainers and is typically used in `publish` GitHub workflows.
 
 This command automates the process of publishing crates to `crates.io`, the Rust package registry.
 By specifying the name of the crate, `xtask` handles the publication process, ensuring that the crate is available for others to use.
