@@ -3,9 +3,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     endgroup, group,
-    utils::{
-        cargo::ensure_cargo_crate_is_installed, process::run_process,
-    },
+    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
 #[tracel_xtask_macros::declare_command_args(None, DependenciesSubCommand)]
