@@ -111,7 +111,7 @@ pub fn run_process_for_workspace<'a>(
     // Process the stdout to inject log groups
     let mut ignore_error = false;
     let mut close_group = false;
-    for (line, is_stderr) in rx.iter() {
+    for (line, _is_stderr) in rx.iter() {
         let mut skip_line = false;
 
         if let Some(rx) = &group_rx {
@@ -137,16 +137,8 @@ pub fn run_process_for_workspace<'a>(
         }
 
         if !skip_line {
-            if is_stderr {
-                eprintln!("{}", line);
-            } else {
-                println!("{}", line);
-            }
+            println!("{}", line);
         }
-    }
-
-    if close_group {
-        endgroup!();
     }
 
     let status = child
@@ -154,6 +146,9 @@ pub fn run_process_for_workspace<'a>(
         .expect("Should be able to wait for the process to finish.");
 
     if status.success() || ignore_error {
+        if close_group {
+            endgroup!();
+        }
         anyhow::Ok(())
     } else {
         Err(anyhow::anyhow!("{}", error_msg))
