@@ -598,7 +598,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 All,
                 #[doc = r"Run cargo-deny Lint dependency graph to ensure all dependencies meet requirements `<https://crates.io/crates/cargo-deny>`. [default]"]
                 Deny,
-                #[doc = r"Run cargo-udeps to find unused dependencies `<https://crates.io/crates/cargo-udeps>`"]
+                #[doc = r"Run cargo-machete to find unused dependencies `<https://crates.io/crates/cargo-machete>`"]
                 Unused,
             },
         ),

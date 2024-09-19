@@ -2,12 +2,8 @@ use anyhow::Ok;
 use strum::IntoEnumIterator;
 
 use crate::{
-    commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
-    utils::{
-        cargo::ensure_cargo_crate_is_installed, process::run_process,
-        rustup::is_current_toolchain_nightly,
-    },
+    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
 #[tracel_xtask_macros::declare_command_args(None, DependenciesSubCommand)]
@@ -16,7 +12,7 @@ pub struct DependenciesCmdArgs {}
 pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
         DependenciesSubCommand::Deny => run_cargo_deny(),
-        DependenciesSubCommand::Unused => run_cargo_udeps(),
+        DependenciesSubCommand::Unused => run_cargo_machete(),
         DependenciesSubCommand::All => DependenciesSubCommand::iter()
             .filter(|c| *c != DependenciesSubCommand::All)
             .try_for_each(|c| handle_command(DependenciesCmdArgs { command: Some(c) })),
@@ -39,22 +35,19 @@ fn run_cargo_deny() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Run cargo-udeps
-fn run_cargo_udeps() -> anyhow::Result<()> {
-    if is_current_toolchain_nightly() {
-        ensure_cargo_crate_is_installed("cargo-udeps", None, None, false)?;
-        // Run cargo udeps
-        group!("Cargo: run unused dependencies checks");
-        run_process(
-            "cargo",
-            &vec!["udeps"],
-            None,
-            None,
-            "Unused dependencies found!",
-        )?;
-        endgroup!();
-    } else {
-        error!("{}", CARGO_NIGHTLY_MSG);
-    }
+/// Run cargo-machete
+fn run_cargo_machete() -> anyhow::Result<()> {
+    ensure_cargo_crate_is_installed("cargo-machete", None, None, false)?;
+    // Run cargo machete
+    group!("Cargo: run unused dependencies checks");
+    run_process(
+        "cargo",
+        &vec!["machete"],
+        None,
+        None,
+        "Unused dependencies found!",
+    )?;
+    endgroup!();
+
     Ok(())
 }
