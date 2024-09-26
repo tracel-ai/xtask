@@ -32,7 +32,7 @@ pub(crate) fn run_build(
             group!("Build Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec!["build", "--workspace", "--color", "always"],
+                &["build", "--workspace", "--color", "always"],
                 excluded,
                 None,
                 None,
@@ -54,7 +54,7 @@ pub(crate) fn run_build(
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["build", "-p", &member.name, "--color", "always"],
+                    &["build", "-p", &member.name, "--color", "always"],
                     excluded,
                     only,
                     &format!("Build command failed for {}", &member.name),

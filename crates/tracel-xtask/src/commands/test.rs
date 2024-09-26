@@ -66,9 +66,10 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
             push_optional_args(&mut cmd_args, args);
+            // let cmd_args: Vec<&str> = cmd_args.iter().map(String::as_str).collect();
             run_process_for_workspace(
                 "cargo",
-                cmd_args.iter().map(String::as_str).collect(),
+                &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Unit Tests"),
@@ -115,7 +116,7 @@ fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), any
     run_process_for_package(
         "cargo",
         &member.name,
-        &cmd_args.iter().map(String::as_str).collect(),
+        &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),
         &args.exclude,
         &args.only,
         &format!("Failed to execute unit test for '{}'", &member.name),
@@ -140,7 +141,7 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
             push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
-                cmd_args.iter().map(String::as_str).collect(),
+                &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Integration Tests"),
@@ -187,7 +188,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     run_process_for_package(
         "cargo",
         &member.name,
-        &cmd_args.iter().map(String::as_str).collect(),
+        &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),
         &args.exclude,
         &args.only,
         &format!("Failed to execute integration test for '{}'", &member.name),

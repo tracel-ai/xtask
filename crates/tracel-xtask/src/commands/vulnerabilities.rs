@@ -57,7 +57,7 @@ fn run_cargo_careful() -> anyhow::Result<()> {
         group!("Cargo: careful setup");
         run_process(
             "cargo",
-            &vec!["careful", "setup"],
+            &["careful", "setup"],
             None,
             None,
             "Error preparing cargo sysroot.",
@@ -67,7 +67,7 @@ fn run_cargo_careful() -> anyhow::Result<()> {
         group!("Cargo: run careful checks");
         run_process(
             "cargo",
-            &vec!["careful", "test"],
+            &["careful", "test"],
             None,
             None,
             "Cargo careful test has errors.",

@@ -35,7 +35,7 @@ fn run_documentation_build(
             group!("Build Workspace documentation");
             run_process_for_workspace(
                 "cargo",
-                vec!["doc", "--workspace", "--no-deps", "--color=always"],
+                &["doc", "--workspace", "--no-deps", "--color=always"],
                 excluded,
                 None,
                 None,
@@ -57,7 +57,7 @@ fn run_documentation_build(
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["doc", "-p", &member.name, "--no-deps", "--color=always"],
+                    &["doc", "-p", &member.name, "--no-deps", "--color=always"],
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -86,7 +86,7 @@ pub(crate) fn run_documentation(
             group!("Workspace Documentation Tests");
             run_process_for_workspace(
                 "cargo",
-                vec!["test", "--workspace", "--doc", "--color", "always"],
+                &["test", "--workspace", "--doc", "--color", "always"],
                 excluded,
                 Some(r"Doc-tests (\w+)"),
                 Some("Doc Tests"),
@@ -125,7 +125,7 @@ fn run_doc_test(
     run_process_for_package(
         "cargo",
         &member.name,
-        &vec!["test", "--doc", "-p", &member.name],
+        &["test", "--doc", "-p", &member.name],
         excluded,
         only,
         &format!(

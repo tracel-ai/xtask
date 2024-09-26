@@ -17,7 +17,7 @@ use crate::{endgroup, group};
 /// Run a process
 pub fn run_process(
     name: &str,
-    args: &Vec<&str>,
+    args: &[&str],
     envs: Option<HashMap<&str, &str>>,
     path: Option<&Path>,
     error_msg: &str,
@@ -50,7 +50,7 @@ pub fn run_process(
 #[allow(clippy::too_many_arguments)]
 pub fn run_process_for_workspace<'a>(
     name: &str,
-    args: Vec<&'a str>,
+    args: &[&'a str],
     excluded: &'a [String],
     group_regexp: Option<&str>,
     group_name: Option<&str>,
@@ -61,7 +61,7 @@ pub fn run_process_for_workspace<'a>(
     let group_rx: Option<Regex> = group_regexp.map(|r| Regex::new(r).unwrap());
     // split the args between cargo args and binary args so that we can extend the cargo args
     // and then append the binary args back.
-    let (cargo_args, binary_args) = split_vector(&args, "--");
+    let (cargo_args, binary_args) = split_vector(args, "--");
     let mut cmd_args = cargo_args.to_owned();
     excluded
         .iter()
@@ -160,7 +160,7 @@ pub fn run_process_for_workspace<'a>(
 pub fn run_process_for_package(
     name: &str,
     package: &String,
-    args: &Vec<&str>,
+    args: &[&str],
     excluded: &[String],
     only: &[String],
     error_msg: &str,

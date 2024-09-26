@@ -32,7 +32,7 @@ pub(crate) fn run_compile(
             group!("Compile Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec!["check", "--workspace"],
+                &["check", "--workspace"],
                 excluded,
                 None,
                 None,
@@ -54,7 +54,7 @@ pub(crate) fn run_compile(
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["check", "-p", &member.name],
+                    &["check", "-p", &member.name],
                     excluded,
                     only,
                     &format!("Compilation failed for {}", &member.name),

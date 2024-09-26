@@ -57,7 +57,7 @@ pub(crate) fn run_audit() -> anyhow::Result<()> {
     group!("Audit Rust Dependencies");
     run_process(
         "cargo",
-        &vec!["audit", "-q", "--color", "always", "fix"],
+        &["audit", "-q", "--color", "always", "fix"],
         None,
         None,
         "Audit check execution failed",
@@ -72,7 +72,7 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Re
             group!("Format Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec!["fmt"],
+                &["fmt"],
                 &[],
                 None,
                 None,
@@ -93,7 +93,7 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Re
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["fmt", "-p", &member.name],
+                    &["fmt", "-p", &member.name],
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -118,7 +118,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
             group!("Lint Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec![
+                &[
                     "clippy",
                     "--no-deps",
                     "--fix",
@@ -149,7 +149,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec![
+                    &[
                         "clippy",
                         "--no-deps",
                         "--fix",
@@ -185,7 +185,7 @@ pub(crate) fn run_typos() -> anyhow::Result<()> {
     group!("Typos");
     run_process(
         "typos",
-        &vec!["--write-changes", "--color", "always"],
+        &["--write-changes", "--color", "always"],
         None,
         None,
         "Some typos have been found and cannot be fixed.",

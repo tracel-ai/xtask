@@ -52,7 +52,7 @@ fn run_audit() -> anyhow::Result<()> {
     ensure_cargo_crate_is_installed("cargo-audit", Some("fix"), None, false)?;
     run_process(
         "cargo",
-        &vec!["audit", "-q", "--color", "always"],
+        &["audit", "-q", "--color", "always"],
         None,
         None,
         "Audit check execution failed",
@@ -67,7 +67,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
             group!("Format Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec!["fmt", "--check"],
+                &["fmt", "--check"],
                 &[],
                 None,
                 None,
@@ -89,7 +89,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec!["fmt", "--check", "-p", &member.name],
+                    &["fmt", "--check", "-p", &member.name],
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -114,7 +114,7 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
             group!("Lint Workspace");
             run_process_for_workspace(
                 "cargo",
-                vec![
+                &[
                     "clippy",
                     "--no-deps",
                     "--color=always",
@@ -143,7 +143,7 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &vec![
+                    &[
                         "clippy",
                         "--no-deps",
                         "--color=always",
@@ -178,7 +178,7 @@ fn run_typos() -> anyhow::Result<()> {
     group!("Typos");
     run_process(
         "typos",
-        &vec!["--diff", "--color", "always"],
+        &["--diff", "--color", "always"],
         None,
         None,
         "Typos check execution failed",

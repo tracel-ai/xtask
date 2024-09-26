@@ -26,7 +26,7 @@ fn run_cargo_deny() -> anyhow::Result<()> {
     group!("Cargo: run deny checks");
     run_process(
         "cargo",
-        &vec!["deny", "check"],
+        &["deny", "check"],
         None,
         None,
         "Some dependencies don't meet the requirements!",
@@ -42,7 +42,7 @@ fn run_cargo_machete() -> anyhow::Result<()> {
     group!("Cargo: run unused dependencies checks");
     run_process(
         "cargo",
-        &vec!["machete"],
+        &["machete"],
         None,
         None,
         "Unused dependencies found!",

@@ -17,7 +17,7 @@ fn bump(command: &BumpSubCommand) -> anyhow::Result<()> {
     ensure_cargo_crate_is_installed("cargo-edit", None, None, false)?;
     run_process(
         "cargo",
-        &vec!["set-version", "--bump", &command.to_string()],
+        &["set-version", "--bump", &command.to_string()],
         None,
         None,
         &format!("Error trying to bump {command} version"),
