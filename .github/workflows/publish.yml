@@ -1,4 +1,4 @@
-name: publish all crates
+name: Publish
 
 on:
   push:
