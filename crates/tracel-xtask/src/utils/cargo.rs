@@ -20,7 +20,7 @@ pub fn ensure_cargo_crate_is_installed(
         }
         if let Some(features) = features {
             if !features.is_empty() {
-                args.extend(vec!["features", features]);
+                args.extend(vec!["--features", features]);
             }
         }
         if let Some(version) = version {
