@@ -32,6 +32,7 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
                     only: args.only.clone(),
                     threads: args.threads,
                     jobs: args.jobs,
+                    features: args.features.clone(),
                 })
             }),
     }
@@ -42,6 +43,11 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
     if let Some(jobs) = &args.jobs {
         cmd_args.extend(vec!["--jobs".to_string(), jobs.to_string()]);
     };
+    if let Some(features) = &args.features {
+        if !features.is_empty() {
+            cmd_args.extend(vec!["--features".to_string(), features.join(",")]);
+        }
+    }
     // test harness options
     cmd_args.extend(vec!["--".to_string(), "--color=always".to_string()]);
     if let Some(threads) = &args.threads {

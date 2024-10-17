@@ -259,6 +259,14 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub threads: Option<u16>,
+                #[doc = r"Comma-separated list of features to enable during tests."]
+                #[arg(
+                    long,
+                    value_name = "FEATURE,FEATURE,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Option<Vec<String>>,
             },
         ),
         (
@@ -478,6 +486,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                 // we can use an inventory (see TODO at the top of the file)
                 if ident_str != "target"
                     && (ident_str == "exclude"
+                        || ident_str == "features"
                         || ident_str == "only"
                         || ident_str == "ignore_audit"
                         || ident_str == "jobs"
