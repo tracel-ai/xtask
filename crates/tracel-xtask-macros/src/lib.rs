@@ -564,12 +564,12 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
         (
             "BumpSubCommand",
             quote! {
-                #[doc = r"Run unit tests."]
+                #[doc = r"Bump the major version (x.0.0)."]
                 Major,
-                #[doc = r"Run integration tests."]
+                #[doc = r"Bump the minor version (0.x.0)."]
                 Minor,
                 #[default]
-                #[doc = r"Run documentation tests."]
+                #[doc = r"Bump the patch version (0.0.x)."]
                 Patch,
             },
         ),
