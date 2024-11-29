@@ -267,6 +267,12 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub features: Option<Vec<String>>,
+                #[doc = r"If set, ignore default features."]
+                #[arg(
+                    long = "no-default-features",
+                    required = false
+                )]
+                pub no_default_features: bool,
             },
         ),
         (
@@ -487,6 +493,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                 if ident_str != "target"
                     && (ident_str == "exclude"
                         || ident_str == "features"
+                        || ident_str == "no_default_features"
                         || ident_str == "only"
                         || ident_str == "ignore_audit"
                         || ident_str == "jobs"

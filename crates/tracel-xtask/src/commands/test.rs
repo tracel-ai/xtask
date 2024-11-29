@@ -33,6 +33,7 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
                     threads: args.threads,
                     jobs: args.jobs,
                     features: args.features.clone(),
+                    no_default_features: args.no_default_features,
                 })
             }),
     }

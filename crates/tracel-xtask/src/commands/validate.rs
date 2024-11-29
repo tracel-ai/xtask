@@ -39,6 +39,7 @@ pub fn handle_command(args: ValidateCmdArgs) -> anyhow::Result<()> {
         jobs: None,
         command: Some(TestSubCommand::All),
         features: None,
+        no_default_features: false,
     })?;
 
     Ok(())
