@@ -49,6 +49,9 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
             cmd_args.extend(vec!["--features".to_string(), features.join(",")]);
         }
     }
+    if args.no_default_features {
+        cmd_args.push("--no-default-features".to_string());
+    }
     // test harness options
     cmd_args.extend(vec!["--".to_string(), "--color=always".to_string()]);
     if let Some(threads) = &args.threads {

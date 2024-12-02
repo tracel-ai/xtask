@@ -14,7 +14,7 @@ pub fn handle_command(args: ExtendedTestArgsCmdArgs) -> anyhow::Result<()> {
     } else {
         println!("debug disabled");
     }
-    // We don't run the actual tests as it creates an infinite loop while executing the integraton tests.
+    // We don't run the actual tests as it creates an infinite loop while executing the integration tests.
     // base_commands::test::handle_command(args.try_into().unwrap())
     Ok(())
 }
