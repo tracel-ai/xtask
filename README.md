@@ -31,14 +31,14 @@ extended using handy proc macros and by following some patterns described in thi
 1. **Create a new Cargo workspace:**
 
 ```bash
-cargo new my_workspace --vcs none
+cargo new my_workspace
 cd my_workspace
 ```
 
 2. **Create the `xtask` binary crate:**
 
 ```bash
-cargo new xtask --bin --vcs none
+cargo new xtask --bin
 ```
 
 3. **Configure the workspace:**
@@ -56,7 +56,7 @@ In the `xtask/Cargo.toml` file, add the following under `[dependencies]`:
 
 ```toml
 [dependencies]
-tracel-xtask = "~1.0"
+tracel-xtask = "1.2"
 ```
 
 5. **Build the workspace:**
@@ -230,31 +230,46 @@ cargo xtask build
 
 ### Global options
 
-The following options are global and precede the actual command on the command line:
+The following options are global and precede the actual command on the command line.
 
-- Environment (`-e`, `--environment`):
+#### Environment
+
+`-e`, `--environment`
 
 ```sh
 cargo xtask -e production build
 ```
 
-`-e` or `--environment` does not do anything per se in the base commands, it is a flag whose only goal is
-to inform your custom commands or dispatch functions about the targeted environment which can be `development` (default),
-`staging` or `production`.
+Its mainf role is to inform your custom commands or dispatch functions about the targeted environment which can be:
+- `dev` (default) for development,
+- `test` for testing,
+- `stag` for staging,
+- `prod` for production.
 
-- Execution environment (`-E`, `--execution-environment`):
+It also automatically loads the following environment variables files if they exists in the working directory:
+- `.env` for any set environment,
+- `.env.{environment}` (example: `.env.dev`) for the non-sensitive configuration,
+- `.env.{environment}.secrets` (example `.env.dev.secrets`) for the sensitive configuration like password. These
+  files must be added to the ignore file of your VCS tool (for git add `.env.*.secrets` to the `.gitignore` file 
+  at the root of your repository).
+
+#### Execution environment
+
+`-E`, `--execution-environment`
 
 ```sh
 cargo xtask -E no-std build
 ```
 
-`-E` or `--execution-environment` does not do anything per se in the base commands, it is a flag whose only goal is
+It does not do anything per se in the base commands, it is a flag whose only goal is
 to inform your custom commands or dispatch functions about the targeted execution environment which can be `std` or
 `no-std`.
 
-- Coverage (`-c`, `--enable-coverage`):
+#### Coverage
 
-`-c` or `--enabled-coverage` setups the Rust toolchain to generate coverage information.
+`-c`, `--enable-coverage`
+
+It setups the Rust toolchain to generate coverage information.
 
 ## Anatomy of a base command
 

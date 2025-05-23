@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod environment;
 pub mod logging;
 pub mod utils;
 mod versions;
@@ -58,43 +59,17 @@ pub mod prelude {
     pub use crate::utils::rustup::rustup_add_target;
     pub use crate::utils::rustup::rustup_get_installed_targets;
     pub use crate::utils::time::format_duration;
-    pub use crate::Environment;
-    pub use crate::ExecutionEnvironment;
+    pub use crate::environment::Environment;
+    pub use crate::environment::ExecutionEnvironment;
     pub use crate::XtaskArgs;
+    // does not re-export strum has it is incompatible with strum macros expansions
 }
 
+use crate::environment::{Environment, ExecutionEnvironment};
 use crate::logging::init_logger;
-
-// does not re-export strum has it is incompatible with strum macros expansions
-use strum::{Display, EnumIter, EnumString};
 
 #[macro_use]
 extern crate log;
-
-#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
-#[strum(serialize_all = "lowercase")]
-pub enum Environment {
-    #[default]
-    /// Development environment.
-    Development,
-    /// Staging environment.
-    Staging,
-    /// Production environment.
-    Production,
-}
-
-#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
-#[strum(serialize_all = "lowercase")]
-pub enum ExecutionEnvironment {
-    /// Set the execution environment to all
-    All,
-    #[strum(to_string = "no-std")]
-    /// Set the execution environment to no-std (no Rust standard library available).
-    NoStd,
-    /// Set the execution environment to std (Rust standard library is available).
-    #[default]
-    Std,
-}
 
 #[derive(clap::Parser)]
 #[command(author, version, about, long_about = None)]
@@ -116,6 +91,8 @@ pub fn init_xtask<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     init_logger().init();
     let args = <XtaskArgs<C> as clap::Parser>::parse();
 
+    group_info!("Environment: {}", args.environment);
+    args.environment.load()?;
     group_info!("Execution environment: {}", args.execution_environment);
 
     // initialize code coverage
