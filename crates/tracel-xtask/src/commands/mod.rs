@@ -5,6 +5,7 @@ pub mod compile;
 pub mod coverage;
 pub mod dependencies;
 pub mod doc;
+pub mod docker;
 pub mod fix;
 pub mod publish;
 pub mod test;

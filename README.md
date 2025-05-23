@@ -853,6 +853,16 @@ jobs:
 This command provide a subcommand to install the necessary dependencies for performing code coverage and a subcommand to generate the
 coverage info file that can then be uploaded to a service provider like codecov. See dedicated section `Enable and generate coverage information`.
 
+### Docker
+
+The `docker` command provides `up` and `down` commands to start and stop stacks. The command is integrated with the environment
+configuration mechanism of `tracel-xtask`.
+
+The name of the compose file must follow the template `docker-compose.{env}.yml` with `env` being the shorthand environment name.
+For instance for the development environment the file is named `docker-compose.dev.yml`.
+
+The command also requires a mandatory project name for the stack in order to have idempotent `up` command.
+
 ### Dependencies
 
 Various additional subcommands about dependencies.

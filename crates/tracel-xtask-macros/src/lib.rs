@@ -150,6 +150,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Dependencies",
+        quote! {
+            #[doc = r"Run the specified dependencies check locally."]
+            Dependencies(tracel_xtask::commands::dependencies::DependenciesCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Doc",
         quote! {
             #[doc = r"Build documentation."]
@@ -157,10 +164,10 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
-        "Dependencies",
+        "Docker",
         quote! {
-            #[doc = r"Run the specified dependencies check locally."]
-            Dependencies(tracel_xtask::commands::dependencies::DependenciesCmdArgs)
+            #[doc = r"Manage docker compose stacks."]
+            Docker(tracel_xtask::commands::doc::DockerCmdArgs)
         },
     );
     variant_map.insert(
@@ -248,6 +255,17 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Ignore audit errors."]
                 #[arg(long = "ignore-audit", required = false)]
                 pub ignore_audit: bool,
+            },
+        ),
+        (
+            "DockerCmdArgs",
+            quote! {
+                #[doc = r"Build images before starting containers."]
+                #[arg(long = "build", required = false)]
+                pub build: bool,
+                #[doc = r"Project name."]
+                #[arg(long = "project", required = true)]
+                pub project: String,
             },
         ),
         (
@@ -634,6 +652,16 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Build,
                 #[doc = r"Run documentation tests."]
                 Tests,
+            },
+        ),
+        (
+            "DockerSubCommand",
+            quote! {
+                #[default]
+                #[doc = r"Start docker compose stack."]
+                Up,
+                #[doc = r"Stop docker compose stack."]
+                Down,
             },
         ),
         (
