@@ -250,19 +250,19 @@ It also automatically loads the following environment variables files if they ex
 - `.env` for any set environment,
 - `.env.{environment}` (example: `.env.dev`) for the non-sensitive configuration,
 - `.env.{environment}.secrets` (example `.env.dev.secrets`) for the sensitive configuration like password. These
-  files must be added to the ignore file of your VCS tool (for git add `.env.*.secrets` to the `.gitignore` file 
+  files must be added to the ignore file of your VCS tool (for git add `.env.*.secrets` to the `.gitignore` file
   at the root of your repository).
 
-#### Execution environment
+#### Runtime environment
 
-`-E`, `--execution-environment`
+`-r`, `--runtime-environment`
 
 ```sh
-cargo xtask -E no-std build
+cargo xtask -r no-std build
 ```
 
 It does not do anything per se in the base commands, it is a flag whose only goal is
-to inform your custom commands or dispatch functions about the targeted execution environment which can be `std` or
+to inform your custom commands or dispatch functions about the targeted runtime environment which can be `std` or
 `no-std`.
 
 #### Coverage

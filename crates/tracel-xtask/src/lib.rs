@@ -60,12 +60,12 @@ pub mod prelude {
     pub use crate::utils::rustup::rustup_get_installed_targets;
     pub use crate::utils::time::format_duration;
     pub use crate::environment::Environment;
-    pub use crate::environment::ExecutionEnvironment;
+    pub use crate::environment::RuntimeEnvironment;
     pub use crate::XtaskArgs;
     // does not re-export strum has it is incompatible with strum macros expansions
 }
 
-use crate::environment::{Environment, ExecutionEnvironment};
+use crate::environment::{Environment, RuntimeEnvironment};
 use crate::logging::init_logger;
 
 #[macro_use]
@@ -80,9 +80,9 @@ pub struct XtaskArgs<C: clap::Subcommand> {
     /// Set environment (for commands that support it).
     #[arg(short = 'e', long, default_value_t = Environment::default())]
     pub environment: Environment,
-    /// Set execution environment (for commands that support it).
-    #[arg(short = 'E', long, default_value_t = ExecutionEnvironment::default())]
-    pub execution_environment: ExecutionEnvironment,
+    /// Set runtime environment (for commands that support it).
+    #[arg(short = 'r', long, default_value_t = RuntimeEnvironment::default())]
+    pub runtime_environment: RuntimeEnvironment,
     #[command(subcommand)]
     pub command: C,
 }
@@ -93,7 +93,7 @@ pub fn init_xtask<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
 
     group_info!("Environment: {}", args.environment);
     args.environment.load()?;
-    group_info!("Execution environment: {}", args.execution_environment);
+    group_info!("Runtime environment: {}", args.runtime_environment);
 
     // initialize code coverage
     if args.enable_coverage {
