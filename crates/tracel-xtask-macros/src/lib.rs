@@ -235,6 +235,14 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
 fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStream> {
     HashMap::from([
         (
+            "BuildCmdArgs",
+            quote! {
+                #[doc = r"Build artifacs in release mode."]
+                #[arg(short = 'r', long = "release", required = false)]
+                pub release: bool,
+            },
+        ),
+        (
             "CheckCmdArgs",
             quote! {
                 #[doc = r"Ignore audit errors."]

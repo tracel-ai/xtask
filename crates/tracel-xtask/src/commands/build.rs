@@ -19,21 +19,21 @@ pub fn handle_command(args: BuildCmdArgs) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
-    run_build(&args.target, &args.exclude, &args.only)
+    run_build(&args.target, &args)
 }
 
-pub(crate) fn run_build(
-    target: &Target,
-    excluded: &Vec<String>,
-    only: &Vec<String>,
-) -> anyhow::Result<()> {
+pub(crate) fn run_build(target: &Target, args: &BuildCmdArgs) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Build Workspace");
+            let mut cmd_args = vec!["build", "--workspace", "--color", "always"];
+            if args.release {
+                cmd_args.push("--release");
+            }
             run_process_for_workspace(
                 "cargo",
-                &["build", "--workspace", "--color", "always"],
-                excluded,
+                &cmd_args,
+                &args.exclude,
                 None,
                 None,
                 "Workspace build failed",
@@ -43,20 +43,23 @@ pub(crate) fn run_build(
             endgroup!();
         }
         Target::Crates | Target::Examples => {
-            let members = match target {
+            let members = match args.target {
                 Target::Crates => get_workspace_members(WorkspaceMemberType::Crate),
                 Target::Examples => get_workspace_members(WorkspaceMemberType::Example),
                 _ => unreachable!(),
             };
 
             for member in members {
-                group!("Build: {}", member.name);
+                let mut cmd_args = vec!["build", "-p", &member.name, "--color", "always"];
+                if args.release {
+                    cmd_args.push("--release");
+                }
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &["build", "-p", &member.name, "--color", "always"],
-                    excluded,
-                    only,
+                    &cmd_args,
+                    &args.exclude,
+                    &args.only,
                     &format!("Build command failed for {}", &member.name),
                     None,
                     None,
@@ -67,7 +70,7 @@ pub(crate) fn run_build(
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_build(&t, excluded, only))?;
+                .try_for_each(|t| run_build(&t, &args))?;
         }
     }
     Ok(())
