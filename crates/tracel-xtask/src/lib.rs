@@ -92,13 +92,13 @@ pub struct XtaskArgs<C: clap::Subcommand> {
 }
 
 pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
+    // init logs early
+    init_logger().init();
     let args = <XtaskArgs<C> as clap::Parser>::parse();
     Ok(args)
 }
 
 pub fn init_xtask<C: clap::Subcommand>(args: XtaskArgs<C>) -> anyhow::Result<XtaskArgs<C>> {
-    // logs
-    init_logger().init();
     // environment
     group_info!("Environment: {}", args.environment);
     args.environment.load()?;
