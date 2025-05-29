@@ -49,25 +49,12 @@ impl Environment {
     }
 }
 
-#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
-#[strum(serialize_all = "lowercase")]
-pub enum RuntimeEnvironment {
-    /// Set the runtime environment to all
-    All,
-    #[strum(to_string = "no-std")]
-    /// Set the runtime environment to no-std (no Rust standard library available).
-    NoStd,
-    /// Set the runtime environment to std (Rust standard library is available).
-    #[default]
-    Std,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
     use rstest::rstest;
     use serial_test::serial;
+    use std::env;
 
     fn expected_vars(env: &Environment) -> Vec<(String, String)> {
         let suffix = match env {
@@ -79,8 +66,14 @@ mod tests {
 
         vec![
             ("FROM_DOTENV".to_string(), ".env".to_string()),
-            (format!("FROM_DOTENV_{suffix}").to_string(), env.get_dotenv_filename()),
-            (format!("FROM_DOTENV_{suffix}_SECRETS").to_string(), env.get_dotenv_secrets_filename()),
+            (
+                format!("FROM_DOTENV_{suffix}").to_string(),
+                env.get_dotenv_filename(),
+            ),
+            (
+                format!("FROM_DOTENV_{suffix}_SECRETS").to_string(),
+                env.get_dotenv_secrets_filename(),
+            ),
         ]
     }
 
@@ -101,7 +94,8 @@ mod tests {
 
         // Assert each expected env var is present and has the correct value
         for (key, expected_value) in expected_vars(&env) {
-            let actual_value = env::var(&key).unwrap_or_else(|_| panic!("Missing expected env var: {}", key));
+            let actual_value =
+                env::var(&key).unwrap_or_else(|_| panic!("Missing expected env var: {}", key));
             assert_eq!(
                 actual_value, expected_value,
                 "Environment variable {} should be set to {} but was {}",

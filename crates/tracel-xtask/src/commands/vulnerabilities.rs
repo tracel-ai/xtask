@@ -4,6 +4,7 @@ use std::process::Command as StdCommand;
 use crate::{
     commands::CARGO_NIGHTLY_MSG,
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         process::run_process,
@@ -16,7 +17,11 @@ use crate::{
 #[tracel_xtask_macros::declare_command_args(None, VulnerabilitiesSubCommand)]
 pub struct VulnerabilitiesCmdArgs {}
 
-pub fn handle_command(args: VulnerabilitiesCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: VulnerabilitiesCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     args.get_command().run()
 }
 

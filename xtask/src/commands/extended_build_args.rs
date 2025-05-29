@@ -8,11 +8,15 @@ pub struct ExtendedBuildArgsCmdArgs {
     pub debug: bool,
 }
 
-pub fn handle_command(args: ExtendedBuildArgsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: ExtendedBuildArgsCmdArgs,
+    env: Environment,
+    context: Context,
+) -> anyhow::Result<()> {
     if args.debug {
         println!("debug enabled");
     } else {
         println!("debug disabled");
     }
-    base_commands::build::handle_command(args.try_into().unwrap())
+    base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), context.clone())
 }

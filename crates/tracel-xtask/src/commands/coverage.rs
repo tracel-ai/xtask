@@ -3,6 +3,7 @@ use clap::Args;
 
 use crate::{
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         cargo::ensure_cargo_crate_is_installed, process::run_process, rustup::rustup_add_component,
     },
@@ -36,7 +37,11 @@ pub struct GenerateCmdArgs {
     pub ignore: Vec<String>,
 }
 
-pub fn handle_command(args: CoverageCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: CoverageCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     match args.get_command() {
         CoverageSubCommand::Install => install_grcov(),
         CoverageSubCommand::Generate(gen_args) => run_grcov(&gen_args),

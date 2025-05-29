@@ -4,6 +4,7 @@ use strum::IntoEnumIterator;
 use crate::{
     commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         process::{run_process, run_process_for_package, run_process_for_workspace},
@@ -17,7 +18,11 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, CheckSubCommand)]
 pub struct CheckCmdArgs {}
 
-pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: CheckCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
         warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
     }
@@ -36,13 +41,17 @@ pub fn handle_command(args: CheckCmdArgs) -> anyhow::Result<()> {
         CheckSubCommand::All => CheckSubCommand::iter()
             .filter(|c| *c != CheckSubCommand::All)
             .try_for_each(|c| {
-                handle_command(CheckCmdArgs {
-                    command: Some(c),
-                    target: args.target.clone(),
-                    exclude: args.exclude.clone(),
-                    only: args.only.clone(),
-                    ignore_audit: args.ignore_audit,
-                })
+                handle_command(
+                    CheckCmdArgs {
+                        command: Some(c),
+                        target: args.target.clone(),
+                        exclude: args.exclude.clone(),
+                        only: args.only.clone(),
+                        ignore_audit: args.ignore_audit,
+                    },
+                    _env.clone(),
+                    _context.clone(),
+                )
             }),
     }
 }

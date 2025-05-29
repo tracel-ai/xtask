@@ -1,4 +1,4 @@
-use tracel_xtask::prelude::*;
+use tracel_xtask::{commands::test::check_environment, prelude::*};
 
 // TestCmdArgs has a subcommand so we need to pass it as third argument
 #[macros::extend_command_args(TestCmdArgs, Target, TestSubCommand)]
@@ -8,7 +8,8 @@ pub struct ExtendedTestArgsCmdArgs {
     pub debug: bool,
 }
 
-pub fn handle_command(args: ExtendedTestArgsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(args: ExtendedTestArgsCmdArgs, env: Environment) -> anyhow::Result<()> {
+    check_environment(&args.clone().try_into().unwrap(), &env);
     if args.debug {
         println!("debug enabled");
     } else {

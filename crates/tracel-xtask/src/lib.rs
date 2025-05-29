@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod context;
 pub mod environment;
 pub mod logging;
 pub mod utils;
@@ -34,6 +35,8 @@ pub mod prelude {
     pub use crate::commands::dependencies::DependenciesSubCommand;
     pub use crate::commands::doc::DocCmdArgs;
     pub use crate::commands::doc::DocSubCommand;
+    pub use crate::commands::docker::DockerCmdArgs;
+    pub use crate::commands::docker::DockerSubCommand;
     pub use crate::commands::fix::FixCmdArgs;
     pub use crate::commands::fix::FixSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
@@ -43,10 +46,12 @@ pub mod prelude {
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::commands::Target;
+    pub use crate::context::Context;
     pub use crate::endgroup;
+    pub use crate::environment::Environment;
     pub use crate::group;
     pub use crate::group_info;
-    pub use crate::init_xtask;
+    pub use crate::parse_args;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::helpers;
     pub use crate::utils::process::random_port;
@@ -59,13 +64,12 @@ pub mod prelude {
     pub use crate::utils::rustup::rustup_add_target;
     pub use crate::utils::rustup::rustup_get_installed_targets;
     pub use crate::utils::time::format_duration;
-    pub use crate::environment::Environment;
-    pub use crate::environment::RuntimeEnvironment;
     pub use crate::XtaskArgs;
     // does not re-export strum has it is incompatible with strum macros expansions
 }
 
-use crate::environment::{Environment, RuntimeEnvironment};
+use crate::context::Context;
+use crate::environment::Environment;
 use crate::logging::init_logger;
 
 #[macro_use]
@@ -75,33 +79,36 @@ extern crate log;
 #[command(author, version, about, long_about = None)]
 pub struct XtaskArgs<C: clap::Subcommand> {
     /// Enable code coverage for Rust code if available (see coverage command for more info).
-    #[arg(short = 'c', long)]
+    #[arg(long)]
     pub enable_coverage: bool,
     /// Set environment (for commands that support it).
     #[arg(short = 'e', long, default_value_t = Environment::default())]
     pub environment: Environment,
-    /// Set runtime environment (for commands that support it).
-    #[arg(short = 'r', long, default_value_t = RuntimeEnvironment::default())]
-    pub runtime_environment: RuntimeEnvironment,
+    /// Set context (for commands that support it).
+    #[arg(short = 'c', long, default_value_t = Context::default())]
+    pub context: Context,
     #[command(subcommand)]
     pub command: C,
 }
 
-pub fn init_xtask<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
-    init_logger().init();
+pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     let args = <XtaskArgs<C> as clap::Parser>::parse();
+    Ok(args)
+}
 
+pub fn init_xtask<C: clap::Subcommand>(args: &XtaskArgs<C>) -> anyhow::Result<()> {
+    // logs
+    init_logger().init();
+    // environment
     group_info!("Environment: {}", args.environment);
     args.environment.load()?;
-    group_info!("Runtime environment: {}", args.runtime_environment);
-
-    // initialize code coverage
+    group_info!("Context: {}", args.context);
+    // code coverage
     if args.enable_coverage {
         group_info!("Enabling coverage support...");
         setup_coverage()?;
     }
-
-    Ok(args)
+    Ok(())
 }
 
 fn setup_coverage() -> anyhow::Result<()> {

@@ -1,11 +1,15 @@
 use std::process::Command as StdCommand;
 
-use crate::prelude::{run_process, Environment};
+use crate::prelude::{run_process, Context, Environment};
 
 #[tracel_xtask_macros::declare_command_args(None, DockerSubCommand)]
 pub struct DockerCmdArgs {}
 
-pub fn handle_command(args: DockerCmdArgs, env: Environment) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: DockerCmdArgs,
+    env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     match args.get_command() {
         DockerSubCommand::Up => up_docker_compose(&env, &args.project, args.build, vec![]),
         DockerSubCommand::Down => down_docker_compose(&env, &args.project),
@@ -16,7 +20,12 @@ fn get_config_filename(config: &str) -> String {
     format!("docker-compose.{}.yml", config)
 }
 
-pub fn up_docker_compose(env: &Environment, project: &str, build: bool, services: Vec<&str>) -> anyhow::Result<()> {
+pub fn up_docker_compose(
+    env: &Environment,
+    project: &str,
+    build: bool,
+    services: Vec<&str>,
+) -> anyhow::Result<()> {
     let env_name = env.to_string();
     let dotenv_filepath = env.get_dotenv_filename();
     let project = format!("{project}-{env_name}");

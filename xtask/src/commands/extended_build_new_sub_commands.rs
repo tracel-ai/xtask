@@ -15,10 +15,14 @@ pub enum BuildSubcommand {
     Command2,
 }
 
-pub fn handle_command(args: ExtendedBuildSubCommandsCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: ExtendedBuildSubCommandsCmdArgs,
+    env: Environment,
+    context: Context,
+) -> anyhow::Result<()> {
     match args.get_command() {
         BuildSubcommand::Command1 => println!("Executing build sub command 1"),
         BuildSubcommand::Command2 => println!("Executing build sub command 2"),
     }
-    base_commands::build::handle_command(args.try_into().unwrap())
+    base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), context.clone())
 }

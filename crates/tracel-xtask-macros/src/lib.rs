@@ -1,6 +1,3 @@
-// TODO Check if it is possible to refactor all the macros using an inventory: https://crates.io/crates/inventory
-// The idea would be to discover and register all the fields of base commands and all the variants of subcommand.
-// If this is possible this should allow to generalize the command extension mechanism and make it even more useful.
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -81,10 +78,10 @@ fn generate_dispatch_function(
         let module_ident = syn::Ident::new(cmd_ident_string.to_lowercase().as_str(), cmd_ident.span());
         match cmd_ident_string.as_str() {
             "Fix" => quote! {
-                #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args, None),
+                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, args.environment, args.context, None),
             },
             _ => quote! {
-                #enum_ident::#cmd_ident(args) => base_commands::#module_ident::handle_command(args),
+                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, args.environment, args.context),
             }
         }
     }).collect();
@@ -119,13 +116,6 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Bump the version of all crates to be published."]
             Bump(tracel_xtask::commands::bump::BumpCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Fix",
-        quote! {
-            #[doc = r"Fix issues found with the 'check' command."]
-            Fix(tracel_xtask::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(
@@ -167,7 +157,14 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Docker",
         quote! {
             #[doc = r"Manage docker compose stacks."]
-            Docker(tracel_xtask::commands::doc::DockerCmdArgs)
+            Docker(tracel_xtask::commands::docker::DockerCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Fix",
+        quote! {
+            #[doc = r"Fix issues found with the 'check' command."]
+            Fix(tracel_xtask::commands::fix::FixCmdArgs)
         },
     );
     variant_map.insert(
@@ -245,7 +242,7 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
             "BuildCmdArgs",
             quote! {
                 #[doc = r"Build artifacs in release mode."]
-                #[arg(short = 'r', long = "release", required = false)]
+                #[arg(short, long, required = false)]
                 pub release: bool,
             },
         ),
@@ -261,10 +258,10 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
             "DockerCmdArgs",
             quote! {
                 #[doc = r"Build images before starting containers."]
-                #[arg(long = "build", required = false)]
+                #[arg(short, long, required = false)]
                 pub build: bool,
                 #[doc = r"Project name."]
-                #[arg(long = "project", required = true)]
+                #[arg(short, long, required = true)]
                 pub project: String,
             },
         ),
@@ -299,6 +296,13 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub no_default_features: bool,
+                #[doc = r"Force execution of tests no matter the environment (i.e. authorize to execute tests in prod)."]
+                #[arg(
+                    short = 'f',
+                    long = "force",
+                    required = false
+                )]
+                pub force: bool,
             },
         ),
         (
@@ -514,15 +518,16 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
         .filter_map(|f| {
             f.ident.as_ref().map(|ident| {
                 let ident_str = ident.to_string();
-                // TODO this hardcoded predicates are awful, they should be unneccesarry if
-                // we can use an inventory (see TODO at the top of the file)
+                // TODO this hardcoded predicate is awful, find a way to make this better
                 if ident_str != "target"
                     && (ident_str == "exclude"
                         || ident_str == "features"
-                        || ident_str == "no_default_features"
-                        || ident_str == "only"
+                        || ident_str == "force"
                         || ident_str == "ignore_audit"
                         || ident_str == "jobs"
+                        || ident_str == "no_default_features"
+                        || ident_str == "only"
+                        || ident_str == "release"
                         || ident_str == "threads")
                 {
                     quote! { #ident: self.#ident, }

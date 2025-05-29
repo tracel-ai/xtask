@@ -4,6 +4,7 @@ use anyhow::{anyhow, Ok};
 
 use crate::{
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{cargo::parse_cargo_search_output, process::run_process},
 };
 
@@ -16,7 +17,11 @@ pub struct PublishCmdArgs {
     name: String,
 }
 
-pub fn handle_command(args: PublishCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: PublishCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     let crate_name = args.name;
 
     group!("Publishing crate '{}'...", &crate_name);

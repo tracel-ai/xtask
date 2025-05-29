@@ -4,6 +4,7 @@ use strum::IntoEnumIterator;
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         process::{run_process_for_package, run_process_for_workspace},
         workspace::{get_workspace_members, WorkspaceMemberType},
@@ -15,7 +16,11 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, None)]
 pub struct CompileCmdArgs {}
 
-pub fn handle_command(args: CompileCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: CompileCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }

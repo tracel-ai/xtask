@@ -4,6 +4,7 @@ use strum::IntoEnumIterator;
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         process::{run_process_for_package, run_process_for_workspace},
         workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
@@ -15,9 +16,16 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, TestSubCommand)]
 pub struct TestCmdArgs {}
 
-pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: TestCmdArgs,
+    env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
+    }
+    if !check_environment(&args, &env) {
+        std::process::exit(1);
     }
     match args.get_command() {
         TestSubCommand::Unit => run_unit(&args.target, &args),
@@ -25,18 +33,38 @@ pub fn handle_command(args: TestCmdArgs) -> anyhow::Result<()> {
         TestSubCommand::All => TestSubCommand::iter()
             .filter(|c| *c != TestSubCommand::All)
             .try_for_each(|c| {
-                handle_command(TestCmdArgs {
-                    command: Some(c),
-                    target: args.target.clone(),
-                    exclude: args.exclude.clone(),
-                    only: args.only.clone(),
-                    threads: args.threads,
-                    jobs: args.jobs,
-                    features: args.features.clone(),
-                    no_default_features: args.no_default_features,
-                })
+                handle_command(
+                    TestCmdArgs {
+                        command: Some(c),
+                        target: args.target.clone(),
+                        exclude: args.exclude.clone(),
+                        only: args.only.clone(),
+                        threads: args.threads,
+                        jobs: args.jobs,
+                        force: args.force,
+                        features: args.features.clone(),
+                        no_default_features: args.no_default_features,
+                    },
+                    env.clone(),
+                    _context.clone(),
+                )
             }),
     }
+}
+
+/// Return true if the environment is OK.
+/// Prevents from running test in production unless the `force` flag is set
+pub fn check_environment(args: &TestCmdArgs, env: &Environment) -> bool {
+    if *env == Environment::Production {
+        if args.force {
+            warn!("Force running tests in production (--force argument is set)");
+            return true;
+        } else {
+            info!("Abort tests to avoid running them in production!");
+            return false;
+        }
+    }
+    true
 }
 
 fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {

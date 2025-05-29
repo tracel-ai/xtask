@@ -4,6 +4,7 @@ use strum::IntoEnumIterator;
 use crate::{
     commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{
         cargo::ensure_cargo_crate_is_installed,
         process::{run_process, run_process_for_package, run_process_for_workspace},
@@ -18,7 +19,12 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, FixSubCommand)]
 pub struct FixCmdArgs {}
 
-pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: FixCmdArgs,
+    _env: Environment,
+    _context: Context,
+    mut answer: Option<bool>,
+) -> anyhow::Result<()> {
     if answer.is_none() {
         if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
             warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
@@ -43,6 +49,8 @@ pub fn handle_command(args: FixCmdArgs, mut answer: Option<bool>) -> anyhow::Res
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),
                         },
+                        _env.clone(),
+                        _context.clone(),
                         answer,
                     )
                 }),

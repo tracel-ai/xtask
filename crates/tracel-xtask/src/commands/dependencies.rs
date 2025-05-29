@@ -3,19 +3,30 @@ use strum::IntoEnumIterator;
 
 use crate::{
     endgroup, group,
+    prelude::{Context, Environment},
     utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
 };
 
 #[tracel_xtask_macros::declare_command_args(None, DependenciesSubCommand)]
 pub struct DependenciesCmdArgs {}
 
-pub fn handle_command(args: DependenciesCmdArgs) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: DependenciesCmdArgs,
+    _env: Environment,
+    _context: Context,
+) -> anyhow::Result<()> {
     match args.get_command() {
         DependenciesSubCommand::Deny => run_cargo_deny(),
         DependenciesSubCommand::Unused => run_cargo_machete(),
         DependenciesSubCommand::All => DependenciesSubCommand::iter()
             .filter(|c| *c != DependenciesSubCommand::All)
-            .try_for_each(|c| handle_command(DependenciesCmdArgs { command: Some(c) })),
+            .try_for_each(|c| {
+                handle_command(
+                    DependenciesCmdArgs { command: Some(c) },
+                    _env.clone(),
+                    _context.clone(),
+                )
+            }),
     }
 }
 
