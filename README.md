@@ -242,7 +242,7 @@ cargo xtask -e production build
 
 Its mainf role is to inform your custom commands or dispatch functions about the targeted environment which can be:
 - `dev` (default) for development,
-- `test` for testing,
+- `test` for test,
 - `stag` for staging,
 - `prod` for production.
 

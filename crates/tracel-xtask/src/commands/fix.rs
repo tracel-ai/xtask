@@ -22,7 +22,7 @@ pub struct FixCmdArgs {}
 pub fn handle_command(
     args: FixCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
     mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
     if answer.is_none() {
@@ -50,7 +50,7 @@ pub fn handle_command(
                             only: args.only.clone(),
                         },
                         _env.clone(),
-                        _context.clone(),
+                        _ctx.clone(),
                         answer,
                     )
                 }),

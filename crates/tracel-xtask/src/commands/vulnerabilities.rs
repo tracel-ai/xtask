@@ -20,7 +20,7 @@ pub struct VulnerabilitiesCmdArgs {}
 pub fn handle_command(
     args: VulnerabilitiesCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     args.get_command().run()
 }

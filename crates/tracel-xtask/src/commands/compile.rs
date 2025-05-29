@@ -19,7 +19,7 @@ pub struct CompileCmdArgs {}
 pub fn handle_command(
     args: CompileCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);

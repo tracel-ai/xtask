@@ -9,11 +9,7 @@ use super::{
 #[tracel_xtask_macros::declare_command_args(None, None)]
 struct ValidateCmdArgs {}
 
-pub fn handle_command(
-    args: ValidateCmdArgs,
-    env: Environment,
-    context: Context,
-) -> anyhow::Result<()> {
+pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> anyhow::Result<()> {
     let target = Target::Workspace;
     let exclude = vec![];
     let only = vec![];
@@ -36,7 +32,7 @@ pub fn handle_command(
                 ignore_audit: args.ignore_audit,
             },
             env.clone(),
-            context.clone(),
+            ctx.clone(),
         )
     })?;
 
@@ -54,7 +50,7 @@ pub fn handle_command(
             no_default_features: false,
         },
         env.clone(),
-        context.clone(),
+        ctx.clone(),
     )?;
 
     Ok(())

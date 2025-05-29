@@ -18,11 +18,11 @@ pub enum BuildSubcommand {
 pub fn handle_command(
     args: ExtendedBuildSubCommandsCmdArgs,
     env: Environment,
-    context: Context,
+    ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         BuildSubcommand::Command1 => println!("Executing build sub command 1"),
         BuildSubcommand::Command2 => println!("Executing build sub command 2"),
     }
-    base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), context.clone())
+    base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), ctx.clone())
 }

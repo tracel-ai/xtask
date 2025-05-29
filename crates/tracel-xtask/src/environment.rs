@@ -17,7 +17,7 @@ pub enum Environment {
     /// Testing environment (alias: test).
     #[strum(serialize = "test")]
     #[clap(alias = "test")]
-    Testing,
+    Test,
     /// Production environment (alias: prod).
     #[strum(serialize = "prod")]
     #[clap(alias = "prod")]
@@ -60,7 +60,7 @@ mod tests {
         let suffix = match env {
             Environment::Development => "DEV",
             Environment::Staging => "STAG",
-            Environment::Testing => "TEST",
+            Environment::Test => "TEST",
             Environment::Production => "PROD",
         };
 
@@ -80,7 +80,7 @@ mod tests {
     #[rstest]
     #[case::dev(Environment::Development)]
     #[case::stag(Environment::Staging)]
-    #[case::test(Environment::Testing)]
+    #[case::test(Environment::Test)]
     #[case::prod(Environment::Production)]
     #[serial]
     fn test_environment_load(#[case] env: Environment) {

@@ -40,7 +40,7 @@ pub struct GenerateCmdArgs {
 pub fn handle_command(
     args: CoverageCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         CoverageSubCommand::Install => install_grcov(),

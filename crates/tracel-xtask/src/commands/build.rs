@@ -16,11 +16,7 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, None)]
 pub struct BuildCmdArgs {}
 
-pub fn handle_command(
-    args: BuildCmdArgs,
-    _env: Environment,
-    _context: Context,
-) -> anyhow::Result<()> {
+pub fn handle_command(args: BuildCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }

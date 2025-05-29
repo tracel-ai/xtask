@@ -9,11 +9,7 @@ use crate::{
 #[tracel_xtask_macros::declare_command_args(None, BumpSubCommand)]
 pub struct BumpCmdArgs {}
 
-pub fn handle_command(
-    args: BumpCmdArgs,
-    _env: Environment,
-    _context: Context,
-) -> anyhow::Result<()> {
+pub fn handle_command(args: BumpCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     bump(&args.get_command())
 }
 

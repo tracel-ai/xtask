@@ -13,7 +13,7 @@ pub struct DependenciesCmdArgs {}
 pub fn handle_command(
     args: DependenciesCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         DependenciesSubCommand::Deny => run_cargo_deny(),
@@ -24,7 +24,7 @@ pub fn handle_command(
                 handle_command(
                     DependenciesCmdArgs { command: Some(c) },
                     _env.clone(),
-                    _context.clone(),
+                    _ctx.clone(),
                 )
             }),
     }

@@ -20,7 +20,7 @@ pub struct PublishCmdArgs {
 pub fn handle_command(
     args: PublishCmdArgs,
     _env: Environment,
-    _context: Context,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     let crate_name = args.name;
 

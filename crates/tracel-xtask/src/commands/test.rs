@@ -16,11 +16,7 @@ use super::Target;
 #[tracel_xtask_macros::declare_command_args(Target, TestSubCommand)]
 pub struct TestCmdArgs {}
 
-pub fn handle_command(
-    args: TestCmdArgs,
-    env: Environment,
-    _context: Context,
-) -> anyhow::Result<()> {
+pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
         warn!("{}", WARN_IGNORED_ONLY_ARGS);
     }
@@ -46,7 +42,7 @@ pub fn handle_command(
                         no_default_features: args.no_default_features,
                     },
                     env.clone(),
-                    _context.clone(),
+                    _ctx.clone(),
                 )
             }),
     }
