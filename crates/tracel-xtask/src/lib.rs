@@ -96,7 +96,7 @@ pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
     Ok(args)
 }
 
-pub fn init_xtask<C: clap::Subcommand>(args: &XtaskArgs<C>) -> anyhow::Result<()> {
+pub fn init_xtask<C: clap::Subcommand>(args: XtaskArgs<C>) -> anyhow::Result<XtaskArgs<C>> {
     // logs
     init_logger().init();
     // environment
@@ -108,7 +108,7 @@ pub fn init_xtask<C: clap::Subcommand>(args: &XtaskArgs<C>) -> anyhow::Result<()
         group_info!("Enabling coverage support...");
         setup_coverage()?;
     }
-    Ok(())
+    Ok(args)
 }
 
 fn setup_coverage() -> anyhow::Result<()> {

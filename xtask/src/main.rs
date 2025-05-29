@@ -44,8 +44,7 @@ pub enum Command {
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = parse_args::<Command>()?;
-    init_xtask::<Command>(&args)?;
+    let args = init_xtask::<Command>(parse_args::<Command>()?)?;
     match args.command {
         Command::ExtendedBuildArgs(cmd_args) => {
             commands::extended_build_args::handle_command(cmd_args, args.environment, args.context)
