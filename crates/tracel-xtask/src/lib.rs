@@ -51,6 +51,7 @@ pub mod prelude {
     pub use crate::environment::Environment;
     pub use crate::group;
     pub use crate::group_info;
+    pub use crate::init_xtask;
     pub use crate::parse_args;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::helpers;
