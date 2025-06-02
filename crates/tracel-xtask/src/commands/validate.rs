@@ -48,6 +48,7 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
             force: false,
             features: None,
             no_default_features: false,
+            no_capture: false,
         },
         env.clone(),
         ctx.clone(),

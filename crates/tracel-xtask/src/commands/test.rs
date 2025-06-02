@@ -40,6 +40,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
                         force: args.force,
                         features: args.features.clone(),
                         no_default_features: args.no_default_features,
+                        no_capture: args.no_capture,
                     },
                     env.clone(),
                     _ctx.clone(),
@@ -81,6 +82,9 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
     if let Some(threads) = &args.threads {
         cmd_args.extend(vec!["--test-threads".to_string(), threads.to_string()]);
     };
+    if args.no_capture {
+        cmd_args.push("--nocapture".to_string());
+    }
 }
 
 pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
@@ -100,7 +104,6 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
             push_optional_args(&mut cmd_args, args);
-            // let cmd_args: Vec<&str> = cmd_args.iter().map(String::as_str).collect();
             run_process_for_workspace(
                 "cargo",
                 &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),

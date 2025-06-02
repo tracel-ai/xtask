@@ -303,6 +303,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub force: bool,
+                #[doc = r"If set, test logs are sent to output."]
+                #[arg(long = "nocapture", required = false)]
+                pub no_capture: bool,
             },
         ),
         (
@@ -526,6 +529,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                         || ident_str == "ignore_audit"
                         || ident_str == "jobs"
                         || ident_str == "no_default_features"
+                        || ident_str == "no_capture"
                         || ident_str == "only"
                         || ident_str == "release"
                         || ident_str == "threads")

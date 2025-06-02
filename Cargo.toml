@@ -33,6 +33,7 @@ syn = {version = "~2.0" , features = ["full"]}
 tracing = { version = "0.1.40", features = ["log"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry"] }
 
+# for tests
 rstest = "0.25.0"
 serial_test = "3.2.0"
 

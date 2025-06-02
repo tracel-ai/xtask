@@ -4,3 +4,5 @@ xtask/target
 .DS_Store
 .vscode
 .dir-locals.el
+
+notes.org
