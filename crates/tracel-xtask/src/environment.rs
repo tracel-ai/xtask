@@ -25,11 +25,11 @@ pub enum Environment {
 }
 
 impl Environment {
-    pub(crate) fn get_dotenv_filename(&self) -> String {
+    pub fn get_dotenv_filename(&self) -> String {
         format!(".env.{}", self)
     }
 
-    pub(crate) fn get_dotenv_secrets_filename(&self) -> String {
+    pub fn get_dotenv_secrets_filename(&self) -> String {
         format!("{}.secrets", self.get_dotenv_filename())
     }
 

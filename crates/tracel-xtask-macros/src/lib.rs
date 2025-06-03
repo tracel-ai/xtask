@@ -263,6 +263,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Project name."]
                 #[arg(short, long, required = true)]
                 pub project: String,
+                #[doc = r"Space separated list of service subset to start. If empty then launch all the services in the stack."]
+                #[arg(short, long, num_args(1..), required = false)]
+                pub services: Vec<String>,
             },
         ),
         (

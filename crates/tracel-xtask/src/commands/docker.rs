@@ -7,7 +7,7 @@ pub struct DockerCmdArgs {}
 
 pub fn handle_command(args: DockerCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
-        DockerSubCommand::Up => up_docker_compose(&env, &args.project, args.build, vec![]),
+        DockerSubCommand::Up => up_docker_compose(&env, &args.project, args.build, args.services),
         DockerSubCommand::Down => down_docker_compose(&env, &args.project),
     }
 }
@@ -20,7 +20,7 @@ pub fn up_docker_compose(
     env: &Environment,
     project: &str,
     build: bool,
-    services: Vec<&str>,
+    services: Vec<String>,
 ) -> anyhow::Result<()> {
     let env_name = env.to_string();
     let dotenv_filepath = env.get_dotenv_filename();
@@ -40,7 +40,7 @@ pub fn up_docker_compose(
     if build {
         args.extend(vec!["--build"]);
     }
-    args.extend(services);
+    args.extend(services.iter().map(String::as_str));
     let result = run_process(
         "docker",
         &args,

@@ -240,7 +240,7 @@ The following options are global and precede the actual command on the command l
 cargo xtask -e production build
 ```
 
-Its mainf role is to inform your custom commands or dispatch functions about the targeted environment which can be:
+Its main role is to inform your custom commands or dispatch functions about the targeted environment which can be:
 - `dev` (default) for development,
 - `test` for test,
 - `stag` for staging,
@@ -864,7 +864,7 @@ configuration mechanism of `tracel-xtask`.
 The name of the compose file must follow the template `docker-compose.{env}.yml` with `env` being the shorthand environment name.
 For instance for the development environment the file is named `docker-compose.dev.yml`.
 
-The command also requires a mandatory project name for the stack in order to have idempotent `up` command.
+The command also requires a mandatory project name for the stack in order to have idempotent `up` commands.
 
 ### Dependencies
 
