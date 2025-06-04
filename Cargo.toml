@@ -11,27 +11,27 @@ members = [
 
 [workspace.package]
 edition = "2021"
-version = "2.0.1"
+version = "2.1.0"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [workspace.dependencies]
-anyhow = "1.0.86"
-clap = { version = "4.5.9", features = ["derive"] }
-derive_more = { version = "0.99.18", features = ["display"], default-features = false }
+anyhow = "1.0.98"
+clap = { version = "4.5.39", features = ["derive"] }
+derive_more = { version = "2.0.1", features = ["display"], default-features = false }
 dotenvy = "0.15.7"
-env_logger = "0.11.7"
-log = { version = "0.4.22" }
-proc-macro2 = "1.0.86"
-quote = "1.0.36"
-rand = { version = "0.8.5" }
-regex = "1.10.5"
-serde = { version = "1.0.200", features = ["derive"] }
-serde_json = "1.0.116"
-strum = {version = "0.26.3", features = ["derive"]}
+env_logger = "0.11.8"
+log = { version = "0.4.27" }
+proc-macro2 = "1.0.95"
+quote = "1.0.40"
+rand = { version = "0.9.1" }
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+strum = {version = "0.27.1", features = ["derive"]}
 syn = {version = "~2.0" , features = ["full"]}
-tracing = { version = "0.1.40", features = ["log"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry"] }
+tracing = { version = "0.1.41", features = ["log"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "registry"] }
 
 # for tests
 rstest = "0.25.0"

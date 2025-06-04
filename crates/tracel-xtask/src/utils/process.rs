@@ -197,8 +197,8 @@ pub fn run_process_for_package(
 
 /// Return a random port between 3000 and 9999
 pub fn random_port() -> u16 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(3000..=9999)
+    let mut rng = rand::rng();
+    rng.random_range(3000..=9999)
 }
 
 fn remove_ansi_codes(s: &str) -> String {
