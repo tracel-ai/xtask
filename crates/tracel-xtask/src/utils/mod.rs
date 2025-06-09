@@ -1,6 +1,7 @@
 use std::process::Command;
 
 pub mod cargo;
+pub mod cleanup;
 pub mod helpers;
 pub mod process;
 pub mod prompt;

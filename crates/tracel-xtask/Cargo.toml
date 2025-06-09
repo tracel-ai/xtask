@@ -14,6 +14,7 @@ rust-version = "1.79"
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+ctrlc = { workspace = true }
 derive_more = { workspace = true }
 dotenvy = { workspace = true }
 env_logger = { workspace = true }
