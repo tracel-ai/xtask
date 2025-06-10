@@ -901,6 +901,76 @@ Commands:
   help                           Print this message or the help of the given subcommand(s)
 ```
 
+## Utilities
+
+### Easy CTRL+c management
+
+`tracel-xtask` gives access to two useful macros `register_cleanup` and `handle_cleanup` to easily define some cleanup functions to be executed at
+a given time during the program as well as whenever the user presses <kbd>CTRL+c</kbd>.
+It is very useful to guard processes while executing some tests and make sure that the state is still cleaned up even if the program is interrupted by
+the user.
+
+Example:
+
+Register cleanup functions in your commands, say you have a customized `test` command that spins up some container.
+
+```rs
+pub(crate) async fn handle_command(
+    args: TestCmdArgs,
+    env: Environment,
+    ctx: Context,
+) -> anyhow::Result<()> {
+    match args.get_command() {
+        TestSubCommand::Integration => {
+            // spin up containers
+            // ...
+            // register cleanup command for them
+            register_cleanup!("Integration tests: Docker compose stack", move || {
+                base_commands::docker::handle_command(
+                    DockerCmdArgs {
+                        build: false,
+                        project: super::DOCKER_COMPOSE_PROJECT_NAME.to_string(),
+                        command: Some(DockerSubCommand::Down),
+                        services: vec![],
+                    },
+                    Environment::Test,
+                    ctx.clone(),
+                )
+                .expect("Should be able to stop docker compose stack");
+            });
+            // Execute xtask test base command
+            base_commands::test::run_integration(&cmd_args.target, &cmd_args)
+        }
+        TestSubCommand::All => { ... }
+    }
+}
+```
+
+Then call the `handle_cleanup` macro at the end of your main function to force a cleanup:
+
+```rs
+use tracel_xtask::prelude::*;
+
+#[macros::base_commands(
+    Build,
+    Check,
+    Fix,
+    Test
+)]
+pub enum Command {}
+
+fn main() -> anyhow::Result<()> {
+    let args = init_xtask::<Command>(parse_args::<Command>()?)?;
+    match args.command {
+        Command::Test(cmd_args) => {
+            commands::test::handle_command(cmd_args, args.environment, args.context).await
+        }
+        _ => dispatch_base_commands(args),
+    }
+    handle_cleanup!();
+}
+```
+
 [1]: https://github.com/matklad/cargo-xtask
 [2]: https://github.com/clap-rs/clap
 [3]: https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html
