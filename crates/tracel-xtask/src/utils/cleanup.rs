@@ -63,6 +63,7 @@ impl CleanupHandler {
     }
 }
 
+/// Since the CLEANUP_HANDLER is a static variable, the drop function is not automatically called when the program exits. It needs to be manually called with the `handle_cleanup!` macro.
 impl Drop for CleanupHandler {
     fn drop(&mut self) {
         if !self.registered.lock().unwrap().is_empty() {
