@@ -11,7 +11,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
-version = "2.1.0"
+version = "2.1.1"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 
@@ -19,6 +19,7 @@ readme = "README.md"
 anyhow = "1.0.98"
 clap = { version = "4.5.39", features = ["derive"] }
 derive_more = { version = "2.0.1", features = ["display"], default-features = false }
+ctrlc = "3.4.7"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
 log = { version = "0.4.27" }
