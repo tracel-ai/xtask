@@ -910,6 +910,8 @@ a given time during the program as well as whenever the user presses <kbd>CTRL+c
 It is very useful to guard processes while executing some tests and make sure that the state is still cleaned up even if the program is interrupted by
 the user.
 
+Since the cleanup handler is stored in a static variable, it's `drop` function is not automatically called when the program exits normally and the `handle_cleanup` macro needs to be called manually. However, when the program is interrupted by the user with <kbd>CTRL+c</kbd>, the cleanup is automatically called.
+
 Example:
 
 Register cleanup functions in your commands, say you have a customized `test` command that spins up some container.
