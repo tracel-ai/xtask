@@ -36,6 +36,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
                         exclude: args.exclude.clone(),
                         only: args.only.clone(),
                         threads: args.threads,
+                        test: args.test.clone(),
                         jobs: args.jobs,
                         force: args.force,
                         features: args.features.clone(),
@@ -91,12 +92,14 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
+            let test = args.test.as_deref().unwrap_or("");
             let mut cmd_args = vec![
                 "test",
                 "--workspace",
                 "--lib",
                 "--bins",
                 "--examples",
+                test,
                 "--color",
                 "always",
             ]
@@ -137,8 +140,10 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
 
 fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
+    let test = args.test.as_deref().unwrap_or("");
     let mut cmd_args = vec![
         "test",
+        test,
         "--lib",
         "--bins",
         "--examples",
@@ -171,7 +176,8 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
     match target {
         Target::Workspace => {
             info!("Workspace Integration Tests");
-            let mut cmd_args = vec!["test", "--workspace", "--test", "*", "--color", "always"]
+            let test = args.test.as_deref().unwrap_or("*");
+            let mut cmd_args = vec!["test", "--workspace", "--test", test, "--color", "always"]
                 .into_iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();

@@ -271,6 +271,13 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
         (
             "TestCmdArgs",
             quote! {
+                #[doc = r"Execute only the test whose name matches the passed string."]
+                #[arg(
+                    long = "test",
+                    value_name = "TEST",
+                    required = false
+                )]
+                pub test: Option<String>,
                 #[doc = r"Maximum number of parallel test crate compilations."]
                 #[arg(
                     long = "compilation-jobs",
@@ -535,6 +542,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                         || ident_str == "no_capture"
                         || ident_str == "only"
                         || ident_str == "release"
+                        || ident_str == "test"
                         || ident_str == "threads")
                 {
                     quote! { #ident: self.#ident, }

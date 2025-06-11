@@ -43,6 +43,7 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
             exclude: exclude.clone(),
             only: only.clone(),
             threads: None,
+            test: None,
             jobs: None,
             command: Some(TestSubCommand::All),
             force: false,
