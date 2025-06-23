@@ -42,6 +42,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
                         features: args.features.clone(),
                         no_default_features: args.no_default_features,
                         no_capture: args.no_capture,
+                        release: args.release,
                     },
                     env.clone(),
                     _ctx.clone(),
@@ -74,6 +75,9 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
         if !features.is_empty() {
             cmd_args.extend(vec!["--features".to_string(), features.join(",")]);
         }
+    }
+    if args.release {
+        cmd_args.push("--release".to_string());
     }
     if args.no_default_features {
         cmd_args.push("--no-default-features".to_string());

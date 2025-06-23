@@ -316,6 +316,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"If set, test logs are sent to output."]
                 #[arg(long = "nocapture", required = false)]
                 pub no_capture: bool,
+                #[doc = r"Build test in release mode."]
+                #[arg(short = 'r', long = "release", required = false)]
+                pub release: bool,
             },
         ),
         (
@@ -324,6 +327,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Ignore audit errors."]
                 #[arg(long = "ignore-audit", required = false)]
                 pub ignore_audit: bool,
+                #[doc = r"Build in release mode."]
+                #[arg(short = 'r', long = "release", required = false)]
+                pub release: bool,
             },
         ),
     ])
