@@ -27,7 +27,7 @@ pub fn handle_command(
 ) -> anyhow::Result<()> {
     if answer.is_none() {
         if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-            warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+            warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
         }
         answer = Some(ask_once(
             "This will run the check with autofix mode enabled.",

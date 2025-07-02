@@ -18,7 +18,7 @@ pub struct BuildCmdArgs {}
 
 pub fn handle_command(args: BuildCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     run_build(&args.target, &args)
 }

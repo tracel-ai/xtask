@@ -31,7 +31,7 @@ pub fn ensure_cargo_crate_is_installed(
             &args,
             None,
             None,
-            &format!("crate '{}' should be installed", crate_name),
+            &format!("crate '{crate_name}' should be installed"),
         )?;
         endgroup!();
     }

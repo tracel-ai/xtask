@@ -13,7 +13,7 @@ pub fn handle_command(args: DockerCmdArgs, env: Environment, _ctx: Context) -> a
 }
 
 fn get_config_filename(config: &str) -> String {
-    format!("docker-compose.{}.yml", config)
+    format!("docker-compose.{config}.yml")
 }
 
 pub fn up_docker_compose(

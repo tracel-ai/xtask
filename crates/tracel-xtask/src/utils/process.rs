@@ -129,7 +129,7 @@ pub fn run_process_for_workspace<'a>(
         if let Some(log) = ignore_log {
             if line.contains(log) {
                 if let Some(msg) = ignore_msg {
-                    warn!("{}", msg);
+                    warn!("{msg}");
                 }
                 ignore_error = true;
                 skip_line = true;
@@ -137,7 +137,7 @@ pub fn run_process_for_workspace<'a>(
         }
 
         if !skip_line {
-            println!("{}", line);
+            println!("{line}");
         }
     }
 
@@ -224,14 +224,14 @@ pub fn run_process_for_package(
             }
             if line.contains(log) {
                 if let Some(msg) = ignore_msg {
-                    warn!("{}", msg);
+                    warn!("{msg}");
                     ignore_error = true;
                     skip_line = true;
                 }
             }
         }
         if !skip_line {
-            println!("{}", line);
+            println!("{line}");
         }
     }
 
@@ -284,8 +284,7 @@ mod tests {
             let port = random_port();
             assert!(
                 (3000..=9999).contains(&port),
-                "Port should be between 3000 and 9999, got {}",
-                port
+                "Port should be between 3000 and 9999, got {port}"
             );
         }
     }
@@ -298,8 +297,7 @@ mod tests {
         let result = remove_ansi_codes(input);
         assert_eq!(
             result, expected,
-            "Expected '{}', but got '{}'",
-            expected, result
+            "Expected '{expected}', but got '{result}'"
         );
     }
 
@@ -311,8 +309,7 @@ mod tests {
         let result = standardize_slashes(input);
         assert_eq!(
             result, expected,
-            "Expected '{}', but got '{}'",
-            expected, result
+            "Expected '{expected}', but got '{result}'"
         );
     }
 

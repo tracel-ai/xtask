@@ -26,7 +26,7 @@ pub enum Environment {
 
 impl Environment {
     pub fn get_dotenv_filename(&self) -> String {
-        format!(".env.{}", self)
+        format!(".env.{self}")
     }
 
     pub fn get_dotenv_secrets_filename(&self) -> String {
@@ -95,11 +95,10 @@ mod tests {
         // Assert each expected env var is present and has the correct value
         for (key, expected_value) in expected_vars(&env) {
             let actual_value =
-                env::var(&key).unwrap_or_else(|_| panic!("Missing expected env var: {}", key));
+                env::var(&key).unwrap_or_else(|_| panic!("Missing expected env var: {key}"));
             assert_eq!(
                 actual_value, expected_value,
-                "Environment variable {} should be set to {} but was {}",
-                key, expected_value, actual_value
+                "Environment variable {key} should be set to {expected_value} but was {actual_value}"
             );
         }
     }

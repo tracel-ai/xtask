@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
 pub fn ask_once(prompt: &str) -> bool {
-    print!("{}\nDo you want to proceed? (yes/no): ", prompt);
+    print!("{prompt}\nDo you want to proceed? (yes/no): ");
     io::stdout().flush().expect("stdout should be flushed");
 
     let mut input = String::new();

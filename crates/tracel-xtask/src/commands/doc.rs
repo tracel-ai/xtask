@@ -18,7 +18,7 @@ pub struct DocCmdArgs {}
 
 pub fn handle_command(args: DocCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     match args.get_command() {
         DocSubCommand::Build => run_documentation_build(&args.target, &args.exclude, &args.only),

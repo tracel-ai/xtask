@@ -20,7 +20,7 @@ pub struct CheckCmdArgs {}
 
 pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-        warn!("{}", WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS);
+        warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
     }
 
     match args.get_command() {

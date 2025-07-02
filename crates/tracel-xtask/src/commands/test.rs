@@ -18,7 +18,7 @@ pub struct TestCmdArgs {}
 
 pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     if !check_environment(&args, &env) {
         std::process::exit(1);

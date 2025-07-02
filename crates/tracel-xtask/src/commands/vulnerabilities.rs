@@ -79,7 +79,7 @@ fn run_cargo_careful() -> anyhow::Result<()> {
         )?;
         endgroup!();
     } else {
-        error!("{}", CARGO_NIGHTLY_MSG);
+        error!("{CARGO_NIGHTLY_MSG}");
     }
     Ok(())
 }
@@ -149,7 +149,7 @@ impl Sanitizer {
             }
             endgroup!();
         } else {
-            error!("{}", CARGO_NIGHTLY_MSG);
+            error!("{CARGO_NIGHTLY_MSG}");
         }
         Ok(())
     }
@@ -305,7 +305,7 @@ impl std::fmt::Display for Target {
             Target::X8664UnknownLinuxGnu => X8664_UNKNOWN_LINUX_GNU,
             Target::Unknown => "",
         };
-        write!(f, "{}", target_str)
+        write!(f, "{target_str}")
     }
 }
 
@@ -358,7 +358,7 @@ mod tests {
         ];
         // std::thread::sleep(std::time::Duration::from_secs(1));
         for variant in variants {
-            let variant_str = format!("{}", variant);
+            let variant_str = format!("{variant}");
             let parsed_variant = Target::from_str(&variant_str);
             assert_eq!(Some(variant), parsed_variant);
         }

@@ -9,8 +9,5 @@ pub fn format_duration(duration: &Duration) -> String {
     let remaining_minutes = minutes % 60;
     let remaining_seconds = seconds % 60;
 
-    format!(
-        "{:02}:{:02}:{:02}",
-        hours, remaining_minutes, remaining_seconds
-    )
+    format!("{hours:02}:{remaining_minutes:02}:{remaining_seconds:02}")
 }

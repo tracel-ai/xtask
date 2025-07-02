@@ -22,7 +22,7 @@ pub fn handle_command(
     _ctx: Context,
 ) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{}", WARN_IGNORED_ONLY_ARGS);
+        warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     run_compile(&args.target, &args.exclude, &args.only)
 }
