@@ -241,7 +241,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
         &format!("Failed to execute integration test for '{}'", &member.name),
         Some("no test target matches pattern"),
         Some(&format!(
-            "No tests found matching the pattern `test_*` for '{}'.",
+            "No integration tests found for '{}'.",
             &member.name
         )),
     )?;

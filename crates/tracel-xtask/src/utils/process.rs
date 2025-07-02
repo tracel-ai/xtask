@@ -173,26 +173,77 @@ pub fn run_process_for_package(
     }
     let joined_args = args.join(" ");
     group_info!("Command line: cargo {}", &joined_args);
-    let output = Command::new("cargo")
-        .args(args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .output()
-        .map_err(|e| anyhow::anyhow!("Failed to execute process for '{}': {}", name, e))?;
 
-    if output.status.success() {
-        return anyhow::Ok(());
-    } else if let Some(log) = ignore_log {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains(log) {
-            if let Some(msg) = ignore_msg {
-                warn!("{}", msg);
+    let mut child = Command::new(name)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            anyhow::anyhow!(format!(
+                "Failed to start {} {}: {}",
+                name,
+                args.first().unwrap(),
+                e
+            ))
+        })?;
+
+    // handle stdout and stderr in dedicated threads using a MPSC channel for synchronization
+    let (tx, rx) = mpsc::channel();
+    // stdout processing thread
+    if let Some(stdout) = child.stdout.take() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                tx.send((line, false)).unwrap();
             }
-            endgroup!();
-            return anyhow::Ok(());
+        });
+    }
+    // stderr processing thread
+    if let Some(stderr) = child.stderr.take() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                tx.send((line, true)).unwrap();
+            }
+        });
+    }
+    // Drop the sender once all the logs have been processed to close the channel
+    drop(tx);
+
+    // Process the stdout to inject log groups
+    let mut ignore_error = false;
+    let mut skip_line = false;
+    for (line, is_stderr) in rx.iter() {
+        if let Some(log) = ignore_log {
+            if !is_stderr {
+                // skip the lines until a non stderr line is encountered
+                skip_line = false;
+            }
+            if line.contains(log) {
+                if let Some(msg) = ignore_msg {
+                    warn!("{}", msg);
+                    ignore_error = true;
+                    skip_line = true;
+                }
+            }
+        }
+        if !skip_line {
+            println!("{}", line);
         }
     }
-    Err(anyhow::anyhow!("{}", error_msg))
+
+    let status = child
+        .wait()
+        .expect("Should be able to wait for the process to finish.");
+
+    if status.success() || ignore_error {
+        anyhow::Ok(())
+    } else {
+        Err(anyhow::anyhow!("{}", error_msg))
+    }
 }
 
 /// Return a random port between 3000 and 9999
