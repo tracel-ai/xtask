@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
     path::Path,
-    process::{Command, Stdio},
+    process::{Command, ExitStatus, Stdio},
     sync::mpsc,
     thread,
 };
@@ -13,6 +13,69 @@ use regex::Regex;
 
 use crate::group_info;
 use crate::{endgroup, group};
+
+/// A custom error for failed subprocesses.
+///
+/// To get the `ExitStatus`, downcast the error at call sites.
+#[derive(Debug)]
+pub struct ProcessExitError {
+    pub message: String,
+    pub status: ExitStatus,
+    pub signal: Option<ExitSignal>,
+}
+
+#[derive(Debug)]
+pub struct ExitSignal {
+    pub code: u32,
+    pub name: String,
+    pub description: String,
+}
+
+impl std::fmt::Display for ProcessExitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.message, self.status)
+    }
+}
+
+impl std::fmt::Display for ExitSignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "signal: {}, {}: {}",
+            self.code, self.name, self.description
+        )
+    }
+}
+
+impl std::error::Error for ProcessExitError {}
+
+fn return_process_error(
+    error_msg: &str,
+    status: ExitStatus,
+    signal: Option<ExitSignal>,
+) -> anyhow::Result<()> {
+    Err(ProcessExitError {
+        message: error_msg.to_string(),
+        status,
+        signal,
+    }
+    .into())
+}
+
+fn extract_exit_signal(line: &str) -> Option<ExitSignal> {
+    // Matches: (signal: 11, SIGSEGV: invalid memory reference)
+    let re = Regex::new(r"\(signal:\s*(\d+),\s*(SIG[A-Z]+):\s*([^)]+)\)").ok()?;
+    let caps = re.captures(line)?;
+    let code = caps.get(1)?.as_str().parse::<u32>().ok()?;
+    let name = caps.get(2)?.as_str().to_string();
+    let description = caps.get(3)?.as_str().trim().to_string();
+
+    Some(ExitSignal {
+        code,
+        name,
+        description,
+    })
+}
 
 /// Run a process
 pub fn run_process(
@@ -40,7 +103,7 @@ pub fn run_process(
         )
     })?;
     if !status.success() {
-        return Err(anyhow::anyhow!("{}", error_msg));
+        return return_process_error(error_msg, status, None);
     }
     anyhow::Ok(())
 }
@@ -111,6 +174,7 @@ pub fn run_process_for_workspace<'a>(
     // Process the stdout to inject log groups
     let mut ignore_error = false;
     let mut close_group = false;
+    let mut signal = None;
     for (line, _is_stderr) in rx.iter() {
         let mut skip_line = false;
 
@@ -136,6 +200,10 @@ pub fn run_process_for_workspace<'a>(
             }
         }
 
+        if line.contains("(signal:") {
+            signal = extract_exit_signal(&line);
+        }
+
         if !skip_line {
             println!("{line}");
         }
@@ -151,7 +219,7 @@ pub fn run_process_for_workspace<'a>(
         }
         anyhow::Ok(())
     } else {
-        Err(anyhow::anyhow!("{}", error_msg))
+        return_process_error(error_msg, status, signal)
     }
 }
 
@@ -216,6 +284,7 @@ pub fn run_process_for_package(
     // Process the stdout to inject log groups
     let mut ignore_error = false;
     let mut skip_line = false;
+    let mut signal = None;
     for (line, is_stderr) in rx.iter() {
         if let Some(log) = ignore_log {
             if !is_stderr {
@@ -230,6 +299,10 @@ pub fn run_process_for_package(
                 }
             }
         }
+        if line.contains("(signal:") {
+            signal = extract_exit_signal(&line);
+        }
+
         if !skip_line {
             println!("{line}");
         }
@@ -242,7 +315,7 @@ pub fn run_process_for_package(
     if status.success() || ignore_error {
         anyhow::Ok(())
     } else {
-        Err(anyhow::anyhow!("{}", error_msg))
+        return_process_error(error_msg, status, signal)
     }
 }
 
