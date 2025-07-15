@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
     path::Path,
-    process::{Command, Stdio},
+    process::{Command, ExitStatus, Stdio},
     sync::mpsc,
     thread,
 };
@@ -13,6 +13,31 @@ use regex::Regex;
 
 use crate::group_info;
 use crate::{endgroup, group};
+
+/// A custom error for failed subprocesses.
+///
+/// To get the `ExitStatus`, downcast the error at call sites.
+#[derive(Debug)]
+pub struct ProcessExitError {
+    pub message: String,
+    pub status: ExitStatus,
+}
+
+impl std::fmt::Display for ProcessExitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} (exit status: {})", self.message, self.status)
+    }
+}
+
+impl std::error::Error for ProcessExitError {}
+
+fn return_process_error(error_msg: &str, status: ExitStatus) -> anyhow::Result<()> {
+    Err(ProcessExitError {
+        message: error_msg.to_string(),
+        status,
+    }
+    .into())
+}
 
 /// Run a process
 pub fn run_process(
@@ -40,7 +65,7 @@ pub fn run_process(
         )
     })?;
     if !status.success() {
-        return Err(anyhow::anyhow!("{}", error_msg));
+        return return_process_error(error_msg, status);
     }
     anyhow::Ok(())
 }
@@ -151,7 +176,7 @@ pub fn run_process_for_workspace<'a>(
         }
         anyhow::Ok(())
     } else {
-        Err(anyhow::anyhow!("{}", error_msg))
+        return_process_error(error_msg, status)
     }
 }
 
@@ -242,7 +267,7 @@ pub fn run_process_for_package(
     if status.success() || ignore_error {
         anyhow::Ok(())
     } else {
-        Err(anyhow::anyhow!("{}", error_msg))
+        return_process_error(error_msg, status)
     }
 }
 
