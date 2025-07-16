@@ -1,6 +1,6 @@
 use strum::{Display, EnumIter, EnumString};
 
-use crate::group_info;
+use crate::{group_error, group_info};
 
 #[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
 #[strum(serialize_all = "lowercase")]
@@ -36,15 +36,17 @@ impl Environment {
     pub(crate) fn load(&self) -> anyhow::Result<()> {
         let filename = self.get_dotenv_filename();
         let secrets_filename = self.get_dotenv_secrets_filename();
-        if dotenvy::from_filename(".env").is_ok() {
-            group_info!("loading '.env' file...");
-        }
-        if dotenvy::from_filename(&filename).is_ok() {
-            group_info!("loading {filename} file...");
-        }
-        if dotenvy::from_filename(&secrets_filename).is_ok() {
-            group_info!("loading {secrets_filename} file...");
-        }
+        let files = vec![".env", &filename, &secrets_filename];
+        files.iter().for_each(|f| {
+            match dotenvy::from_filename(f) {
+                Ok(_) => {
+                    group_info!("loading {} file...", f);
+                },
+                Err(e) => {
+                    group_error!("error while loading {} file ({})", f, e);
+                },
+            }
+        });
         Ok(())
     }
 }
