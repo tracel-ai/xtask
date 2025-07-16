@@ -142,7 +142,7 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
     anyhow::Ok(())
 }
 
-fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), anyhow::Error> {
+pub fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     let test = args.test.as_deref().unwrap_or("");
     let mut cmd_args = vec![
