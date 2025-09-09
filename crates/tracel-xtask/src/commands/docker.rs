@@ -26,13 +26,7 @@ pub fn up_docker_compose(
     let project = format!("{project}-{env_name}");
     let config = get_config_filename(&env_name);
     let env_files = env.get_env_files();
-    let mut args = vec![
-        "compose",
-        "-f",
-        &config,
-        "-p",
-        &project,
-    ];
+    let mut args = vec!["compose", "-f", &config, "-p", &project];
     env_files.iter().for_each(|f| {
         let path = std::path::Path::new(f);
         if path.exists() {
@@ -69,13 +63,7 @@ pub fn down_docker_compose(env: &Environment, project: &str) -> anyhow::Result<(
     let project = format!("{project}-{env_name}");
     let config = get_config_filename(&env_name);
     let env_files = env.get_env_files();
-    let mut args = vec![
-        "compose",
-        "-f",
-        &config,
-        "-p",
-        &project,
-    ];
+    let mut args = vec!["compose", "-f", &config, "-p", &project];
     env_files.iter().for_each(|f| {
         let path = std::path::Path::new(f);
         if path.exists() {

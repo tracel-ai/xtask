@@ -36,7 +36,11 @@ impl Environment {
     pub fn get_env_files(&self) -> [String; 3] {
         let filename = self.get_dotenv_filename();
         let secrets_filename = self.get_dotenv_secrets_filename();
-        [".env".to_owned(), filename.to_owned(), secrets_filename.to_owned()]
+        [
+            ".env".to_owned(),
+            filename.to_owned(),
+            secrets_filename.to_owned(),
+        ]
     }
 
     pub(crate) fn load(&self) -> anyhow::Result<()> {
