@@ -23,20 +23,23 @@ pub fn up_docker_compose(
     services: Vec<String>,
 ) -> anyhow::Result<()> {
     let env_name = env.to_string();
-    let dotenv_filepath = env.get_dotenv_filename();
     let project = format!("{project}-{env_name}");
     let config = get_config_filename(&env_name);
+    let env_files = env.get_env_files();
     let mut args = vec![
         "compose",
         "-f",
         &config,
-        "--env-file",
-        &dotenv_filepath,
         "-p",
         &project,
-        "up",
-        "-d",
     ];
+    env_files.iter().for_each(|f| {
+        let path = std::path::Path::new(f);
+        if path.exists() {
+            args.extend(vec!["--env-file", f]);
+        }
+    });
+    args.extend(vec!["up", "-d"]);
     if build {
         args.extend(vec!["--build"]);
     }
@@ -63,19 +66,23 @@ pub fn up_docker_compose(
 
 pub fn down_docker_compose(env: &Environment, project: &str) -> anyhow::Result<()> {
     let env_name = env.to_string();
-    let dotenv_filepath = env.get_dotenv_filename();
     let project = format!("{project}-{env_name}");
     let config = get_config_filename(&env_name);
-    let args = vec![
+    let env_files = env.get_env_files();
+    let mut args = vec![
         "compose",
         "-f",
         &config,
-        "--env-file",
-        &dotenv_filepath,
         "-p",
         &project,
-        "down",
     ];
+    env_files.iter().for_each(|f| {
+        let path = std::path::Path::new(f);
+        if path.exists() {
+            args.extend(vec!["--env-file", f]);
+        }
+    });
+    args.extend(vec!["down"]);
     let result = run_process(
         "docker",
         &args,

@@ -33,10 +33,14 @@ impl Environment {
         format!("{}.secrets", self.get_dotenv_filename())
     }
 
-    pub(crate) fn load(&self) -> anyhow::Result<()> {
+    pub fn get_env_files(&self) -> [String; 3] {
         let filename = self.get_dotenv_filename();
         let secrets_filename = self.get_dotenv_secrets_filename();
-        let files = [".env", &filename, &secrets_filename];
+        [".env".to_owned(), filename.to_owned(), secrets_filename.to_owned()]
+    }
+
+    pub(crate) fn load(&self) -> anyhow::Result<()> {
+        let files = self.get_env_files();
         files.iter().for_each(|f| {
             let path = std::path::Path::new(f);
             if path.exists() {
