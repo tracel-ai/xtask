@@ -36,15 +36,20 @@ impl Environment {
     pub(crate) fn load(&self) -> anyhow::Result<()> {
         let filename = self.get_dotenv_filename();
         let secrets_filename = self.get_dotenv_secrets_filename();
-        let files = vec![".env", &filename, &secrets_filename];
+        let files = [".env", &filename, &secrets_filename];
         files.iter().for_each(|f| {
-            match dotenvy::from_filename(f) {
-                Ok(_) => {
-                    group_info!("loading {} file...", f);
-                },
-                Err(e) => {
-                    group_error!("error while loading {} file ({})", f, e);
-                },
+            let path = std::path::Path::new(f);
+            if path.exists() {
+                match dotenvy::from_filename(f) {
+                    Ok(_) => {
+                        group_info!("loading '{}' file...", f);
+                    }
+                    Err(e) => {
+                        group_error!("error while loading '{}' file ({})", f, e);
+                    }
+                }
+            } else {
+                group_info!("environment file '{}' does not exist, skipping...", f);
             }
         });
         Ok(())
