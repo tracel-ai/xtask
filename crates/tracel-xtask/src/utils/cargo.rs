@@ -54,8 +54,9 @@ pub fn parse_cargo_search_output(output: &str) -> Option<(String, String)> {
     let ansi_re = Regex::new(r"\x1b\[[0-9;]*m").expect("should compile regex for ANSI codes");
     let cleaned_output = ansi_re.replace_all(output, "");
     // Then retrieve the crate name and version in the output
-    let re = Regex::new(r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+)""#)
-        .expect("should compile regex");
+    let re = Regex::new(
+        r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-\d+)?)""#
+    ).expect("should compile regex");
     if let Some(captures) = re.captures(&cleaned_output) {
         if let (Some(name), Some(version)) = (captures.name("name"), captures.name("version")) {
             return Some((name.as_str().to_owned(), version.as_str().to_owned()));
@@ -78,6 +79,8 @@ mod tests {
     #[case::extra_whitespace("   tracel-xtask-macros    =    \"1.0.1\"  ", Some(("tracel-xtask-macros", "1.0.1")))]
     #[case::no_quotes("tracel-xtask-macros = 1.0.1", None)]
     #[case::wrong_version_format("tracel-xtask-macros = \"1.0\"", None)]
+    #[case::valid_input_with_release_suffix("tracel-xtask-macros = \"20.1.4-1\"", Some(("tracel-xtask-macros", "20.1.4-1")))]
+    #[case::valid_input_with_release_suffix_multiple_digits("tracel-xtask-macros = \"20.1.4-103\"", Some(("tracel-xtask-macros", "20.1.4-103")))]
     fn test_parse_cargo_search_output(#[case] input: &str, #[case] expected: Option<(&str, &str)>) {
         let expected = expected.map(|(name, version)| (name.to_string(), version.to_string()));
         let result = parse_cargo_search_output(input);
