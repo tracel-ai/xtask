@@ -105,7 +105,7 @@ pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
 pub fn init_xtask<C: clap::Subcommand>(args: XtaskArgs<C>) -> anyhow::Result<XtaskArgs<C>> {
     // environment
     group_info!("Environment: {}", args.environment);
-    args.environment.load()?;
+    args.environment.load(None)?;
     group_info!("Context: {}", args.context);
     // code coverage
     if args.enable_coverage {

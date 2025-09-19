@@ -43,10 +43,14 @@ impl Environment {
         ]
     }
 
-    pub(crate) fn load(&self) -> anyhow::Result<()> {
+    pub(crate) fn load(&self, prefix: Option<&str>) -> anyhow::Result<()> {
         let files = self.get_env_files();
         files.iter().for_each(|f| {
-            let path = std::path::Path::new(f);
+            let path = if let Some(p) = prefix {
+                std::path::PathBuf::from(p).join(f)
+            } else {
+                std::path::PathBuf::from(f)
+            };
             if path.exists() {
                 match dotenvy::from_filename(f) {
                     Ok(_) => {
@@ -105,7 +109,7 @@ mod tests {
         }
 
         // Run the actual function under test
-        env.load().expect("Environment load should succeed");
+        env.load(Some("../..")).expect("Environment load should succeed");
 
         // Assert each expected env var is present and has the correct value
         for (key, expected_value) in expected_vars(&env) {
