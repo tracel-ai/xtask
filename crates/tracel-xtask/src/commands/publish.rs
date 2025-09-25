@@ -15,6 +15,9 @@ const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
 pub struct PublishCmdArgs {
     /// The name of the crate to publish on crates.io
     name: String,
+    /// When set, only perfom a dry-run and does not publish the crate
+    #[arg(long)]
+    dry_run_only: bool,
 }
 
 pub fn handle_command(
@@ -41,7 +44,7 @@ pub fn handle_command(
         None => info!("This is the first version to be published on crates.io!"),
     }
     // Publish the crate
-    publish(crate_name)?;
+    publish(crate_name, args.dry_run_only)?;
     endgroup!();
 
     Ok(())
@@ -87,7 +90,7 @@ fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
     Ok(None)
 }
 
-fn publish(crate_name: String) -> anyhow::Result<()> {
+fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
     // Perform dry-run to ensure everything is good for publishing
     run_process(
         "cargo",
@@ -96,6 +99,10 @@ fn publish(crate_name: String) -> anyhow::Result<()> {
         None,
         &format!("Publish dry run failed for crate '{}'.", &crate_name),
     )?;
+
+    if dry_run_only {
+        return Ok(());
+    }
 
     let crates_io_token =
         env::var(CRATES_IO_API_TOKEN).expect("Failed to retrieve the crates.io API token");
