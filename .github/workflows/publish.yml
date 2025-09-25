@@ -7,7 +7,7 @@ on:
 
 jobs:
   tracel-xtask-macros:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v4
     with:
       crate: tracel-xtask-macros
     secrets:
@@ -15,7 +15,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v4
     with:
       crate: tracel-xtask
     needs:
