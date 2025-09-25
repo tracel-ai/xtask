@@ -54,9 +54,8 @@ pub fn parse_cargo_search_output(output: &str) -> Option<(String, String)> {
     let ansi_re = Regex::new(r"\x1b\[[0-9;]*m").expect("should compile regex for ANSI codes");
     let cleaned_output = ansi_re.replace_all(output, "");
     // Then retrieve the crate name and version in the output
-    let re = Regex::new(
-        r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-\d+)?)""#
-    ).expect("should compile regex");
+    let re = Regex::new(r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-\d+)?)""#)
+        .expect("should compile regex");
     if let Some(captures) = re.captures(&cleaned_output) {
         if let (Some(name), Some(version)) = (captures.name("name"), captures.name("version")) {
             return Some((name.as_str().to_owned(), version.as_str().to_owned()));

@@ -109,7 +109,8 @@ mod tests {
         }
 
         // Run the actual function under test
-        env.load(Some("../..")).expect("Environment load should succeed");
+        env.load(Some("../.."))
+            .expect("Environment load should succeed");
 
         // Assert each expected env var is present and has the correct value
         for (key, expected_value) in expected_vars(&env) {
