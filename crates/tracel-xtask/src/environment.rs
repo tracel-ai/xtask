@@ -43,7 +43,10 @@ impl Environment {
         ]
     }
 
-    pub(crate) fn load(&self, prefix: Option<&str>) -> anyhow::Result<()> {
+    /// Load the .env environment files family.
+    /// You don't need to call it in an xtask binary but can be useful
+    /// in a non-xtask binary.
+    pub fn load(&self, prefix: Option<&str>) -> anyhow::Result<()> {
         let files = self.get_env_files();
         files.iter().for_each(|f| {
             let path = if let Some(p) = prefix {
