@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask"
-version = "2.1.10"
+version = "2.1.11"
 dependencies = [
  "anyhow",
  "clap",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-macros"
-version = "2.1.10"
+version = "2.1.11"
 dependencies = [
  "proc-macro2",
  "quote",
