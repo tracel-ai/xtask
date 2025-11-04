@@ -61,6 +61,9 @@ pub mod prelude {
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::helpers;
     pub use crate::utils::git::repo_root_or_cwd;
+    pub use crate::utils::git::git_current_commit_hash;
+    pub use crate::utils::git::git_is_repo_dirty;
+    pub use crate::utils::git::git_repo_root_or_cwd;
     pub use crate::utils::process::random_port;
     pub use crate::utils::process::run_process;
     pub use crate::utils::process::run_process_for_package;

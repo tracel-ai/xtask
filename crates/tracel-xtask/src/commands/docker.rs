@@ -7,7 +7,7 @@ use crate::utils::aws_cli::{
     aws_account_id, aws_cli_capture_stdout, ecr_docker_login, ecr_ensure_repo_exists,
     ecr_get_manifest, ecr_put_manifest,
 };
-use crate::utils::git::repo_root_or_cwd;
+use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::run_process;
 
 const AWS_REGION: &str = "us-east-1";
@@ -93,7 +93,7 @@ pub fn handle_command(
 }
 
 fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
-    let context_dir = build_args.context_dir.unwrap_or(repo_root_or_cwd()?);
+    let context_dir = build_args.context_dir.unwrap_or(git_repo_root_or_cwd()?);
     let dockerfile_path = if build_args.dockerfile.is_absolute() {
         build_args.dockerfile.clone()
     } else {
