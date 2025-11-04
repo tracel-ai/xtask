@@ -109,7 +109,6 @@ pub fn run_process(
 }
 
 pub fn run_process_capture_stdout(cmd: &mut Command, label: &str) -> anyhow::Result<String> {
-    eprintln!("$ {:?}", cmd);
     let out = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
