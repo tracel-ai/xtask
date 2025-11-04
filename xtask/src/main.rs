@@ -12,7 +12,7 @@ extern crate log;
     Compile,
     Coverage,
     Doc,
-    Docker,
+    DockerCompose,
     Dependencies,
     Fix,
     Publish,

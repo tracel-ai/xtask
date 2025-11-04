@@ -35,6 +35,8 @@ pub mod prelude {
     pub use crate::commands::dependencies::DependenciesSubCommand;
     pub use crate::commands::doc::DocCmdArgs;
     pub use crate::commands::doc::DocSubCommand;
+    pub use crate::commands::docker::DockerCmdArgs;
+    pub use crate::commands::docker::DockerSubCommand;
     pub use crate::commands::docker_compose::DockerComposeCmdArgs;
     pub use crate::commands::docker_compose::DockerComposeSubCommand;
     pub use crate::commands::fix::FixCmdArgs;
@@ -58,6 +60,7 @@ pub mod prelude {
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::helpers;
+    pub use crate::utils::git::repo_root_or_cwd;
     pub use crate::utils::process::random_port;
     pub use crate::utils::process::run_process;
     pub use crate::utils::process::run_process_for_package;

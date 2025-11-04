@@ -15,6 +15,7 @@ rust-version = "1.79"
 proc-macro = true
 
 [dependencies]
+heck = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

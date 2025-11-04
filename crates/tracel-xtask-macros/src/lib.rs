@@ -1,4 +1,5 @@
 extern crate proc_macro;
+use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
@@ -75,7 +76,7 @@ fn generate_dispatch_function(
     let arms: Vec<proc_macro2::TokenStream> = args.iter().map(|meta| {
         let cmd_ident = meta.path().get_ident().unwrap();
         let cmd_ident_string = cmd_ident.to_string();
-        let module_ident = syn::Ident::new(cmd_ident_string.to_lowercase().as_str(), cmd_ident.span());
+        let module_ident = syn::Ident::new(cmd_ident_string.to_snake_case().as_str(), cmd_ident.span());
         match cmd_ident_string.as_str() {
             "Fix" => quote! {
                 #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, args.environment, args.context, None),
@@ -151,6 +152,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Build documentation."]
             Doc(tracel_xtask::commands::doc::DocCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Docker",
+        quote! {
+            #[doc = r"Execute docker commands."]
+            DockerCompose(tracel_xtask::commands::docker::DockerCmdArgs)
         },
     );
     variant_map.insert(
@@ -655,7 +663,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 #[doc = r"Install grcov and its dependencies."]
                 Install,
                 #[doc = r"Generate lcov.info file. [default with default debug profile]"]
-                Generate(GenerateCmdArgs),
+                Generate(GenerateSubCmdArgs),
             },
         ),
         (
@@ -678,6 +686,19 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Build,
                 #[doc = r"Run documentation tests."]
                 Tests,
+            },
+        ),
+        (
+            "DockerSubCommand",
+            quote! {
+                #[doc = r"Build a docker file."]
+                Build(BuildSubCmdArgs),
+                #[doc = r"Push a container to a registry."]
+                Push(PushSubCmdArgs),
+                #[doc = r"Promote a pushed container to latest."]
+                Promote(PromoteSubCmdArgs),
+                #[doc = r"Rollback previously released container to latest."]
+                Rollback(RollbackSubCmdArgs),
             },
         ),
         (

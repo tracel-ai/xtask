@@ -1,5 +1,4 @@
 use anyhow::Ok;
-use clap::Args;
 
 use crate::{
     endgroup, group,
@@ -17,12 +16,12 @@ pub struct CoverageCmdArgs {}
 
 impl Default for CoverageSubCommand {
     fn default() -> Self {
-        CoverageSubCommand::Generate(GenerateCmdArgs::default())
+        CoverageSubCommand::Generate(GenerateSubCmdArgs::default())
     }
 }
 
-#[derive(Args, Default, Clone, PartialEq)]
-pub struct GenerateCmdArgs {
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct GenerateSubCmdArgs {
     /// Build profile to use.
     #[arg(short, long, value_enum, default_value_t = Profile::default())]
     profile: Profile,
@@ -56,7 +55,7 @@ fn install_grcov() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_grcov(generate_args: &GenerateCmdArgs) -> anyhow::Result<()> {
+fn run_grcov(generate_args: &GenerateSubCmdArgs) -> anyhow::Result<()> {
     group!("Grcov");
     let binary_path = format!("./target/{}/", generate_args.profile);
     #[rustfmt::skip]

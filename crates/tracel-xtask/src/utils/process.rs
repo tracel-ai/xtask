@@ -7,7 +7,7 @@ use std::{
     thread,
 };
 
-use anyhow;
+use anyhow::{self, Context};
 use rand::Rng;
 use regex::Regex;
 
@@ -106,6 +106,19 @@ pub fn run_process(
         return return_process_error(error_msg, status, None);
     }
     anyhow::Ok(())
+}
+
+pub fn run_process_capture_stdout(cmd: &mut Command, label: &str) -> anyhow::Result<String> {
+    eprintln!("$ {:?}", cmd);
+    let out = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .output()
+        .with_context(|| format!("running {label}"))?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("{label} failed with status {}", out.status));
+    }
+    Ok(String::from_utf8(out.stdout).context("non-UTF8 output")?)
 }
 
 /// Run a process for workspace

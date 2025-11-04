@@ -22,6 +22,7 @@ derive_more = { version = "2.0.1", features = ["display"], default-features = fa
 ctrlc = "3.4.7"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
+heck = "0.5.0"
 log = { version = "0.4.27" }
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
