@@ -154,10 +154,10 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
-        "Docker",
+        "DockerCompose",
         quote! {
             #[doc = r"Manage docker compose stacks."]
-            Docker(tracel_xtask::commands::docker::DockerCmdArgs)
+            DockerCompose(tracel_xtask::commands::docker_compose::DockerComposeCmdArgs)
         },
     );
     variant_map.insert(
@@ -255,7 +255,7 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
             },
         ),
         (
-            "DockerCmdArgs",
+            "DockerComposeCmdArgs",
             quote! {
                 #[doc = r"Build images before starting containers."]
                 #[arg(short, long, required = false)]
@@ -681,7 +681,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
-            "DockerSubCommand",
+            "DockerComposeSubCommand",
             quote! {
                 #[default]
                 #[doc = r"Start docker compose stack."]
