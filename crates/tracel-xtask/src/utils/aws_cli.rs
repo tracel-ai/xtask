@@ -207,3 +207,56 @@ pub fn ecr_put_manifest(
         "aws ecr put-image failed",
     )
 }
+
+/// Query the digest for a given repository, region and tag
+pub fn ecr_image_digest(
+    repository: &str,
+    tag: &str,
+    region: &str,
+) -> anyhow::Result<Option<String>> {
+    let json = aws_cli_capture_stdout(
+        vec![
+            "ecr".into(),
+            "describe-images".into(),
+            "--repository-name".into(),
+            repository.into(),
+            "--region".into(),
+            region.into(),
+            "--image-ids".into(),
+            format!("imageTag={tag}"),
+            "--query".into(),
+            "imageDetails[0].imageDigest".into(),
+            "--output".into(),
+            "text".into(),
+        ],
+        "aws ecr describe-images for digest",
+        None,
+        None,
+    )?;
+
+    let digest = json.trim();
+    if digest.is_empty() || digest.eq_ignore_ascii_case("None") {
+        Ok(None)
+    } else {
+        Ok(Some(digest.to_string()))
+    }
+}
+
+/// Generate the AWS Console URL that leads directly to the image details page
+/// for the given repository and tag.
+/// If the digest cannot be retrieved, return None.
+pub fn ecr_image_url(repository: &str, tag: &str, region: &str) -> anyhow::Result<Option<String>> {
+    use crate::utils::aws_cli::{aws_account_id, ecr_image_digest};
+    let account_id = aws_account_id()?;
+    if let Some(digest) = ecr_image_digest(repository, tag, region)? {
+        Ok(Some(format!(
+            "https://{region}.console.aws.amazon.com/ecr/repositories/private/{account_id}/{repository}/_/image/{digest}/details?region={region}",
+            region = region,
+            account_id = account_id,
+            repository = repository,
+            digest = digest,
+        )))
+    } else {
+        Ok(None)
+    }
+}
