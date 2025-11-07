@@ -2,7 +2,7 @@ use strum::{Display, EnumIter, EnumString};
 
 use crate::{group_error, group_info};
 
-#[derive(EnumString, EnumIter, Default, Display, Clone, PartialEq, clap::ValueEnum)]
+#[derive(EnumString, EnumIter, Default, Display, Clone, Debug, PartialEq, clap::ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Environment {
     /// Development environment (alias: dev).

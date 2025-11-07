@@ -260,3 +260,129 @@ pub fn ecr_image_url(repository: &str, tag: &str, region: &str) -> anyhow::Resul
         Ok(None)
     }
 }
+
+/// Get the commit sha for an alias tag (i.e. 'latest' or 'rollback')
+pub fn ecr_get_commit_sha_tag_from_alias_tag(
+    repository: &str,
+    alias_tag: &str,
+    region: &str,
+) -> anyhow::Result<Option<String>> {
+    // Describe the image by alias tag to get its image details with all tags
+    let json = aws_cli_capture_stdout(
+        vec![
+            "ecr".into(),
+            "describe-images".into(),
+            "--repository-name".into(),
+            repository.into(),
+            "--region".into(),
+            region.into(),
+            "--image-ids".into(),
+            format!("imageTag={alias_tag}"),
+            "--query".into(),
+            "imageDetails[0].imageTags".into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws ecr describe-images",
+        None,
+        None,
+    )?;
+
+    let v: serde_json::Value =
+        serde_json::from_str(&json).context("parsing describe-images output")?;
+    let tags = v.as_array().cloned().unwrap_or_default();
+
+    // Return the first non-alias tag that looks like a commit sha
+    let is_hexish = |s: &str| {
+        let len = s.len();
+        (7..=40).contains(&len) && s.chars().all(|c| c.is_ascii_hexdigit())
+    };
+    let mut candidates: Vec<String> = tags
+        .into_iter()
+        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+        .filter(|s| s != "latest" && s != "rollback" && is_hexish(s))
+        .collect();
+    candidates.sort_by_key(|s| std::cmp::Reverse(s.len()));
+    Ok(candidates.into_iter().next())
+}
+
+/// Get the commit sha tag for the most recently pushed image in the repo.
+pub fn ecr_get_last_pushed_commit_sha_tag(
+    repository: &str,
+    region: &str,
+) -> anyhow::Result<Option<String>> {
+    // Get tags for the most recent image by pushed time
+    let json = aws_cli_capture_stdout(
+        vec![
+            "ecr".into(),
+            "describe-images".into(),
+            "--repository-name".into(),
+            repository.into(),
+            "--region".into(),
+            region.into(),
+            "--query".into(),
+            "max_by(imageDetails, & imagePushedAt).imageTags".into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws ecr describe-images (last pushed)",
+        None,
+        None,
+    )?;
+
+    let v: serde_json::Value = serde_json::from_str(&json).context("parsing last-pushed tags")?;
+    let tags = v.as_array().cloned().unwrap_or_default();
+
+    // Return a non-alias tag that looks like a commit sha
+    let is_hexish = |s: &str| {
+        let len = s.len();
+        (7..=40).contains(&len) && s.chars().all(|c| c.is_ascii_hexdigit())
+    };
+    let mut candidates: Vec<String> = tags
+        .into_iter()
+        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+        .filter(|s| s != "latest" && s != "rollback" && is_hexish(s))
+        .collect();
+    candidates.sort_by_key(|s| std::cmp::Reverse(s.len()));
+    Ok(candidates.into_iter().next())
+}
+
+/// Fetch the latest numerical tag and return it incremented by 1
+pub fn ecr_compute_next_numeric_tag(repository: &str, region: &str) -> anyhow::Result<u64> {
+    let json = aws_cli_capture_stdout(
+        vec![
+            "ecr".into(),
+            "describe-images".into(),
+            "--repository-name".into(),
+            repository.into(),
+            "--region".into(),
+            region.into(),
+            "--query".into(),
+            "imageDetails[].imageTags[]".into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws ecr describe-images",
+        None,
+        None,
+    )?;
+
+    let v: serde_json::Value =
+        serde_json::from_str(&json).context("parsing describe-images output")?;
+    let mut max_seen: u64 = 0;
+    if let serde_json::Value::Array(tags) = v {
+        for t in tags {
+            if let Some(s) = t.as_str() {
+                if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) {
+                    if let Ok(n) = s.parse::<u64>() {
+                        if n > max_seen {
+                            max_seen = n;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(max_seen.saturating_add(1).max(1))
+}

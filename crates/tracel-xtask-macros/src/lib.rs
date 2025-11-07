@@ -693,6 +693,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             quote! {
                 #[doc = r"Build a docker file."]
                 Build(BuildSubCmdArgs),
+                #[doc = r"Show current latest and rollback images in registry."]
+                List(ListSubCmdArgs),
                 #[doc = r"Push a container to a registry."]
                 Push(PushSubCmdArgs),
                 #[doc = r"Promote a pushed container to latest."]

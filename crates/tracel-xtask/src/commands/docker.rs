@@ -1,16 +1,13 @@
 use std::path::PathBuf;
 
-use anyhow::Context;
-
-use crate::prelude::{Context as XtaskContext, Environment};
+use crate::prelude::{ecr_image_url, Context as XtaskContext, Environment};
 use crate::utils::aws_cli::{
-    aws_account_id, aws_cli_capture_stdout, ecr_docker_login, ecr_ensure_repo_exists,
-    ecr_get_manifest, ecr_put_manifest,
+    aws_account_id, ecr_compute_next_numeric_tag, ecr_docker_login, ecr_ensure_repo_exists,
+    ecr_get_commit_sha_tag_from_alias_tag, ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest,
+    ecr_put_manifest,
 };
 use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::run_process;
-
-const AWS_REGION: &str = "us-east-1";
 
 #[tracel_xtask_macros::declare_command_args(None, DockerSubCommand)]
 pub struct DockerCmdArgs {}
@@ -40,31 +37,43 @@ pub struct BuildSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ListSubCmdArgs {
+    /// Region where the docker repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Docker repository name
+    #[arg(long)]
+    pub repository: String,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct PushSubCmdArgs {
     /// Local image name (the one used in the build command)
     #[arg(long)]
     pub image: String,
-
     /// Local image tag (the one used when building)
     #[arg(long)]
     pub local_tag: String,
-
-    /// ECR repository name to push into
+    /// Region where the docker repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Docker repository name to push into
     #[arg(long)]
     pub repository: String,
-
     /// Explicit remote tag (if provided, it overrides auto computation)
     #[arg(long)]
     pub remote_tag: Option<String>,
-
-    /// When true, compute the next monotonic tag from ECR instead of reusing the local tag
+    /// When true, compute the next monotonic tag from the docker repository instead of reusing the local tag
     #[arg(long)]
     pub auto_remote_tag: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct PromoteSubCmdArgs {
-    /// ECR repository name
+    /// Region where the docker repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Docker repository name
     #[arg(long)]
     pub repository: String,
     /// Build tag to promote to 'latest'
@@ -74,7 +83,10 @@ pub struct PromoteSubCmdArgs {
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct RollbackSubCmdArgs {
-    /// ECR repository name
+    /// Region where the docker repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Docker repository name
     #[arg(long)]
     pub repository: String,
 }
@@ -86,6 +98,7 @@ pub fn handle_command(
 ) -> anyhow::Result<()> {
     match args.get_command() {
         DockerSubCommand::Build(build_args) => build(build_args),
+        DockerSubCommand::List(list_args) => list(list_args),
         DockerSubCommand::Push(push_args) => push(push_args),
         DockerSubCommand::Promote(promote_args) => promote(promote_args),
         DockerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
@@ -116,8 +129,59 @@ fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
     docker_cli(args, None, None, "docker build failed")
 }
 
+fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
+    let ecr_repository = &list_args.repository;
+    let latest_present = ecr_get_manifest(&ecr_repository, &list_args.region, "latest")?.is_some();
+    let rollback_present =
+        ecr_get_manifest(&ecr_repository, &list_args.region, "rollback")?.is_some();
+    let latest_tag = if latest_present {
+        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "latest", &list_args.region)?
+    } else {
+        None
+    };
+    let rollback_tag = if rollback_present {
+        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "rollback", &list_args.region)?
+    } else {
+        None
+    };
+    let last_pushed_tag = ecr_get_last_pushed_commit_sha_tag(ecr_repository, &list_args.region)?;
+
+    eprintln!(
+        "📚 Repository: {ecr_repository} (region {})",
+        list_args.region
+    );
+    // current latest
+    match (latest_present, &latest_tag) {
+        (true, Some(t)) => {
+            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            eprintln!("• latest: ✅\n  🏷 {t}\n  🌐 {url}");
+        }
+        (true, None) => eprintln!("• latest:   ✅\n  found but tag unknown"),
+        _ => eprintln!("• latest:   ❌"),
+    }
+    // current rollback
+    match (rollback_present, &rollback_tag) {
+        (true, Some(t)) => {
+            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            eprintln!("• rollback: ✅\n  🏷 {t}\n  🌐 {url}");
+        }
+        (true, None) => eprintln!("• rollback: ✅\n  found but tag unknown"),
+        _ => eprintln!("• rollback: ❌"),
+    }
+    // latest non-alias tag (so not latest or rollback tagged)
+    match &last_pushed_tag {
+        Some(t) => {
+            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            eprintln!("• last pushed: ✅\n  🏷 {t}\n  🌐 {url}");
+        }
+        None => eprintln!("• last pushed: ❌"),
+    }
+
+    Ok(())
+}
+
 fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
-    ecr_ensure_repo_exists(&push_args.repository, &AWS_REGION)?;
+    ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
 
     // Determine remote tag:
     // 1) if --remote-tag is provided then use it
@@ -126,7 +190,7 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     let remote_tag = if let Some(explicit) = &push_args.remote_tag {
         explicit.clone()
     } else if push_args.auto_remote_tag {
-        let next = compute_next_numeric_tag(&push_args.repository)?;
+        let next = ecr_compute_next_numeric_tag(&push_args.repository, &push_args.region)?;
         eprintln!("➡️  Using computed remote monotonic tag: {}", next);
         next.to_string()
     } else {
@@ -134,9 +198,9 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     };
 
     let account_id = aws_account_id()?;
-    ecr_docker_login(&account_id, &AWS_REGION)?;
+    ecr_docker_login(&account_id, &push_args.region)?;
 
-    let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, AWS_REGION);
+    let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, push_args.region);
     let remote = format!("{}/{}:{}", registry, push_args.repository, remote_tag);
 
     // docker tag <local>:<local_tag> <remote>:<remote_tag>
@@ -152,25 +216,44 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     )?;
 
     // docker push <remote>:<remote_tag>
-    docker_cli(vec!["push".into(), remote], None, None, "docker push failed")
+    docker_cli(
+        vec!["push".into(), remote],
+        None,
+        None,
+        "docker push failed",
+    )
 }
 
 /// promote: N to latest and old latest to rollback
 fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
-    let prev_latest = ecr_get_manifest(&promote_args.repository, &AWS_REGION, "latest")?;
-    let n_manifest = ecr_get_manifest(&promote_args.repository, &AWS_REGION, &promote_args.tag)?
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Tag '{}' not found in '{}'",
-                promote_args.tag,
-                promote_args.repository
-            )
-        })?;
+    let prev_latest = ecr_get_manifest(&promote_args.repository, &promote_args.region, "latest")?;
+    let n_manifest = ecr_get_manifest(
+        &promote_args.repository,
+        &promote_args.region,
+        &promote_args.tag,
+    )?
+    .ok_or_else(|| {
+        anyhow::anyhow!(
+            "Tag '{}' not found in '{}'",
+            promote_args.tag,
+            promote_args.repository
+        )
+    })?;
 
-    ecr_put_manifest(&promote_args.repository, &AWS_REGION, "latest", &n_manifest)?;
+    ecr_put_manifest(
+        &promote_args.repository,
+        &promote_args.region,
+        "latest",
+        &n_manifest,
+    )?;
 
     if let Some(prev) = prev_latest {
-        ecr_put_manifest(&promote_args.repository, &AWS_REGION, "rollback", &prev)?;
+        ecr_put_manifest(
+            &promote_args.repository,
+            &promote_args.region,
+            "rollback",
+            &prev,
+        )?;
     }
 
     Ok(())
@@ -178,50 +261,16 @@ fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
 
 /// rollback: promote rollback to latest
 fn rollback(rollback_args: RollbackSubCmdArgs) -> anyhow::Result<()> {
-    let rb = ecr_get_manifest(&rollback_args.repository, &AWS_REGION, "rollback")?.ok_or(
-        anyhow::anyhow!("No 'rollback' tag found in '{}'", rollback_args.repository),
-    )?;
-    ecr_put_manifest(&rollback_args.repository, &AWS_REGION, "latest", &rb)
-}
-
-/// Fetch the latest numerical tag and return it incremented by 1
-fn compute_next_numeric_tag(repository: &str) -> anyhow::Result<u64> {
-    let json = aws_cli_capture_stdout(
-        vec![
-            "ecr".into(),
-            "describe-images".into(),
-            "--repository-name".into(),
-            repository.into(),
-            "--region".into(),
-            AWS_REGION.into(),
-            "--query".into(),
-            "imageDetails[].imageTags[]".into(),
-            "--output".into(),
-            "json".into(),
-        ],
-        "aws ecr describe-images",
-        None,
-        None,
-    )?;
-
-    let v: serde_json::Value =
-        serde_json::from_str(&json).context("parsing describe-images output")?;
-    let mut max_seen: u64 = 0;
-    if let serde_json::Value::Array(tags) = v {
-        for t in tags {
-            if let Some(s) = t.as_str() {
-                if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) {
-                    if let Ok(n) = s.parse::<u64>() {
-                        if n > max_seen {
-                            max_seen = n;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(max_seen.saturating_add(1).max(1))
+    let rb =
+        ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "rollback")?.ok_or(
+            anyhow::anyhow!("No 'rollback' tag found in '{}'", rollback_args.repository),
+        )?;
+    ecr_put_manifest(
+        &rollback_args.repository,
+        &rollback_args.region,
+        "latest",
+        &rb,
+    )
 }
 
 fn docker_cli(
