@@ -59,8 +59,6 @@ pub fn aws_cli_try_capture_stdout(
     Ok(Some(s))
 }
 
-// High level helpers --------------------------------------------------------
-
 pub fn aws_account_id() -> anyhow::Result<String> {
     aws_cli_capture_stdout(
         vec![
@@ -77,6 +75,10 @@ pub fn aws_account_id() -> anyhow::Result<String> {
     )
     .map(|s| s.trim().to_string())
 }
+
+// EC2 -----------------------------------------------------------------------
+
+// TODO add an utility function that starts refresh on an ASG
 
 // ECR -----------------------------------------------------------------------
 

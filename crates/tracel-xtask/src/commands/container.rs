@@ -1,3 +1,5 @@
+/// Manage containers.
+/// Current implementation uses `docker` and `AWS ECR` as container registry.
 use std::path::PathBuf;
 
 use crate::prelude::{ecr_image_url, Context as XtaskContext, Environment};
@@ -9,20 +11,20 @@ use crate::utils::aws_cli::{
 use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::run_process;
 
-#[tracel_xtask_macros::declare_command_args(None, DockerSubCommand)]
-pub struct DockerCmdArgs {}
+#[tracel_xtask_macros::declare_command_args(None, ContainerSubCommand)]
+pub struct ContainerCmdArgs {}
 
-impl Default for DockerSubCommand {
+impl Default for ContainerSubCommand {
     fn default() -> Self {
-        DockerSubCommand::Build(BuildSubCmdArgs::default())
+        ContainerSubCommand::Build(BuildSubCmdArgs::default())
     }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct BuildSubCmdArgs {
-    /// Path to Dockerfile relative to context directory
-    pub dockerfile: PathBuf,
-    /// Docker build context directory (default to repository root)
+    /// Path to build file relative to context directory (i.e. a Dockerfile)
+    pub build_file: PathBuf,
+    /// Build context directory (default to repository root)
     #[arg(long)]
     pub context_dir: Option<PathBuf>,
     /// Local image name
@@ -38,10 +40,10 @@ pub struct BuildSubCmdArgs {
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct ListSubCmdArgs {
-    /// Region where the docker repository lives
+    /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
-    /// Docker repository name
+    /// Container repository name
     #[arg(long)]
     pub repository: String,
 }
@@ -54,26 +56,26 @@ pub struct PushSubCmdArgs {
     /// Local image tag (the one used when building)
     #[arg(long)]
     pub local_tag: String,
-    /// Region where the docker repository lives
+    /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
-    /// Docker repository name to push into
+    /// Container repository name to push into
     #[arg(long)]
     pub repository: String,
     /// Explicit remote tag (if provided, it overrides auto computation)
     #[arg(long)]
     pub remote_tag: Option<String>,
-    /// When true, compute the next monotonic tag from the docker repository instead of reusing the local tag
+    /// When true, compute the next monotonic tag from the container repository instead of reusing the local tag
     #[arg(long)]
     pub auto_remote_tag: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct PromoteSubCmdArgs {
-    /// Region where the docker repository lives
+    /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
-    /// Docker repository name
+    /// Container repository name
     #[arg(long)]
     pub repository: String,
     /// Build tag to promote to 'latest'
@@ -83,40 +85,40 @@ pub struct PromoteSubCmdArgs {
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct RollbackSubCmdArgs {
-    /// Region where the docker repository lives
+    /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
-    /// Docker repository name
+    /// Container repository name
     #[arg(long)]
     pub repository: String,
 }
 
 pub fn handle_command(
-    args: DockerCmdArgs,
+    args: ContainerCmdArgs,
     _env: Environment,
     _ctx: XtaskContext,
 ) -> anyhow::Result<()> {
     match args.get_command() {
-        DockerSubCommand::Build(build_args) => build(build_args),
-        DockerSubCommand::List(list_args) => list(list_args),
-        DockerSubCommand::Push(push_args) => push(push_args),
-        DockerSubCommand::Promote(promote_args) => promote(promote_args),
-        DockerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
+        ContainerSubCommand::Build(build_args) => build(build_args),
+        ContainerSubCommand::List(list_args) => list(list_args),
+        ContainerSubCommand::Push(push_args) => push(push_args),
+        ContainerSubCommand::Promote(promote_args) => promote(promote_args),
+        ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
     }
 }
 
 fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
     let context_dir = build_args.context_dir.unwrap_or(git_repo_root_or_cwd()?);
-    let dockerfile_path = if build_args.dockerfile.is_absolute() {
-        build_args.dockerfile.clone()
+    let build_file_path = if build_args.build_file.is_absolute() {
+        build_args.build_file.clone()
     } else {
-        context_dir.join(&build_args.dockerfile)
+        context_dir.join(&build_args.build_file)
     };
 
     let tag = build_args.tag.as_deref().unwrap_or("latest");
     let mut args: Vec<String> = vec![
         "build".into(),
-        format!("--file={}", dockerfile_path.to_string_lossy()),
+        format!("--file={}", build_file_path.to_string_lossy()),
         format!("--tag={}:{}", build_args.image, tag),
         // context_dir is positional
         context_dir.to_string_lossy().into(),

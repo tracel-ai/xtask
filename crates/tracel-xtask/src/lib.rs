@@ -35,8 +35,8 @@ pub mod prelude {
     pub use crate::commands::dependencies::DependenciesSubCommand;
     pub use crate::commands::doc::DocCmdArgs;
     pub use crate::commands::doc::DocSubCommand;
-    pub use crate::commands::docker::DockerCmdArgs;
-    pub use crate::commands::docker::DockerSubCommand;
+    pub use crate::commands::container::ContainerCmdArgs;
+    pub use crate::commands::container::ContainerSubCommand;
     pub use crate::commands::docker_compose::DockerComposeCmdArgs;
     pub use crate::commands::docker_compose::DockerComposeSubCommand;
     pub use crate::commands::fix::FixCmdArgs;

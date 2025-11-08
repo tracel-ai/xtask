@@ -134,6 +134,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Container",
+        quote! {
+            #[doc = r"Execute docker commands."]
+            Container(tracel_xtask::commands::docker::ContainerCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Coverage",
         quote! {
             #[doc = r"Install and run coverage tools."]
@@ -152,13 +159,6 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Build documentation."]
             Doc(tracel_xtask::commands::doc::DocCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Docker",
-        quote! {
-            #[doc = r"Execute docker commands."]
-            DockerCompose(tracel_xtask::commands::docker::DockerCmdArgs)
         },
     );
     variant_map.insert(
@@ -657,6 +657,21 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
+            "ContainerSubCommand",
+            quote! {
+                #[doc = r"Build a container."]
+                Build(BuildSubCmdArgs),
+                #[doc = r"Show current latest and rollback images in registry."]
+                List(ListSubCmdArgs),
+                #[doc = r"Push a container to a registry."]
+                Push(PushSubCmdArgs),
+                #[doc = r"Promote a pushed container to latest."]
+                Promote(PromoteSubCmdArgs),
+                #[doc = r"Rollback previously released container to latest."]
+                Rollback(RollbackSubCmdArgs),
+            },
+        ),
+        (
             // note: default is manually implemented for this subcommand as the default variant is not a unit variant.
             "CoverageSubCommand",
             quote! {
@@ -686,21 +701,6 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Build,
                 #[doc = r"Run documentation tests."]
                 Tests,
-            },
-        ),
-        (
-            "DockerSubCommand",
-            quote! {
-                #[doc = r"Build a docker file."]
-                Build(BuildSubCmdArgs),
-                #[doc = r"Show current latest and rollback images in registry."]
-                List(ListSubCmdArgs),
-                #[doc = r"Push a container to a registry."]
-                Push(PushSubCmdArgs),
-                #[doc = r"Promote a pushed container to latest."]
-                Promote(PromoteSubCmdArgs),
-                #[doc = r"Rollback previously released container to latest."]
-                Rollback(RollbackSubCmdArgs),
             },
         ),
         (
