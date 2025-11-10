@@ -53,9 +53,15 @@ pub fn parse_cargo_search_output(output: &str) -> Option<(String, String)> {
     // First strip ANSI color codes
     let ansi_re = Regex::new(r"\x1b\[[0-9;]*m").expect("should compile regex for ANSI codes");
     let cleaned_output = ansi_re.replace_all(output, "");
-    // Then retrieve the crate name and version in the output
-    let re = Regex::new(r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-\d+)?)""#)
-        .expect("should compile regex");
+    // Then retrieve the crate name and version in the output.
+    // Examples of accepted format:
+    //   - x.y.z
+    //   - x.y.z-123
+    //   - x.y.z-pre.1
+    let re = Regex::new(
+        r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-(?:\d+|pre\.\d+))?)""#,
+    )
+    .expect("should compile regex");
     if let Some(captures) = re.captures(&cleaned_output) {
         if let (Some(name), Some(version)) = (captures.name("name"), captures.name("version")) {
             return Some((name.as_str().to_owned(), version.as_str().to_owned()));
@@ -66,23 +72,38 @@ pub fn parse_cargo_search_output(output: &str) -> Option<(String, String)> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rstest::rstest;
+    mod parse_cargo_search_output {
+        use super::super::parse_cargo_search_output;
 
-    #[rstest]
-    #[case::valid_input("tracel-xtask-macros = \"1.0.1\"", Some(("tracel-xtask-macros", "1.0.1")))]
-    #[case::valid_input_with_comments("heat-sdk-cli-macros = \"0.1.0\"    # Macros for Tracel Heat SDK CLI.\n", Some(("heat-sdk-cli-macros", "0.1.0")))]
-    #[case::valid_input_with_comments_and_color_codes("\u{1b}[1m\u{1b}[32mheat-sdk-cli-macros\u{1b}[0m = \"0.1.0\"    # Macros for Tracel Heat SDK CLI.\n", Some(("heat-sdk-cli-macros", "0.1.0")))]
-    #[case::missing_version("tracel-xtask-macros =", None)]
-    #[case::invalid_format("tracel-xtask-macros: \"1.0.1\"", None)]
-    #[case::extra_whitespace("   tracel-xtask-macros    =    \"1.0.1\"  ", Some(("tracel-xtask-macros", "1.0.1")))]
-    #[case::no_quotes("tracel-xtask-macros = 1.0.1", None)]
-    #[case::wrong_version_format("tracel-xtask-macros = \"1.0\"", None)]
-    #[case::valid_input_with_release_suffix("tracel-xtask-macros = \"20.1.4-1\"", Some(("tracel-xtask-macros", "20.1.4-1")))]
-    #[case::valid_input_with_release_suffix_multiple_digits("tracel-xtask-macros = \"20.1.4-103\"", Some(("tracel-xtask-macros", "20.1.4-103")))]
-    fn test_parse_cargo_search_output(#[case] input: &str, #[case] expected: Option<(&str, &str)>) {
-        let expected = expected.map(|(name, version)| (name.to_string(), version.to_string()));
-        let result = parse_cargo_search_output(input);
-        assert_eq!(result, expected);
+        fn expect_pair(e: Option<(&str, &str)>) -> Option<(String, String)> {
+            e.map(|(n, v)| (n.to_owned(), v.to_owned()))
+        }
+
+        macro_rules! cases {
+            ( $( { $name:ident, $input:expr, $expected:expr } ),* $(,)? ) => {
+                $(
+                    #[test]
+                    fn $name() {
+                        let expected = expect_pair($expected);
+                        let result = parse_cargo_search_output($input);
+                        assert_eq!(result, expected);
+                    }
+                )*
+            };
+        }
+
+        cases! {
+            { valid_input, "tracel-xtask-macros = \"1.0.1\"", Some(("tracel-xtask-macros", "1.0.1")) },
+            { valid_input_with_comments, "heat-sdk-cli-macros = \"0.1.0\"    # Macros for Tracel Heat SDK CLI.\n", Some(("heat-sdk-cli-macros", "0.1.0")) },
+            { valid_input_with_comments_and_color_codes, "\u{1b}[1m\u{1b}[32mheat-sdk-cli-macros\u{1b}[0m = \"0.1.0\"    # Macros for Tracel Heat SDK CLI.\n", Some(("heat-sdk-cli-macros", "0.1.0")) },
+            { missing_version, "tracel-xtask-macros =", None },
+            { invalid_format, "tracel-xtask-macros: \"1.0.1\"", None },
+            { extra_whitespace, "   tracel-xtask-macros    =    \"1.0.1\"  ", Some(("tracel-xtask-macros", "1.0.1")) },
+            { no_quotes, "tracel-xtask-macros = 1.0.1", None },
+            { wrong_version_format, "tracel-xtask-macros = \"1.0\"", None },
+            { valid_input_with_release_suffix, "tracel-xtask-macros = \"20.1.4-1\"", Some(("tracel-xtask-macros", "20.1.4-1")) },
+            { valid_input_with_release_suffix_multiple_digits, "tracel-xtask-macros = \"20.1.4-103\"", Some(("tracel-xtask-macros", "20.1.4-103")) },
+            { valid_input_with_pre_release_suffix, "tracel-xtask-macros = \"20.1.4-pre.1\"", Some(("tracel-xtask-macros", "20.1.4-pre.1")) },
+        }
     }
 }
