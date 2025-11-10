@@ -59,6 +59,7 @@ pub fn aws_cli_try_capture_stdout(
     Ok(Some(s))
 }
 
+/// Return the setup account Id of the local aws cli.
 pub fn aws_account_id() -> anyhow::Result<String> {
     aws_cli_capture_stdout(
         vec![
@@ -78,7 +79,66 @@ pub fn aws_account_id() -> anyhow::Result<String> {
 
 // EC2 -----------------------------------------------------------------------
 
-// TODO add an utility function that starts refresh on an ASG
+/// Start an Auto Scaling Group instance refresh and return its refresh ID.
+/// If you pass `None` for `preferences_json`, AWS will use the ASG defaults.
+/// Example preferences (as JSON string):
+/// r#"{"Strategy":"Rolling","InstanceWarmup":120,"MinHealthyPercentage":90}"#
+///
+/// Note: this only *starts* the refresh; it does not wait for completion.
+pub fn ec2_autoscaling_start_instance_refresh(
+    asg_name: &str,
+    region: &str,
+    preferences_json: Option<&str>,
+) -> anyhow::Result<String> {
+    let mut args = vec![
+        "autoscaling".into(),
+        "start-instance-refresh".into(),
+        "--auto-scaling-group-name".into(),
+        asg_name.into(),
+        "--region".into(),
+        region.into(),
+        "--query".into(),
+        "InstanceRefreshId".into(),
+        "--output".into(),
+        "text".into(),
+    ];
+
+    if let Some(prefs) = preferences_json {
+        // AWS CLI expects a JSON payload as a single argument
+        args.push("--preferences".into());
+        args.push(prefs.into());
+    }
+
+    aws_cli_capture_stdout(args, "aws autoscaling start-instance-refresh", None, None)
+        .map(|s| s.trim().to_string())
+}
+
+/// Get the latest instance refresh status for an ASG (if any).
+/// Possible values include: Pending, InProgress, Successful, Failed, Cancelling, Cancelled.
+pub fn ec2_autoscaling_latest_instance_refresh_status(
+    asg_name: &str,
+    region: &str,
+) -> anyhow::Result<Option<String>> {
+    let out = aws_cli_try_capture_stdout(
+        vec![
+            "autoscaling".into(),
+            "describe-instance-refreshes".into(),
+            "--auto-scaling-group-name".into(),
+            asg_name.into(),
+            "--region".into(),
+            region.into(),
+            "--query".into(),
+            "sort_by(InstanceRefreshes,&StartTime)[-1].Status".into(),
+            "--output".into(),
+            "text".into(),
+        ],
+        "aws autoscaling describe-instance-refreshes",
+    )?;
+
+    Ok(out
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s != "None"))
+}
 
 // ECR -----------------------------------------------------------------------
 

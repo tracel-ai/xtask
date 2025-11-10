@@ -669,6 +669,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Promote(PromoteSubCmdArgs),
                 #[doc = r"Rollback previously released container to latest."]
                 Rollback(RollbackSubCmdArgs),
+                #[doc = r"Rollout last promoted container."]
+                Rollout(RolloutSubCmdArgs),
             },
         ),
         (

@@ -4,9 +4,10 @@ use std::path::PathBuf;
 
 use crate::prelude::{ecr_image_url, Context as XtaskContext, Environment};
 use crate::utils::aws_cli::{
-    aws_account_id, ecr_compute_next_numeric_tag, ecr_docker_login, ecr_ensure_repo_exists,
-    ecr_get_commit_sha_tag_from_alias_tag, ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest,
-    ecr_put_manifest,
+    aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
+    ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
+    ecr_ensure_repo_exists, ecr_get_commit_sha_tag_from_alias_tag,
+    ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest, ecr_put_manifest,
 };
 use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::run_process;
@@ -84,6 +85,45 @@ pub struct PromoteSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct RolloutSubCmdArgs {
+    /// Region of the Auto Scaling Group
+    #[arg(long)]
+    pub region: String,
+
+    /// Name of the Auto Scaling Group to refresh
+    #[arg(long, value_name = "ASG_NAME")]
+    pub asg: String,
+
+    /// Strategy for instance refresh (Rolling is the standard choice for zero-downtime rollouts)
+    #[arg(long, value_name = "Rolling", default_value = "Rolling")]
+    pub strategy: String,
+
+    /// Seconds for instance warmup
+    #[arg(long, value_name = "SECS", default_value_t = 120)]
+    pub instance_warmup: u64,
+
+    /// Minimum healthy percentage during the rollout
+    #[arg(long, value_name = "PCT", default_value_t = 90)]
+    pub min_healthy_percentage: u8,
+
+    /// If set, skip replacing instances that already match the launch template/config
+    #[arg(long, default_value_t = true)]
+    pub skip_matching: bool,
+
+    /// Wait until the refresh reaches a terminal state (Successful/Failed/Cancelled)
+    #[arg(long)]
+    pub wait: bool,
+
+    /// Max seconds to wait when --wait is set
+    #[arg(long, default_value_t = 1800)]
+    pub wait_timeout_secs: u64,
+
+    /// Poll interval seconds when --wait is set
+    #[arg(long, default_value_t = 10)]
+    pub wait_poll_secs: u64,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct RollbackSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
@@ -104,6 +144,7 @@ pub fn handle_command(
         ContainerSubCommand::Push(push_args) => push(push_args),
         ContainerSubCommand::Promote(promote_args) => promote(promote_args),
         ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
+        ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args),
     }
 }
 
@@ -273,6 +314,103 @@ fn rollback(rollback_args: RollbackSubCmdArgs) -> anyhow::Result<()> {
         "latest",
         &rb,
     )
+}
+
+/// rollout: rollout latest promoted container
+fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use std::{
+        io::{self, Write},
+        time::{Duration, Instant},
+    };
+
+    // Build preferences JSON strictly from flags
+    let preferences = serde_json::json!({
+        "Strategy": args.strategy,
+        "InstanceWarmup": args.instance_warmup,
+        "MinHealthyPercentage": args.min_healthy_percentage,
+        "SkipMatching": args.skip_matching,
+    })
+    .to_string();
+
+    // Kick off the refresh
+    let refresh_id =
+        ec2_autoscaling_start_instance_refresh(&args.asg, &args.region, Some(&preferences))
+            .context("instance refresh should start")?;
+
+    eprintln!("🚀 Started instance refresh");
+    eprintln!("  ASG:     {}", args.asg);
+    eprintln!("  Region:  {}", args.region);
+    eprintln!("  Refresh: {}", refresh_id);
+
+    // Optional wait for completion with spinner
+    if args.wait {
+        let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        let mut frame_index = 0;
+
+        let start = Instant::now();
+        let timeout = Duration::from_secs(args.wait_timeout_secs);
+        let poll = Duration::from_secs(args.wait_poll_secs);
+
+        loop {
+            // rotate spinner
+            let spinner = spinner_frames[frame_index % spinner_frames.len()];
+            frame_index += 1;
+
+            let status_opt =
+                ec2_autoscaling_latest_instance_refresh_status(&args.asg, &args.region)
+                    .context("instance refresh status should be retrievable")?;
+
+            let (emoji, msg) = match status_opt.as_deref() {
+                Some("Pending") => ("⏳", "Pending"),
+                Some("InProgress") => ("🚧", "In progress"),
+                Some("Successful") => ("✅", "Completed successfully"),
+                Some("Failed") => ("❌", "Failed"),
+                Some("Cancelled") => ("⚠️", "Cancelled"),
+                Some(other) => ("❔", other),
+                None => ("🕐", "Waiting..."),
+            };
+
+            // Print single-line spinner + status
+            print!(
+                "\r{spinner}  {emoji}  Refreshing {asg} — Status: {msg:<20}",
+                asg = args.asg
+            );
+            io::stdout().flush().ok();
+
+            // Check terminal states
+            match status_opt.as_deref() {
+                Some("Successful") => {
+                    println!(
+                        "\r✅  Rollout completed successfully!{space}",
+                        space = " ".repeat(40)
+                    );
+                    return Ok(());
+                }
+                Some("Failed") => {
+                    println!("\r❌  Rollout failed.{space}", space = " ".repeat(40));
+                    anyhow::bail!("rollout finished with status: Failed");
+                }
+                Some("Cancelled") => {
+                    println!("\r⚠️  Rollout cancelled.{space}", space = " ".repeat(40));
+                    anyhow::bail!("rollout finished with status: Cancelled");
+                }
+                _ => {}
+            }
+
+            if start.elapsed() >= timeout {
+                println!(
+                    "\r⏰  Timeout after {}s — rollout still not completed.",
+                    args.wait_timeout_secs
+                );
+                anyhow::bail!("rollout timed out after {} seconds", args.wait_timeout_secs);
+            }
+
+            std::thread::sleep(poll);
+        }
+    }
+
+    Ok(())
 }
 
 fn docker_cli(
