@@ -29,3 +29,4 @@ tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=2.1.11" }
 [dev-dependencies]
 rstest = { workspace = true }
 serial_test = { workspace = true }
+tempfile = { workspace = true }
