@@ -834,7 +834,7 @@ on:
 
 jobs:
   publish-B:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v6
     with:
       crate: B
     secrets:
@@ -842,7 +842,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   publish-A:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v1
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v6
     with:
       crate: A
     needs:
@@ -856,9 +856,64 @@ jobs:
 This command provide a subcommand to install the necessary dependencies for performing code coverage and a subcommand to generate the
 coverage info file that can then be uploaded to a service provider like codecov. See dedicated section `Enable and generate coverage information`.
 
-### Docker
+### Container
 
-The `docker` command provides `up` and `down` commands to start and stop stacks. The command is integrated with the environment
+The `container` command standardizes how we build, publish, promote, and roll out containers.
+It currently supports **Docker** for container builds, **AWS ECR** as the container registry and **AWS EC2 Auto Scaling Groups (ASG)** for deployment rollouts.
+The design, however, could later be refactored to support other cloud providers or services (such as podman, AWS ECS, GCP Artifact Registry, Azure Container Registry, or self-hosted registries) with ideally minimal changes to the workflow.
+
+#### Conceptual Model
+
+##### Deploy
+
+**Build of container** -> **Push to container registry** -> **Promote to `latest`** -> **Rollout**
+
+##### Rollback
+
+**Rollback by promoting `rollback` to `latest`** -> **Rollout**
+
+#### Prerequisites
+
+- **AWS CLI** setup with permissions for ECR and Auto Scaling.
+- **Docker** installed locally or on your CI runners.
+
+#### Example
+
+First build the container locally:
+
+```
+cargo xtask -e stag container build --allow-dirty --context-dir . --build-file Dockerfile --image my_image
+```
+
+Retrieve the commit `SHA` tag from the output of the build command and push the container to the registry:
+
+```
+cargo xtask -e stag container push --image my_image --local-tag SHA --repository my_image --auto-remote_tag --region AWS_REGION
+```
+
+The container image will be pushed with the commit SHA tag and a monotonic number tag.
+
+Promote the pushed image to mark it as latest (move the latest tag to it):
+
+```
+cargo xtask -e stag container promote --repository my_image --tag SHA --region AWS_REGION
+```
+
+Then to actually deploy to the targeted environment, initiate a rollout:
+
+```
+cargo xtask -e stag container rollout --region AWS_REGION --asg ASG_NAME --wait
+```
+
+To see the current `latest` and `rollback` images use the `list` subcommand:
+
+```
+cargo xtask -e stag container list --region AWS_REGION --repository my_image
+```
+
+### Docker Compose
+
+The `docker-compose` command provides `up` and `down` commands to start and stop stacks. The command is integrated with the environment
 configuration mechanism of `tracel-xtask`.
 
 The name of the compose file must follow the template `docker-compose.{env}.yml` with `env` being the shorthand environment name.
