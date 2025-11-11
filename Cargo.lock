@@ -909,7 +909,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask"
-version = "2.1.11"
+version = "2.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-macros"
-version = "2.1.11"
+version = "2.2.1"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -1215,7 +1215,7 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "xtask"
-version = "2.1.11"
+version = "2.2.1"
 dependencies = [
  "dotenvy",
  "log",

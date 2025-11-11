@@ -84,7 +84,7 @@ pub struct PromoteSubCmdArgs {
     pub tag: String,
 }
 
-#[derive(clap::Args, Default, Clone, PartialEq)]
+#[derive(clap::Args, Clone, PartialEq, Debug)]
 pub struct RolloutSubCmdArgs {
     /// Region of the Auto Scaling Group
     #[arg(long)]
@@ -95,32 +95,48 @@ pub struct RolloutSubCmdArgs {
     pub asg: String,
 
     /// Strategy for instance refresh (Rolling is the standard choice for zero-downtime rollouts)
-    #[arg(long, value_name = "Rolling", default_value = "Rolling")]
+    #[arg(long, value_name = "Rolling", default_value_t = RolloutSubCmdArgs::default().strategy)]
     pub strategy: String,
 
     /// Seconds for instance warmup
-    #[arg(long, value_name = "SECS", default_value_t = 120)]
+    #[arg(long, value_name = "SECS", default_value_t = RolloutSubCmdArgs::default().instance_warmup)]
     pub instance_warmup: u64,
 
     /// Minimum healthy percentage during the rollout
-    #[arg(long, value_name = "PCT", default_value_t = 90)]
+    #[arg(long, value_name = "PCT", default_value_t = RolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
 
     /// If set, skip replacing instances that already match the launch template/config
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = RolloutSubCmdArgs::default().skip_matching)]
     pub skip_matching: bool,
 
-    /// Wait until the refresh reaches a terminal state (Successful/Failed/Cancelled)
-    #[arg(long)]
+    /// Wait until the refresh completes
+    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait)]
     pub wait: bool,
 
     /// Max seconds to wait when --wait is set
-    #[arg(long, default_value_t = 1800)]
+    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait_timeout_secs)]
     pub wait_timeout_secs: u64,
 
     /// Poll interval seconds when --wait is set
-    #[arg(long, default_value_t = 10)]
+    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait_poll_secs)]
     pub wait_poll_secs: u64,
+}
+
+impl Default for RolloutSubCmdArgs {
+    fn default() -> Self {
+        Self {
+            region: String::new(),
+            asg: String::new(),
+            strategy: "Rolling".to_string(),
+            instance_warmup: 120,
+            min_healthy_percentage: 90,
+            skip_matching: true,
+            wait: false,
+            wait_timeout_secs: 1800,
+            wait_poll_secs: 10,
+        }
+    }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -326,7 +342,6 @@ fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
 
     // Build preferences JSON strictly from flags
     let preferences = serde_json::json!({
-        "Strategy": args.strategy,
         "InstanceWarmup": args.instance_warmup,
         "MinHealthyPercentage": args.min_healthy_percentage,
         "SkipMatching": args.skip_matching,
@@ -334,9 +349,13 @@ fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
     .to_string();
 
     // Kick off the refresh
-    let refresh_id =
-        ec2_autoscaling_start_instance_refresh(&args.asg, &args.region, Some(&preferences))
-            .context("instance refresh should start")?;
+    let refresh_id = ec2_autoscaling_start_instance_refresh(
+        &args.asg,
+        &args.region,
+        &args.strategy,
+        Some(&preferences),
+    )
+    .context("instance refresh should start")?;
 
     eprintln!("🚀 Started instance refresh");
     eprintln!("  ASG:     {}", args.asg);

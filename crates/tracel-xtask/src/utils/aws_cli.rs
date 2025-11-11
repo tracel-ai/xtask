@@ -88,6 +88,7 @@ pub fn aws_account_id() -> anyhow::Result<String> {
 pub fn ec2_autoscaling_start_instance_refresh(
     asg_name: &str,
     region: &str,
+    strategy: &str,
     preferences_json: Option<&str>,
 ) -> anyhow::Result<String> {
     let mut args = vec![
@@ -95,6 +96,8 @@ pub fn ec2_autoscaling_start_instance_refresh(
         "start-instance-refresh".into(),
         "--auto-scaling-group-name".into(),
         asg_name.into(),
+        "--strategy".into(),
+        strategy.into(),
         "--region".into(),
         region.into(),
         "--query".into(),
