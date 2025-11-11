@@ -2,7 +2,10 @@
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
 use std::path::PathBuf;
 
-use crate::prelude::{ecr_image_url, Context as XtaskContext, Environment};
+use crate::prelude::{
+    anyhow::Context,
+    {ecr_image_url, Context as XtaskContext, Environment},
+};
 use crate::utils::aws_cli::{
     aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
     ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
@@ -337,9 +340,12 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// promote: N to latest and old latest to rollback
+/// promote: point N to `latest` and move the previous `latest` to `rollback`
 fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
-    let prev_latest = ecr_get_manifest(&promote_args.repository, &promote_args.region, "latest")?;
+    // Fetch current 'latest' and the target tag's manifest.
+    let prev_latest_manifest =
+        ecr_get_manifest(&promote_args.repository, &promote_args.region, "latest")
+            .context("current 'latest' manifest should be retrievable")?;
     let n_manifest = ecr_get_manifest(
         &promote_args.repository,
         &promote_args.region,
@@ -352,38 +358,87 @@ fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
             promote_args.repository
         )
     })?;
-
+    // If 'latest' is already the target manifest then do nothing
+    if let Some(ref prev) = prev_latest_manifest {
+        if prev == &n_manifest {
+            eprintln!(
+                "ℹ️  Tag '{}' is already promoted as 'latest' in '{}', no changes needed.",
+                promote_args.tag, promote_args.repository
+            );
+            return Ok(());
+        }
+    }
+    // Update 'latest' to the new manifest.
     ecr_put_manifest(
         &promote_args.repository,
         &promote_args.region,
         "latest",
         &n_manifest,
-    )?;
-
-    if let Some(prev) = prev_latest {
+    )
+    .context("'latest' should be updated to the target manifest")?;
+    // If there was a previous 'latest', move it to 'rollback'.
+    if let Some(prev) = prev_latest_manifest {
+        // Only write rollback if it's different from the new 'latest'.
         ecr_put_manifest(
             &promote_args.repository,
             &promote_args.region,
             "rollback",
             &prev,
-        )?;
+        )
+        .context("'rollback' should be updated to the previous 'latest'")?;
     }
 
+    eprintln!(
+        "✅ Promoted '{}' to 'latest' in repository '{}'.",
+        promote_args.tag, promote_args.repository
+    );
     Ok(())
 }
 
-/// rollback: promote rollback to latest
+/// rollback: promote 'rollback' to 'latest' and then remove the 'rollback' tag
 fn rollback(rollback_args: RollbackSubCmdArgs) -> anyhow::Result<()> {
-    let rb =
-        ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "rollback")?.ok_or(
-            anyhow::anyhow!("No 'rollback' tag found in '{}'", rollback_args.repository),
-        )?;
-    ecr_put_manifest(
+    use anyhow::Context;
+    // Fetch the manifest of the 'rollback' tag
+    let rb = ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "rollback")?
+        .ok_or_else(|| {
+            anyhow::anyhow!("No 'rollback' tag found in '{}'", rollback_args.repository)
+        })?;
+    // If 'latest' is different, update it; if it's already the same, skip write.
+    if ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "latest")?.as_ref()
+        != Some(&rb)
+    {
+        ecr_put_manifest(
+            &rollback_args.repository,
+            &rollback_args.region,
+            "latest",
+            &rb,
+        )
+        .context("'latest' should be updated to the 'rollback' manifest")?;
+        eprintln!("✅ Promoted 'rollback' to 'latest'.");
+    } else {
+        eprintln!("ℹ️ 'latest' already points to the 'rollback' manifest, skipping promotion...");
+    }
+    // Remove the 'rollback' tag so it no longer aliases this image.
+    let aws_args: Vec<&str> = vec![
+        "ecr",
+        "batch-delete-image",
+        "--repository-name",
         &rollback_args.repository,
+        "--image-ids",
+        "imageTag=rollback",
+        "--region",
         &rollback_args.region,
-        "latest",
-        &rb,
+    ];
+    run_process(
+        "aws",
+        &aws_args,
+        None,
+        None,
+        "removing 'rollback' tag should succeed",
     )
+    .context("failed to remove 'rollback' tag")?;
+    eprintln!("🧹 Removed 'rollback' tag.");
+    Ok(())
 }
 
 /// rollout: rollout latest promoted container
