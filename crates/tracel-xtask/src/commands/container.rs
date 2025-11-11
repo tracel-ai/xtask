@@ -193,9 +193,9 @@ fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
 
 fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
     let ecr_repository = &list_args.repository;
-    let latest_present = ecr_get_manifest(&ecr_repository, &list_args.region, "latest")?.is_some();
+    let latest_present = ecr_get_manifest(ecr_repository, &list_args.region, "latest")?.is_some();
     let rollback_present =
-        ecr_get_manifest(&ecr_repository, &list_args.region, "rollback")?.is_some();
+        ecr_get_manifest(ecr_repository, &list_args.region, "rollback")?.is_some();
     let latest_tag = if latest_present {
         ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "latest", &list_args.region)?
     } else {

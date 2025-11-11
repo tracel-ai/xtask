@@ -5,9 +5,15 @@ use crate::prelude::{run_process, Context, Environment};
 #[tracel_xtask_macros::declare_command_args(None, DockerComposeSubCommand)]
 pub struct DockerComposeCmdArgs {}
 
-pub fn handle_command(args: DockerComposeCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
+pub fn handle_command(
+    args: DockerComposeCmdArgs,
+    env: Environment,
+    _ctx: Context,
+) -> anyhow::Result<()> {
     match args.get_command() {
-        DockerComposeSubCommand::Up => up_docker_compose(&env, &args.project, args.build, args.services),
+        DockerComposeSubCommand::Up => {
+            up_docker_compose(&env, &args.project, args.build, args.services)
+        }
         DockerComposeSubCommand::Down => down_docker_compose(&env, &args.project),
     }
 }

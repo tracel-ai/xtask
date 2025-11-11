@@ -57,15 +57,15 @@ pub mod prelude {
     pub use crate::init_xtask;
     pub use crate::parse_args;
     pub use crate::register_cleanup;
-    pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
-    pub use crate::utils::cleanup::CLEANUP_HANDLER;
-    pub use crate::utils::helpers;
     pub use crate::utils::aws_cli::ecr_get_manifest;
     pub use crate::utils::aws_cli::ecr_image_digest;
     pub use crate::utils::aws_cli::ecr_image_url;
+    pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
+    pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::git::git_current_commit_hash;
     pub use crate::utils::git::git_is_repo_dirty;
     pub use crate::utils::git::git_repo_root_or_cwd;
+    pub use crate::utils::helpers;
     pub use crate::utils::process::random_port;
     pub use crate::utils::process::run_process;
     pub use crate::utils::process::run_process_for_package;

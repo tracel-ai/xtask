@@ -117,7 +117,7 @@ pub fn run_process_capture_stdout(cmd: &mut Command, label: &str) -> anyhow::Res
     if !out.status.success() {
         return Err(anyhow::anyhow!("{label} failed with status {}", out.status));
     }
-    Ok(String::from_utf8(out.stdout).context("non-UTF8 output")?)
+    String::from_utf8(out.stdout).context("non-UTF8 output")
 }
 
 /// Run a process for workspace
