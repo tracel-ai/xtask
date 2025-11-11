@@ -54,7 +54,7 @@ pub struct PushSubCmdArgs {
     /// Local image name (the one used in the build command)
     #[arg(long)]
     pub image: String,
-    /// Local image tag (the one used when building) — typically the commit SHA
+    /// Local image tag (the one used when building), usually it is the commit SHA
     #[arg(long)]
     pub local_tag: String,
     /// Region where the container repository lives
@@ -63,7 +63,7 @@ pub struct PushSubCmdArgs {
     /// Container repository name to push into
     #[arg(long)]
     pub repository: String,
-    /// Additional explicit remote tag to ADD (pushed alongside the commit SHA)
+    /// Additional explicit remote tag to add (pushed alongside the commit SHA)
     #[arg(long)]
     pub remote_tag: Option<String>,
     /// When set, also add the next monotonic tag alongside the commit SHA
@@ -241,14 +241,47 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
 
 fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
+    // check if the container as already been pushed
+    if let Some(existing_manifest) = ecr_get_manifest(
+        &push_args.repository,
+        &push_args.region,
+        &push_args.local_tag,
+    )? {
+        eprintln!(
+            "ℹ️ Image with commit tag '{}' already exists in ECR, skipping push...",
+            push_args.local_tag
+        );
+
+        // If an explicit extra tag is requested, alias it to the same manifest without re-pushing.
+        if let Some(explicit) = &push_args.remote_tag {
+            eprintln!(
+                "🏷️  Adding explicit alias tag '{}' to existing image",
+                explicit
+            );
+            ecr_put_manifest(
+                &push_args.repository,
+                &push_args.region,
+                explicit,
+                &existing_manifest,
+            )?;
+            eprintln!("✅ Added alias tag '{}'", explicit);
+        }
+        eprintln!("🎉 Push completed");
+        return Ok(());
+    }
+
     // login
     let account_id = aws_account_id()?;
     ecr_docker_login(&account_id, &push_args.region)?;
+
     // push image with primary tag (commit sha)
     let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, push_args.region);
     let repo_full = format!("{}/{}", registry, push_args.repository);
     let primary_remote = format!("{repo_full}:{}", push_args.local_tag);
-    eprintln!("➡️  Preparing to push primary tag (commit): {}", push_args.local_tag);
+    eprintln!(
+        "➡️  Preparing to push primary tag (commit): {}",
+        push_args.local_tag
+    );
     docker_cli(
         vec![
             "tag".into(),
@@ -277,6 +310,7 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
         eprintln!("🏷️  Adding explicit extra tag: {}", explicit);
         extra_tags.push(explicit.clone());
     }
+
     // Push additional tags
     for tag in &extra_tags {
         let remote = format!("{repo_full}:{tag}");
