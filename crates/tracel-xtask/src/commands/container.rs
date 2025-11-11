@@ -215,8 +215,8 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
             let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• latest: ✅\n  🏷 {t}\n  🌐 {url}");
         }
-        (true, None) => eprintln!("• latest:   ✅\n  found but tag unknown"),
-        _ => eprintln!("• latest:   ❌"),
+        (true, None) => eprintln!("• latest: ✅\n  found but tag unknown"),
+        _ => eprintln!("• latest: ❌"),
     }
     // current rollback
     match (rollback_present, &rollback_tag) {
@@ -401,17 +401,17 @@ fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
             match status_opt.as_deref() {
                 Some("Successful") => {
                     println!(
-                        "\r✅  Rollout completed successfully!{space}",
+                        "\r✅ Rollout completed successfully!{space}",
                         space = " ".repeat(40)
                     );
                     return Ok(());
                 }
                 Some("Failed") => {
-                    println!("\r❌  Rollout failed.{space}", space = " ".repeat(40));
+                    println!("\r❌ Rollout failed.{space}", space = " ".repeat(40));
                     anyhow::bail!("rollout finished with status: Failed");
                 }
                 Some("Cancelled") => {
-                    println!("\r⚠️  Rollout cancelled.{space}", space = " ".repeat(40));
+                    println!("\r⚠️ Rollout cancelled.{space}", space = " ".repeat(40));
                     anyhow::bail!("rollout finished with status: Cancelled");
                 }
                 _ => {}
