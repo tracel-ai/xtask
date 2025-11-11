@@ -56,7 +56,7 @@ In the `xtask/Cargo.toml` file, add the following under `[dependencies]`:
 
 ```toml
 [dependencies]
-tracel-xtask = "2.0"
+tracel-xtask = "3.0"
 ```
 
 5. **Build the workspace:**
