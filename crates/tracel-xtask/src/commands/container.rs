@@ -54,7 +54,7 @@ pub struct PushSubCmdArgs {
     /// Local image name (the one used in the build command)
     #[arg(long)]
     pub image: String,
-    /// Local image tag (the one used when building)
+    /// Local image tag (the one used when building) — typically the commit SHA
     #[arg(long)]
     pub local_tag: String,
     /// Region where the container repository lives
@@ -63,10 +63,10 @@ pub struct PushSubCmdArgs {
     /// Container repository name to push into
     #[arg(long)]
     pub repository: String,
-    /// Explicit remote tag (if provided, it overrides auto computation)
+    /// Additional explicit remote tag to ADD (pushed alongside the commit SHA)
     #[arg(long)]
     pub remote_tag: Option<String>,
-    /// When true, compute the next monotonic tag from the container repository instead of reusing the local tag
+    /// When set, also add the next monotonic tag alongside the commit SHA
     #[arg(long)]
     pub auto_remote_tag: bool,
 }
@@ -241,46 +241,66 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
 
 fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
-
-    // Determine remote tag:
-    // 1) if --remote-tag is provided then use it
-    // 2) else if --auto-remote-tag then compute next numeric tag
-    // 3) otherwise reuse the local tag
-    let remote_tag = if let Some(explicit) = &push_args.remote_tag {
-        explicit.clone()
-    } else if push_args.auto_remote_tag {
-        let next = ecr_compute_next_numeric_tag(&push_args.repository, &push_args.region)?;
-        eprintln!("➡️  Using computed remote monotonic tag: {}", next);
-        next.to_string()
-    } else {
-        push_args.local_tag.clone()
-    };
-
+    // login
     let account_id = aws_account_id()?;
     ecr_docker_login(&account_id, &push_args.region)?;
-
+    // push image with primary tag (commit sha)
     let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, push_args.region);
-    let remote = format!("{}/{}:{}", registry, push_args.repository, remote_tag);
-
-    // docker tag <local>:<local_tag> <remote>:<remote_tag>
+    let repo_full = format!("{}/{}", registry, push_args.repository);
+    let primary_remote = format!("{repo_full}:{}", push_args.local_tag);
+    eprintln!("➡️  Preparing to push primary tag (commit): {}", push_args.local_tag);
     docker_cli(
         vec![
             "tag".into(),
             format!("{}:{}", push_args.image, push_args.local_tag),
-            remote.clone(),
+            primary_remote.clone(),
         ],
         None,
         None,
-        "docker tag failed",
+        "docker tag (primary) should succeed",
+    )?;
+    docker_cli(
+        vec!["push".into(), primary_remote.clone()],
+        None,
+        None,
+        "docker push (primary) should succeed",
     )?;
 
-    // docker push <remote>:<remote_tag>
-    docker_cli(
-        vec!["push".into(), remote],
-        None,
-        None,
-        "docker push failed",
-    )
+    // Collect any additional tags we should add in addition to the commit sha
+    let mut extra_tags: Vec<String> = Vec::new();
+    if push_args.auto_remote_tag {
+        let next = ecr_compute_next_numeric_tag(&push_args.repository, &push_args.region)?;
+        eprintln!("🔢 Auto monotonic tag computed: {}", next);
+        extra_tags.push(next.to_string());
+    }
+    if let Some(explicit) = &push_args.remote_tag {
+        eprintln!("🏷️  Adding explicit extra tag: {}", explicit);
+        extra_tags.push(explicit.clone());
+    }
+    // Push additional tags
+    for tag in &extra_tags {
+        let remote = format!("{repo_full}:{tag}");
+        docker_cli(
+            vec![
+                "tag".into(),
+                format!("{}:{}", push_args.image, push_args.local_tag),
+                remote.clone(),
+            ],
+            None,
+            None,
+            "docker tag should succeed",
+        )?;
+        docker_cli(
+            vec!["push".into(), remote.clone()],
+            None,
+            None,
+            "docker push should succeed",
+        )?;
+        eprintln!("✅ Added extra tag: {}", tag);
+    }
+    eprintln!("🎉 Push completed");
+
+    Ok(())
 }
 
 /// promote: N to latest and old latest to rollback
