@@ -15,7 +15,7 @@ const CRATES_IO_API_TOKEN: &str = "CRATES_IO_API_TOKEN";
 pub struct PublishCmdArgs {
     /// The name of the crate to publish on crates.io
     name: String,
-    /// When set, only perfom a dry-run and does not publish the crate
+    /// When set, only perform a dry-run and does not publish the crate
     #[arg(long)]
     dry_run_only: bool,
     /// Optional path to the Cargo.toml to validate the version against the tag

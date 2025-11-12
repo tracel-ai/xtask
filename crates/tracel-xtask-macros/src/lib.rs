@@ -249,7 +249,7 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
         (
             "BuildCmdArgs",
             quote! {
-                #[doc = r"Build artifacs in release mode."]
+                #[doc = r"Build artifacts in release mode."]
                 #[arg(short, long, required = false)]
                 pub release: bool,
             },
