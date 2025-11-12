@@ -30,6 +30,7 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
                 only: only.clone(),
                 command: Some(c.clone()),
                 ignore_audit: args.ignore_audit,
+                ignore_typos: args.ignore_typos,
             },
             env.clone(),
             ctx.clone(),

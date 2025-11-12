@@ -260,6 +260,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Ignore audit errors."]
                 #[arg(long = "ignore-audit", required = false)]
                 pub ignore_audit: bool,
+                #[doc = r"Ignore typos errors."]
+                #[arg(long = "ignore-typos", required = false)]
+                pub ignore_typos: bool,
             },
         ),
         (
@@ -335,6 +338,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Ignore audit errors."]
                 #[arg(long = "ignore-audit", required = false)]
                 pub ignore_audit: bool,
+                #[doc = r"Ignore typos errors."]
+                #[arg(long = "ignore-typos", required = false)]
+                pub ignore_typos: bool,
                 #[doc = r"Build in release mode."]
                 #[arg(short = 'r', long = "release", required = false)]
                 pub release: bool,
@@ -551,6 +557,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                         || ident_str == "features"
                         || ident_str == "force"
                         || ident_str == "ignore_audit"
+                        || ident_str == "ignore_typos"
                         || ident_str == "jobs"
                         || ident_str == "no_default_features"
                         || ident_str == "no_capture"

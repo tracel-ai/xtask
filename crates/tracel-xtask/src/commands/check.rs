@@ -24,16 +24,26 @@ pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> a
     }
 
     match args.get_command() {
-        CheckSubCommand::Audit if args.ignore_audit => {
-            if run_audit().is_err() {
+        CheckSubCommand::Audit => {
+            let res = run_audit();
+            if res.is_err() && args.ignore_audit {
                 warn!("Ignoring audit error because of '--ignore-audit' flag.");
+                Ok(())
+            } else {
+                res
             }
-            Ok(())
         }
-        CheckSubCommand::Audit => run_audit(),
         CheckSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
         CheckSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
-        CheckSubCommand::Typos => run_typos(),
+        CheckSubCommand::Typos => {
+            let res = run_typos();
+            if res.is_err() && args.ignore_typos {
+                warn!("Ignoring typos error because of '--ignore-typos' flag.");
+                Ok(())
+            } else {
+                res
+            }
+        }
         CheckSubCommand::All => CheckSubCommand::iter()
             .filter(|c| *c != CheckSubCommand::All)
             .try_for_each(|c| {
@@ -44,6 +54,7 @@ pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> a
                         exclude: args.exclude.clone(),
                         only: args.only.clone(),
                         ignore_audit: args.ignore_audit,
+                        ignore_typos: args.ignore_typos,
                     },
                     _env.clone(),
                     _ctx.clone(),
