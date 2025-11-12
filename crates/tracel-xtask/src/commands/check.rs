@@ -194,7 +194,8 @@ fn run_typos() -> anyhow::Result<()> {
     group!("Typos");
     run_process(
         "typos",
-        &["--diff", "--color", "always"],
+        // default without any args if better than '--diff --colors always'
+        &[],
         None,
         None,
         "Typos check execution failed",
