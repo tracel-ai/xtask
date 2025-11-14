@@ -95,17 +95,13 @@ pub fn run_process(
         command.envs(&envs);
     }
     let status = command.args(args).status().map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to execute {} {}: {}",
-            name,
-            args.first().unwrap(),
-            e
-        )
+        let first = args.first().copied().unwrap_or("");
+        anyhow::anyhow!("Failed to execute {} {}: {}", name, first, e)
     })?;
     if !status.success() {
         return return_process_error(error_msg, status, None);
     }
-    anyhow::Ok(())
+    Ok(())
 }
 
 pub fn run_process_capture_stdout(cmd: &mut Command, label: &str) -> anyhow::Result<String> {
