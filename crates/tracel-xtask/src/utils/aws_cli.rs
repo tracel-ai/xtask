@@ -451,3 +451,58 @@ pub fn ecr_compute_next_numeric_tag(repository: &str, region: &str) -> anyhow::R
 
     Ok(max_seen.saturating_add(1).max(1))
 }
+
+// Secrets Manager ------------------------------------------------------------
+
+/// Fetch the SecretString for a given secret.
+/// `secret_id` can be a name or an ARN.
+pub fn secretsmanager_get_secret_string(secret_id: &str, region: &str) -> anyhow::Result<String> {
+    let out = aws_cli_capture_stdout(
+        vec![
+            "secretsmanager".into(),
+            "get-secret-value".into(),
+            "--secret-id".into(),
+            secret_id.into(),
+            "--region".into(),
+            region.into(),
+            "--query".into(),
+            "SecretString".into(),
+            "--output".into(),
+            "text".into(),
+        ],
+        "aws secretsmanager get-secret-value",
+        None,
+        None,
+    )?;
+
+    Ok(out.trim_end().to_string())
+}
+
+/// Put a new SecretString value for the given secret.
+/// This creates a new version of the secret.
+pub fn secretsmanager_put_secret_string(
+    secret_id: &str,
+    region: &str,
+    secret_string: &str,
+) -> anyhow::Result<()> {
+    // we avoid using `aws_cli` here to prevent logging the secret value in the process command line.
+    let status = Command::new("aws")
+        .arg("secretsmanager")
+        .arg("put-secret-value")
+        .arg("--secret-id")
+        .arg(secret_id)
+        .arg("--region")
+        .arg(region)
+        .arg("--secret-string")
+        .arg(secret_string)
+        .status()
+        .with_context(|| "aws secretsmanager put-secret-value should succeed".to_string())?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "aws secretsmanager put-secret-value should succeed (exit status {status})"
+        ));
+    }
+
+    Ok(())
+}

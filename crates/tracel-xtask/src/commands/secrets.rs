@@ -1,0 +1,220 @@
+/// Manage AWS Secrets Manager secrets.
+use std::{
+    collections::HashMap,
+    fmt::Write as _,
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+};
+
+use crate::prelude::{Context as XtaskContext, Environment};
+use crate::utils::aws_cli::{secretsmanager_get_secret_string, secretsmanager_put_secret_string};
+
+const FALLBACK_EDITOR: &str = "vi";
+
+#[tracel_xtask_macros::declare_command_args(None, SecretsSubCommand)]
+pub struct SecretsCmdArgs {}
+
+impl Default for SecretsSubCommand {
+    fn default() -> Self {
+        SecretsSubCommand::View(ViewSubCmdArgs::default())
+    }
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct EditSubCmdArgs {
+    /// Region where the secret lives
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret identifier (name or ARN)
+    #[arg(value_name = "SECRET_ID")]
+    pub secret_id: String,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct EnvFileSubCmdArgs {
+    /// Output file path. If omitted, writes to stdout.
+    #[arg(long)]
+    pub output: Option<std::path::PathBuf>,
+
+    /// Region where the secrets live
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret identifiers (names or ARN), can provide multiple ones.
+    #[arg(value_name = "SECRET_ID", num_args(1..), required = true)]
+    pub secret_ids: Vec<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ViewSubCmdArgs {
+    /// Region where the secret lives
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret identifier (name or ARN)
+    #[arg(value_name = "SECRET_ID")]
+    pub secret_id: String,
+}
+
+pub fn handle_command(
+    args: SecretsCmdArgs,
+    _env: Environment,
+    _ctx: XtaskContext,
+) -> anyhow::Result<()> {
+    match args.get_command() {
+        SecretsSubCommand::Edit(edit_args) => edit(edit_args),
+        SecretsSubCommand::EnvFile(env_args) => env_file(env_args),
+        SecretsSubCommand::View(view_args) => view(view_args),
+    }
+}
+
+/// `view` subcommand: fetch and print the secret.
+fn view(args: ViewSubCmdArgs) -> anyhow::Result<()> {
+    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    println!("{value}");
+    Ok(())
+}
+
+/// Fetch secret into a temp file, open editor,
+/// ask to commit or discard on close and then push a new version if confirmed.
+fn edit(args: EditSubCmdArgs) -> anyhow::Result<()> {
+    // 1) fetch current secret value
+    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    // 2) create temp file path
+    let tmp_path = temp_file_path(&args.secret_id);
+    fs::write(&tmp_path, &original)?;
+    eprintln!(
+        "Editing secret '{}' in region '{}' using temporary file:\n  {}",
+        args.secret_id,
+        args.region,
+        tmp_path.display()
+    );
+    // 3) open editor
+    let editor = detect_editor();
+    let mut parts = editor.split_whitespace();
+    let cmd = parts.next().unwrap_or(FALLBACK_EDITOR);
+    let mut command = std::process::Command::new(cmd);
+    for arg in parts {
+        command.arg(arg);
+    }
+    command.arg(&tmp_path);
+    let status = command
+        .status()
+        .map_err(|e| anyhow::anyhow!("launching editor '{editor}' should succeed: {e}"))?;
+    if !status.success() {
+        fs::remove_file(&tmp_path).ok();
+        return Err(anyhow::anyhow!(
+            "editor '{editor}' should exit successfully (exit status {status})"
+        ));
+    }
+    // 4) read updated contents of file and do some cleanup
+    let edited = fs::read_to_string(&tmp_path)?;
+    fs::remove_file(&tmp_path).ok();
+    // ff nothing changed, we're done.
+    if edited == original {
+        eprintln!("No changes detected, not pushing a new secret version.");
+        return Ok(());
+    }
+    // 5) ask user for confirmation to commit changes
+    eprintln!("Secret content has changed.");
+    print!("Do you want to push a new secret version? [y/N]: ");
+    io::stdout().flush().ok();
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    let answer = answer.trim().to_lowercase();
+    if answer != "y" && answer != "yes" {
+        eprintln!("Aborting: new secret version was not pushed.");
+        return Ok(());
+    }
+    // 6) Commit new version
+    secretsmanager_put_secret_string(&args.secret_id, &args.region, &edited)?;
+    eprintln!(
+        "✅ New version pushed for secret '{}' in region '{}'.",
+        args.secret_id, args.region
+    );
+
+    Ok(())
+}
+
+fn env_file(args: EnvFileSubCmdArgs) -> anyhow::Result<()> {
+    if args.secret_ids.is_empty() {
+        eprintln!("No secrets provided.");
+        return Ok(());
+    }
+    // In case of multiple same secret names, the latest wins
+    let mut merged: HashMap<String, String> = HashMap::new();
+    for id in &args.secret_ids {
+        eprintln!("Fetching secret '{id}'...");
+        let s = secretsmanager_get_secret_string(id, &args.region)?;
+        let s = s.trim();
+        if s.is_empty() {
+            continue;
+        }
+        // 1) try JSON object
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(s) {
+            if let Some(obj) = value.as_object() {
+                for (k, v) in obj {
+                    let v_str = v
+                        .as_str()
+                        .map(|x| x.to_string())
+                        .unwrap_or_else(|| v.to_string());
+                    merged.insert(k.clone(), v_str);
+                }
+                continue;
+            }
+        }
+        // 2) fallback to .env style format
+        for line in s.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((k, v)) = line.split_once('=') {
+                merged.insert(k.trim().to_string(), v.trim().to_string());
+            }
+        }
+    }
+
+    // Sort the env vars for deterministic ordering
+    let mut entries: Vec<(String, String)> = merged.into_iter().collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    // Write to passed path or to stdout if no path has been passed
+    let mut buf = String::new();
+    for (k, v) in entries {
+        writeln!(&mut buf, "{k}={v}")?;
+    }
+    if let Some(path) = args.output {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&path, buf)?;
+        eprintln!("Wrote env file to {}", path.display());
+    } else {
+        print!("{buf}");
+    }
+
+    Ok(())
+}
+
+/// Build a temp file path for editing a secret.
+fn temp_file_path(secret_id: &str) -> PathBuf {
+    let mut base: String = secret_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    if base.len() > 64 {
+        base.truncate(64);
+    }
+    let pid = std::process::id();
+    let filename = format!("tracel-secret-{base}-{pid}.tmp");
+    std::env::temp_dir().join(filename)
+}
+
+/// Detect the editor to use $VISUAL then $EDITOR then falling back to "vi".
+fn detect_editor() -> String {
+    std::env::var("VISUAL")
+        .or_else(|_| std::env::var("EDITOR"))
+        .unwrap_or_else(|_| FALLBACK_EDITOR.to_string())
+}

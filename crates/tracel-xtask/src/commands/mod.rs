@@ -9,6 +9,7 @@ pub mod doc;
 pub mod docker_compose;
 pub mod fix;
 pub mod publish;
+pub mod secrets;
 pub mod test;
 pub mod validate;
 pub mod vulnerabilities;

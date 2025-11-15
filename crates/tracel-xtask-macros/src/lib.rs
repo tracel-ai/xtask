@@ -136,7 +136,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Container",
         quote! {
-            #[doc = r"Execute docker commands."]
+            #[doc = r"Manage containers lifecycle, from build to deployment."]
             Container(tracel_xtask::commands::docker::ContainerCmdArgs)
         },
     );
@@ -180,6 +180,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Publish a crate to crates.io."]
             Publish(tracel_xtask::commands::publish::PublishCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Secrets",
+        quote! {
+            #[doc = r"Manage secrets."]
+            Secrets(tracel_xtask::commands::secrets::SecretsCmdArgs)
         },
     );
     variant_map.insert(
@@ -736,6 +743,17 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Lint,
                 #[doc = r"Find typos in source code and fix them."]
                 Typos,
+            },
+        ),
+        (
+            "SecretsSubCommand",
+            quote! {
+                #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
+                Edit(EditSubCmdArgs),
+                #[doc = r"Fetch the secrets and write an environment file to a specified path."]
+                EnvFile(EnvFileSubCmdArgs),
+                #[doc = r"Show the latest version of a secret."]
+                View(ViewSubCmdArgs),
             },
         ),
         (
