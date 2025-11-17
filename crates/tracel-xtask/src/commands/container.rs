@@ -2,8 +2,8 @@
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
 use std::path::PathBuf;
 
-use crate::prelude::*;
 use crate::prelude::anyhow::Context as _;
+use crate::prelude::*;
 use crate::utils::aws_cli::{
     aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
     ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
@@ -18,12 +18,12 @@ pub struct ContainerCmdArgs {}
 
 impl Default for ContainerSubCommand {
     fn default() -> Self {
-        ContainerSubCommand::Build(BuildSubCmdArgs::default())
+        ContainerSubCommand::Build(ContainerBuildSubCmdArgs::default())
     }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct BuildSubCmdArgs {
+pub struct ContainerBuildSubCmdArgs {
     /// Path to build file relative to context directory (i.e. a Dockerfile)
     pub build_file: PathBuf,
     /// Build context directory (default to repository root)
@@ -41,7 +41,7 @@ pub struct BuildSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ListSubCmdArgs {
+pub struct ContainerListSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -51,7 +51,7 @@ pub struct ListSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct PullSubCmdArgs {
+pub struct ContainerPullSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -67,7 +67,7 @@ pub struct PullSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct PushSubCmdArgs {
+pub struct ContainerPushSubCmdArgs {
     /// Local image name (the one used in the build command)
     #[arg(long)]
     pub image: String,
@@ -89,7 +89,7 @@ pub struct PushSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct PromoteSubCmdArgs {
+pub struct ContainerPromoteSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -102,7 +102,7 @@ pub struct PromoteSubCmdArgs {
 }
 
 #[derive(clap::Args, Clone, PartialEq, Debug)]
-pub struct RolloutSubCmdArgs {
+pub struct ContainerRolloutSubCmdArgs {
     /// Region of the Auto Scaling Group
     #[arg(long)]
     pub region: String,
@@ -112,36 +112,36 @@ pub struct RolloutSubCmdArgs {
     pub asg: String,
 
     /// Strategy for instance refresh (Rolling is the standard choice for zero-downtime rollouts)
-    #[arg(long, value_name = "Rolling", default_value_t = RolloutSubCmdArgs::default().strategy)]
+    #[arg(long, value_name = "Rolling", default_value_t = ContainerRolloutSubCmdArgs::default().strategy)]
     pub strategy: String,
 
     /// Seconds for instance warmup
-    #[arg(long, value_name = "SECS", default_value_t = RolloutSubCmdArgs::default().instance_warmup)]
+    #[arg(long, value_name = "SECS", default_value_t = ContainerRolloutSubCmdArgs::default().instance_warmup)]
     pub instance_warmup: u64,
 
     /// Minimum healthy percentage during the rollout
-    #[arg(long, value_name = "PCT", default_value_t = RolloutSubCmdArgs::default().min_healthy_percentage)]
+    #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
 
     /// If set, skip replacing instances that already match the launch template/config
-    #[arg(long, default_value_t = RolloutSubCmdArgs::default().skip_matching)]
+    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().skip_matching)]
     pub skip_matching: bool,
 
     /// Wait until the refresh completes
-    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait)]
+    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait)]
     pub wait: bool,
 
     /// Max seconds to wait when --wait is set
-    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait_timeout_secs)]
+    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_timeout_secs)]
     pub wait_timeout_secs: u64,
 
     /// Poll interval seconds when --wait is set
-    #[arg(long, default_value_t = RolloutSubCmdArgs::default().wait_poll_secs)]
+    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_poll_secs)]
     pub wait_poll_secs: u64,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct RunSubCmdArgs {
+pub struct ContainerRunSubCmdArgs {
     /// Fully qualified image reference (e.g. 123.dkr.ecr.us-east-1.amazonaws.com/bc-backend:latest)
     #[arg(long)]
     pub image: String,
@@ -163,7 +163,7 @@ pub struct RunSubCmdArgs {
     pub extra_arg: Vec<String>,
 }
 
-impl Default for RolloutSubCmdArgs {
+impl Default for ContainerRolloutSubCmdArgs {
     fn default() -> Self {
         Self {
             region: String::new(),
@@ -180,7 +180,7 @@ impl Default for RolloutSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct RollbackSubCmdArgs {
+pub struct ContainerRollbackSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -206,7 +206,7 @@ pub fn handle_command(
     }
 }
 
-fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
+fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     let context_dir = build_args.context_dir.unwrap_or(git_repo_root_or_cwd()?);
     let build_file_path = if build_args.build_file.is_absolute() {
         build_args.build_file.clone()
@@ -230,7 +230,7 @@ fn build(build_args: BuildSubCmdArgs) -> anyhow::Result<()> {
     docker_cli(args, None, None, "docker build failed")
 }
 
-fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
+fn list(list_args: ContainerListSubCmdArgs) -> anyhow::Result<()> {
     let ecr_repository = &list_args.repository;
     let latest_present = ecr_get_manifest(ecr_repository, &list_args.region, "latest")?.is_some();
     let rollback_present =
@@ -281,7 +281,7 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn pull(args: PullSubCmdArgs) -> anyhow::Result<()> {
+fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
     let account_id = aws_account_id()?;
     eprintln!(
         "📥 Pulling image from ECR\n Account: {account_id}\n Region:  {}\n Repo:    {}\n Tag:     {}",
@@ -308,7 +308,7 @@ fn pull(args: PullSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
+fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
     // check if the container as already been pushed
     if let Some(existing_manifest) = ecr_get_manifest(
@@ -407,7 +407,7 @@ fn push(push_args: PushSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// promote: point N to `latest` and move the previous `latest` to `rollback`
-fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
+fn promote(promote_args: ContainerPromoteSubCmdArgs) -> anyhow::Result<()> {
     // Fetch current 'latest' and the target tag's manifest.
     let prev_latest_manifest =
         ecr_get_manifest(&promote_args.repository, &promote_args.region, "latest")
@@ -462,7 +462,7 @@ fn promote(promote_args: PromoteSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// rollback: promote 'rollback' to 'latest' and then remove the 'rollback' tag
-fn rollback(rollback_args: RollbackSubCmdArgs) -> anyhow::Result<()> {
+fn rollback(rollback_args: ContainerRollbackSubCmdArgs) -> anyhow::Result<()> {
     use anyhow::Context;
     // Fetch the manifest of the 'rollback' tag
     let rb = ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "rollback")?
@@ -508,7 +508,7 @@ fn rollback(rollback_args: RollbackSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// rollout: rollout latest promoted container
-fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
+fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
     use anyhow::Context;
     use std::{
         io::{self, Write},
@@ -607,7 +607,7 @@ fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run(args: RunSubCmdArgs) -> anyhow::Result<()> {
+fn run(args: ContainerRunSubCmdArgs) -> anyhow::Result<()> {
     let mut cli_args: Vec<String> = vec!["run".into(), "--rm".into()];
 
     if let Some(ref name) = args.name {

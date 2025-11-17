@@ -17,12 +17,12 @@ pub struct SecretsCmdArgs {}
 
 impl Default for SecretsSubCommand {
     fn default() -> Self {
-        SecretsSubCommand::View(ViewSubCmdArgs::default())
+        SecretsSubCommand::View(SecretsViewSubCmdArgs::default())
     }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct EditSubCmdArgs {
+pub struct SecretsEditSubCmdArgs {
     /// Region where the secret lives
     #[arg(long)]
     pub region: String,
@@ -33,7 +33,7 @@ pub struct EditSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct EnvFileSubCmdArgs {
+pub struct SecretsEnvFileSubCmdArgs {
     /// Output file path. If omitted, writes to stdout.
     #[arg(long)]
     pub output: Option<std::path::PathBuf>,
@@ -48,7 +48,7 @@ pub struct EnvFileSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ViewSubCmdArgs {
+pub struct SecretsViewSubCmdArgs {
     /// Region where the secret lives
     #[arg(long)]
     pub region: String,
@@ -71,7 +71,7 @@ pub fn handle_command(
 }
 
 /// `view` subcommand: fetch and print the secret.
-fn view(args: ViewSubCmdArgs) -> anyhow::Result<()> {
+fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
     let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
     println!("{value}");
     Ok(())
@@ -79,7 +79,7 @@ fn view(args: ViewSubCmdArgs) -> anyhow::Result<()> {
 
 /// Fetch secret into a temp file, open editor,
 /// ask to commit or discard on close and then push a new version if confirmed.
-fn edit(args: EditSubCmdArgs) -> anyhow::Result<()> {
+fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
     // 1) fetch current secret value
     let original = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
     // 2) create temp file path
@@ -138,7 +138,7 @@ fn edit(args: EditSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn env_file(args: EnvFileSubCmdArgs) -> anyhow::Result<()> {
+fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     if args.secret_ids.is_empty() {
         eprintln!("No secrets provided.");
         return Ok(());

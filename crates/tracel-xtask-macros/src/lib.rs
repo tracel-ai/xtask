@@ -674,21 +674,21 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             "ContainerSubCommand",
             quote! {
                 #[doc = r"Build a container."]
-                Build(BuildSubCmdArgs),
+                Build(ContainerBuildSubCmdArgs),
                 #[doc = r"Show current latest and rollback images in registry."]
-                List(ListSubCmdArgs),
+                List(ContainerListSubCmdArgs),
                 #[doc = r"Pull a container from a registry."]
-                Pull(PullSubCmdArgs),
+                Pull(ContainerPullSubCmdArgs),
                 #[doc = r"Push a container to a registry."]
-                Push(PushSubCmdArgs),
+                Push(ContainerPushSubCmdArgs),
                 #[doc = r"Promote a pushed container to latest."]
-                Promote(PromoteSubCmdArgs),
+                Promote(ContainerPromoteSubCmdArgs),
                 #[doc = r"Rollback previously released container to latest."]
-                Rollback(RollbackSubCmdArgs),
+                Rollback(ContainerRollbackSubCmdArgs),
                 #[doc = r"Rollout last promoted container."]
-                Rollout(RolloutSubCmdArgs),
+                Rollout(ContainerRolloutSubCmdArgs),
                 #[doc = r"Run a local container."]
-                Run(RunSubCmdArgs),
+                Run(ContainerRunSubCmdArgs),
             },
         ),
         (
@@ -753,11 +753,11 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             "SecretsSubCommand",
             quote! {
                 #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
-                Edit(EditSubCmdArgs),
+                Edit(SecretsEditSubCmdArgs),
                 #[doc = r"Fetch the secrets and write an environment file to a specified path."]
-                EnvFile(EnvFileSubCmdArgs),
+                EnvFile(SecretsEnvFileSubCmdArgs),
                 #[doc = r"Show the latest version of a secret."]
-                View(ViewSubCmdArgs),
+                View(SecretsViewSubCmdArgs),
             },
         ),
         (
