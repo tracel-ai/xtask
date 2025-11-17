@@ -2,10 +2,8 @@
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
 use std::path::PathBuf;
 
-use crate::prelude::{
-    anyhow::Context,
-    {ecr_image_url, Context as XtaskContext, Environment},
-};
+use crate::prelude::*;
+use crate::prelude::anyhow::Context as _;
 use crate::utils::aws_cli::{
     aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
     ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
@@ -50,6 +48,22 @@ pub struct ListSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct PullSubCmdArgs {
+    /// Region where the container repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Container repository name
+    #[arg(long)]
+    pub repository: String,
+    /// Image tag to pull
+    #[arg(long)]
+    pub tag: String,
+    /// Platform to pull (e.g. linux/amd64), if omitted then docker's default platform is used
+    #[arg(long)]
+    pub platform: Option<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -126,6 +140,29 @@ pub struct RolloutSubCmdArgs {
     pub wait_poll_secs: u64,
 }
 
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct RunSubCmdArgs {
+    /// Fully qualified image reference (e.g. 123.dkr.ecr.us-east-1.amazonaws.com/bc-backend:latest)
+    #[arg(long)]
+    pub image: String,
+
+    /// Container name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Optional env-file to pass to docker
+    #[arg(long)]
+    pub env_file: Option<std::path::PathBuf>,
+
+    /// When set, use `--network host`
+    #[arg(long)]
+    pub host_network: bool,
+
+    /// Extra docker run args, passed as-is after the standard flags
+    #[arg(long)]
+    pub extra_arg: Vec<String>,
+}
+
 impl Default for RolloutSubCmdArgs {
     fn default() -> Self {
         Self {
@@ -155,15 +192,17 @@ pub struct RollbackSubCmdArgs {
 pub fn handle_command(
     args: ContainerCmdArgs,
     _env: Environment,
-    _ctx: XtaskContext,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         ContainerSubCommand::Build(build_args) => build(build_args),
         ContainerSubCommand::List(list_args) => list(list_args),
+        ContainerSubCommand::Pull(pull_args) => pull(pull_args),
         ContainerSubCommand::Push(push_args) => push(push_args),
         ContainerSubCommand::Promote(promote_args) => promote(promote_args),
         ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
         ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args),
+        ContainerSubCommand::Run(run_args) => run(run_args),
     }
 }
 
@@ -215,7 +254,7 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
     // current latest
     match (latest_present, &latest_tag) {
         (true, Some(t)) => {
-            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• latest: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         (true, None) => eprintln!("• latest: ✅\n  found but tag unknown"),
@@ -224,7 +263,7 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
     // current rollback
     match (rollback_present, &rollback_tag) {
         (true, Some(t)) => {
-            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• rollback: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         (true, None) => eprintln!("• rollback: ✅\n  found but tag unknown"),
@@ -233,12 +272,39 @@ fn list(list_args: ListSubCmdArgs) -> anyhow::Result<()> {
     // latest non-alias tag (so not latest or rollback tagged)
     match &last_pushed_tag {
         Some(t) => {
-            let url = ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• last pushed: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         None => eprintln!("• last pushed: ❌"),
     }
 
+    Ok(())
+}
+
+fn pull(args: PullSubCmdArgs) -> anyhow::Result<()> {
+    let account_id = aws_account_id()?;
+    eprintln!(
+        "📥 Pulling image from ECR\n Account: {account_id}\n Region:  {}\n Repo:    {}\n Tag:     {}",
+        args.region, args.repository, args.tag
+    );
+    ecr_docker_login(&account_id, &args.region)?;
+    // Build docker args
+    let full_ref = format!(
+        "{account}.dkr.ecr.{region}.amazonaws.com/{repo}:{tag}",
+        account = account_id,
+        region = args.region,
+        repo = args.repository,
+        tag = args.tag,
+    );
+    let mut docker_args: Vec<String> = vec!["pull".into()];
+    if let Some(ref platform) = args.platform {
+        docker_args.push("--platform".into());
+        docker_args.push(platform.clone());
+    }
+    docker_args.push(full_ref.clone());
+    // pull image
+    docker_cli(docker_args, None, None, "docker pull should succeed")?;
+    eprintln!("✅ Pulled image: {full_ref}");
     Ok(())
 }
 
@@ -539,6 +605,33 @@ fn rollout(args: RolloutSubCmdArgs) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn run(args: RunSubCmdArgs) -> anyhow::Result<()> {
+    let mut cli_args: Vec<String> = vec!["run".into(), "--rm".into()];
+
+    if let Some(ref name) = args.name {
+        cli_args.push("--name".into());
+        cli_args.push(name.clone());
+    }
+
+    if let Some(ref env_file) = args.env_file {
+        cli_args.push("--env-file".into());
+        cli_args.push(env_file.to_string_lossy().into_owned());
+    }
+
+    if args.host_network {
+        cli_args.push("--network".into());
+        cli_args.push("host".into());
+    }
+
+    // Extra args come before the image
+    cli_args.extend(args.extra_arg.clone());
+
+    // Finally, the image (repo:tag, commit tag, whatever)
+    cli_args.push(args.image.clone());
+
+    docker_cli(cli_args, None, None, "docker run should succeed")
 }
 
 fn docker_cli(

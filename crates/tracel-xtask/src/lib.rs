@@ -42,6 +42,8 @@ pub mod prelude {
     pub use crate::commands::fix::FixCmdArgs;
     pub use crate::commands::fix::FixSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
+    pub use crate::commands::secrets::SecretsCmdArgs;
+    pub use crate::commands::secrets::SecretsSubCommand;
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::test::TestSubCommand;
     pub use crate::commands::validate::ValidateCmdArgs;

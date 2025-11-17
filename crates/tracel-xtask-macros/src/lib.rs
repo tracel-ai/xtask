@@ -677,6 +677,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Build(BuildSubCmdArgs),
                 #[doc = r"Show current latest and rollback images in registry."]
                 List(ListSubCmdArgs),
+                #[doc = r"Pull a container from a registry."]
+                Pull(PullSubCmdArgs),
                 #[doc = r"Push a container to a registry."]
                 Push(PushSubCmdArgs),
                 #[doc = r"Promote a pushed container to latest."]
@@ -685,6 +687,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Rollback(RollbackSubCmdArgs),
                 #[doc = r"Rollout last promoted container."]
                 Rollout(RolloutSubCmdArgs),
+                #[doc = r"Run a local container."]
+                Run(RunSubCmdArgs),
             },
         ),
         (
