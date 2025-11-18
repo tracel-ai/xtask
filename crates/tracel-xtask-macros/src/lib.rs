@@ -79,15 +79,15 @@ fn generate_dispatch_function(
         let module_ident = syn::Ident::new(cmd_ident_string.to_snake_case().as_str(), cmd_ident.span());
         match cmd_ident_string.as_str() {
             "Fix" => quote! {
-                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, args.environment, args.context, None),
+                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, env, args.context, None),
             },
             _ => quote! {
-                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, args.environment, args.context),
+                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, env, args.context),
             }
         }
     }).collect();
     let func = quote! {
-        fn dispatch_base_commands(args: XtaskArgs<Command>) -> anyhow::Result<()> {
+        fn dispatch_base_commands(args: XtaskArgs<Command>, env: Environment) -> anyhow::Result<()> {
             match args.command {
                 #(#arms)*
                 _ => Err(anyhow::anyhow!("Unknown command")),

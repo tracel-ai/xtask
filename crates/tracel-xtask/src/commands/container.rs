@@ -34,7 +34,7 @@ pub struct ContainerBuildSubCmdArgs {
     pub image: String,
     /// Local tag (defaults to "latest" if omitted)
     #[arg(long)]
-    pub tag: Option<String>,
+    pub build_tag: Option<String>,
     /// Build arguments
     #[arg(long)]
     pub build_args: Vec<String>,
@@ -48,6 +48,9 @@ pub struct ContainerListSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
+    /// The tag reprensenting the latest tag (defaults to the environment name if ommited)
+    #[arg(long)]
+    pub latest_tag: Option<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -82,7 +85,7 @@ pub struct ContainerPushSubCmdArgs {
     pub repository: String,
     /// Additional explicit remote tag to add (pushed alongside the commit SHA)
     #[arg(long)]
-    pub remote_tag: Option<String>,
+    pub additional_tag: Option<String>,
     /// When set, also add the next monotonic tag alongside the commit SHA
     #[arg(long)]
     pub auto_remote_tag: bool,
@@ -96,9 +99,31 @@ pub struct ContainerPromoteSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
-    /// Build tag to promote to 'latest'
+    /// Build tag to promote for the given environmentd
     #[arg(long)]
-    pub tag: String,
+    pub build_tag: String,
+    /// Promote tag applied by this command (defaults to the environment name if ommited)
+    #[arg(long)]
+    pub promote_tag: Option<String>,
+    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if ommited)
+    #[arg(long)]
+    pub rollback_tag: Option<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ContainerRollbackSubCmdArgs {
+    /// Region where the container repository lives
+    #[arg(long)]
+    pub region: String,
+    /// Container repository name
+    #[arg(long)]
+    pub repository: String,
+    /// Promote tag applied by this command (defaults to the environment name if ommited)
+    #[arg(long)]
+    pub promote_tag: Option<String>,
+    /// Rollback tag to promote to promote tag (defaults to 'rollback_<environment>' if ommited)
+    #[arg(long)]
+    pub rollback_tag: Option<String>,
 }
 
 #[derive(clap::Args, Clone, PartialEq, Debug)]
@@ -179,28 +204,18 @@ impl Default for ContainerRolloutSubCmdArgs {
     }
 }
 
-#[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerRollbackSubCmdArgs {
-    /// Region where the container repository lives
-    #[arg(long)]
-    pub region: String,
-    /// Container repository name
-    #[arg(long)]
-    pub repository: String,
-}
-
 pub fn handle_command(
     args: ContainerCmdArgs,
-    _env: Environment,
+    env: Environment,
     _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         ContainerSubCommand::Build(build_args) => build(build_args),
-        ContainerSubCommand::List(list_args) => list(list_args),
+        ContainerSubCommand::List(list_args) => list(list_args, &env),
         ContainerSubCommand::Pull(pull_args) => pull(pull_args),
         ContainerSubCommand::Push(push_args) => push(push_args),
-        ContainerSubCommand::Promote(promote_args) => promote(promote_args),
-        ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args),
+        ContainerSubCommand::Promote(promote_args) => promote(promote_args, &env),
+        ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env),
         ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args),
         ContainerSubCommand::Run(run_args) => run(run_args),
     }
@@ -214,7 +229,7 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
         context_dir.join(&build_args.build_file)
     };
 
-    let tag = build_args.tag.as_deref().unwrap_or("latest");
+    let tag = build_args.build_tag.as_deref().unwrap_or("latest");
     let mut args: Vec<String> = vec![
         "build".into(),
         format!("--file={}", build_file_path.to_string_lossy()),
@@ -230,12 +245,14 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     docker_cli(args, None, None, "docker build failed")
 }
 
-fn list(list_args: ContainerListSubCmdArgs) -> anyhow::Result<()> {
+fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let ecr_repository = &list_args.repository;
-    let latest_present = ecr_get_manifest(ecr_repository, &list_args.region, "latest")?.is_some();
+    let latest_tag = list_args.latest_tag.unwrap_or(env.to_string());
+    let latest_present =
+        ecr_get_manifest(ecr_repository, &list_args.region, &latest_tag)?.is_some();
     let rollback_present =
         ecr_get_manifest(ecr_repository, &list_args.region, "rollback")?.is_some();
-    let latest_tag = if latest_present {
+    let latest_commit_tag = if latest_present {
         ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "latest", &list_args.region)?
     } else {
         None
@@ -252,7 +269,7 @@ fn list(list_args: ContainerListSubCmdArgs) -> anyhow::Result<()> {
         list_args.region
     );
     // current latest
-    match (latest_present, &latest_tag) {
+    match (latest_present, &latest_commit_tag) {
         (true, Some(t)) => {
             let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• latest: ✅\n  🏷 {t}\n  🌐 {url}");
@@ -322,7 +339,7 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
         );
 
         // If an explicit extra tag is requested, alias it to the same manifest without re-pushing.
-        if let Some(explicit) = &push_args.remote_tag {
+        if let Some(explicit) = &push_args.additional_tag {
             eprintln!(
                 "🏷️  Adding explicit alias tag '{}' to existing image",
                 explicit
@@ -375,7 +392,7 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
         eprintln!("🔢 Auto monotonic tag computed: {}", next);
         extra_tags.push(next.to_string());
     }
-    if let Some(explicit) = &push_args.remote_tag {
+    if let Some(explicit) = &push_args.additional_tag {
         eprintln!("🏷️  Adding explicit extra tag: {}", explicit);
         extra_tags.push(explicit.clone());
     }
@@ -407,29 +424,30 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// promote: point N to `latest` and move the previous `latest` to `rollback`
-fn promote(promote_args: ContainerPromoteSubCmdArgs) -> anyhow::Result<()> {
+fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+    let promote_tag = promote_args.promote_tag.unwrap_or(env.to_string());
     // Fetch current 'latest' and the target tag's manifest.
     let prev_latest_manifest =
-        ecr_get_manifest(&promote_args.repository, &promote_args.region, "latest")
-            .context("current 'latest' manifest should be retrievable")?;
+        ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
+            .context("current '{promote_tag}' manifest should be retrievable")?;
     let n_manifest = ecr_get_manifest(
         &promote_args.repository,
         &promote_args.region,
-        &promote_args.tag,
+        &promote_args.build_tag,
     )?
     .ok_or_else(|| {
         anyhow::anyhow!(
             "Tag '{}' not found in '{}'",
-            promote_args.tag,
+            promote_args.build_tag,
             promote_args.repository
         )
     })?;
-    // If 'latest' is already the target manifest then do nothing
+    // If 'latest' tag is already the target manifest then do nothing
     if let Some(ref prev) = prev_latest_manifest {
         if prev == &n_manifest {
             eprintln!(
-                "ℹ️  Tag '{}' is already promoted as 'latest' in '{}', no changes needed.",
-                promote_args.tag, promote_args.repository
+                "ℹ️  Tag '{}' is already promoted as '{promote_tag}' in '{}', no changes needed.",
+                promote_args.build_tag, promote_args.repository
             );
             return Ok(());
         }
@@ -438,60 +456,79 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs) -> anyhow::Result<()> {
     ecr_put_manifest(
         &promote_args.repository,
         &promote_args.region,
-        "latest",
+        &promote_tag,
         &n_manifest,
     )
-    .context("'latest' should be updated to the target manifest")?;
+    .context("'{promote_tag}' should be updated to the target manifest")?;
     // If there was a previous 'latest', move it to 'rollback'.
     if let Some(prev) = prev_latest_manifest {
+        let rollback_tag = promote_args
+            .rollback_tag
+            .unwrap_or(format!("rollback_{env}"));
         // Only write rollback if it's different from the new 'latest'.
         ecr_put_manifest(
             &promote_args.repository,
             &promote_args.region,
-            "rollback",
+            &rollback_tag,
             &prev,
         )
-        .context("'rollback' should be updated to the previous 'latest'")?;
+        .context("'{rollback_tag}' should be updated to the previous '{promote_tag}'")?;
     }
 
     eprintln!(
-        "✅ Promoted '{}' to 'latest' in repository '{}'.",
-        promote_args.tag, promote_args.repository
+        "✅ Promoted '{}' to '{promote_tag}' in repository '{}'.",
+        promote_args.build_tag, promote_args.repository
     );
     Ok(())
 }
 
-/// rollback: promote 'rollback' to 'latest' and then remove the 'rollback' tag
-fn rollback(rollback_args: ContainerRollbackSubCmdArgs) -> anyhow::Result<()> {
-    use anyhow::Context;
+/// rollback: promote current 'rollback_tag' container to 'promote_tag' and then remove 'rollback_tag'
+fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+    let rollback_tag = rollback_args
+        .rollback_tag
+        .unwrap_or(format!("rollback_{env}"));
     // Fetch the manifest of the 'rollback' tag
-    let rb = ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "rollback")?
-        .ok_or_else(|| {
-            anyhow::anyhow!("No 'rollback' tag found in '{}'", rollback_args.repository)
-        })?;
-    // If 'latest' is different, update it; if it's already the same, skip write.
-    if ecr_get_manifest(&rollback_args.repository, &rollback_args.region, "latest")?.as_ref()
+    let rb = ecr_get_manifest(
+        &rollback_args.repository,
+        &rollback_args.region,
+        &rollback_tag,
+    )?
+    .ok_or_else(|| {
+        anyhow::anyhow!(
+            "No '{rollback_tag}' tag found in '{}'",
+            rollback_args.repository
+        )
+    })?;
+    // If promoted container is different, update it; if it's already the same, skip write.
+    let promote_tag = rollback_args.promote_tag.unwrap_or(env.to_string());
+    if ecr_get_manifest(
+        &rollback_args.repository,
+        &rollback_args.region,
+        &promote_tag,
+    )?
+    .as_ref()
         != Some(&rb)
     {
         ecr_put_manifest(
             &rollback_args.repository,
             &rollback_args.region,
-            "latest",
+            &promote_tag,
             &rb,
         )
-        .context("'latest' should be updated to the 'rollback' manifest")?;
-        eprintln!("✅ Promoted 'rollback' to 'latest'.");
+        .context("'{promote_tag}' should be updated to the '{rollback_tag}' manifest")?;
+        eprintln!("✅ Promoted '{rollback_tag}' to '{promote_tag}'.");
     } else {
-        eprintln!("ℹ️ 'latest' already points to the 'rollback' manifest, skipping promotion...");
+        eprintln!("ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion...");
     }
     // Remove the 'rollback' tag so it no longer aliases this image.
+    let filter = format!("imageTag={rollback_tag}");
     let aws_args: Vec<&str> = vec![
         "ecr",
         "batch-delete-image",
         "--repository-name",
         &rollback_args.repository,
         "--image-ids",
-        "imageTag=rollback",
+        &filter,
         "--region",
         &rollback_args.region,
     ];
@@ -500,10 +537,10 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs) -> anyhow::Result<()> {
         &aws_args,
         None,
         None,
-        "removing 'rollback' tag should succeed",
+        "removing '{rollback_tag}' tag should succeed",
     )
-    .context("failed to remove 'rollback' tag")?;
-    eprintln!("🧹 Removed 'rollback' tag.");
+    .context("failed to remove '{rollback_tag}' tag")?;
+    eprintln!("🧹 Removed '{rollback_tag}' tag.");
     Ok(())
 }
 

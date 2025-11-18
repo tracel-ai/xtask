@@ -53,6 +53,8 @@ pub mod prelude {
     pub use crate::context::Context;
     pub use crate::endgroup;
     pub use crate::environment::Environment;
+    pub use crate::environment::EnvironmentIndex;
+    pub use crate::environment::EnvironmentName;
     pub use crate::group;
     pub use crate::group_info;
     pub use crate::handle_cleanup;
@@ -78,8 +80,10 @@ pub mod prelude {
     // does not re-export strum has it is incompatible with strum macros expansions
 }
 
+use environment::EnvironmentName;
+use prelude::Environment;
+
 use crate::context::Context;
-use crate::environment::Environment;
 use crate::logging::init_logger;
 
 #[macro_use]
@@ -91,34 +95,41 @@ pub struct XtaskArgs<C: clap::Subcommand> {
     /// Enable code coverage for Rust code if available (see coverage command for more info).
     #[arg(long)]
     pub enable_coverage: bool,
-    /// Set environment (for commands that support it).
-    #[arg(short = 'e', long, default_value_t = Environment::default())]
-    pub environment: Environment,
-    /// Set context (for commands that support it).
+    /// Set environment.
+    #[arg(short = 'e', long = "env_name", default_value_t = EnvironmentName::default())]
+    pub environment_name: EnvironmentName,
+    /// Set environment index, must be between 1 and 255 inclusive
+    #[arg(short = 'i', long = "env_index", default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=255))]
+    pub environment_index: u8,
+    /// Set context.
     #[arg(short = 'c', long, default_value_t = Context::default())]
     pub context: Context,
     #[command(subcommand)]
     pub command: C,
 }
 
-pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<XtaskArgs<C>> {
+pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<(XtaskArgs<C>, Environment)> {
     // init logs early
     init_logger().init();
     let args = <XtaskArgs<C> as clap::Parser>::parse();
-    Ok(args)
+    let env = Environment::new(args.environment_name.clone(), args.environment_index);
+    Ok((args, env))
 }
 
-pub fn init_xtask<C: clap::Subcommand>(args: XtaskArgs<C>) -> anyhow::Result<XtaskArgs<C>> {
-    // environment
-    group_info!("Environment: {}", args.environment);
-    args.environment.load(None)?;
+pub fn init_xtask<C: clap::Subcommand>(
+    config: (XtaskArgs<C>, Environment),
+) -> anyhow::Result<(XtaskArgs<C>, Environment)> {
+    let args = config.0;
+    let env = config.1;
+    group_info!("Environment: {env}");
+    env.load(None)?;
     group_info!("Context: {}", args.context);
     // code coverage
     if args.enable_coverage {
         group_info!("Enabling coverage support...");
         setup_coverage()?;
     }
-    Ok(args)
+    Ok((args, env))
 }
 
 fn setup_coverage() -> anyhow::Result<()> {

@@ -3,7 +3,9 @@ use strum::IntoEnumIterator;
 
 use crate::{
     commands::WARN_IGNORED_ONLY_ARGS,
-    endgroup, group,
+    endgroup,
+    environment::EnvironmentName,
+    group,
     prelude::{Context, Environment},
     utils::{
         process::{run_process_for_package, run_process_for_workspace},
@@ -54,7 +56,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
 /// Return true if the environment is OK.
 /// Prevents from running test in production unless the `force` flag is set
 pub fn check_environment(args: &TestCmdArgs, env: &Environment) -> bool {
-    if *env == Environment::Production {
+    if env.name == EnvironmentName::Production {
         if args.force {
             warn!("Force running tests in production (--force argument is set)");
             return true;

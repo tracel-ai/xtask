@@ -1,32 +1,49 @@
-use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Write as _},
+    path::PathBuf,
+};
 
-use strum::{Display, EnumIter, EnumString};
+use strum::{EnumIter, EnumString};
 
 use crate::{group_error, group_info, utils::git};
 
-#[derive(EnumString, EnumIter, Default, Display, Clone, Debug, PartialEq, clap::ValueEnum)]
-#[strum(serialize_all = "lowercase")]
-pub enum Environment {
-    /// Development environment (alias: dev).
-    #[default]
-    #[strum(serialize = "dev")]
-    #[clap(alias = "dev")]
-    Development,
-    /// Staging environment (alias: stag).
-    #[strum(serialize = "stag")]
-    #[clap(alias = "stag")]
-    Staging,
-    /// Testing environment (alias: test).
-    #[strum(serialize = "test")]
-    #[clap(alias = "test")]
-    Test,
-    /// Production environment (alias: prod).
-    #[strum(serialize = "prod")]
-    #[clap(alias = "prod")]
-    Production,
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Environment {
+    pub name: EnvironmentName,
+    pub index: EnvironmentIndex,
+}
+
+impl Display for Environment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.medium())
+    }
 }
 
 impl Environment {
+    pub fn new(name: EnvironmentName, index: u8) -> Self {
+        Self {
+            name,
+            index: index.into(),
+        }
+    }
+
+    pub fn long(&self) -> String {
+        format!("{}{}", self.name.long(), self.index)
+    }
+
+    pub fn medium(&self) -> String {
+        format!("{}{}", self.name.medium(), self.index)
+    }
+
+    pub fn short(&self) -> String {
+        format!("{}{}", self.name.short(), self.index)
+    }
+
+    pub fn index(&self) -> u8 {
+        self.index.index
+    }
+
     pub fn get_dotenv_filename(&self) -> String {
         format!(".env.{self}")
     }
@@ -46,8 +63,6 @@ impl Environment {
     }
 
     /// Load the .env environment files family.
-    /// You don't need to call it in an xtask binary but can be useful
-    /// in a non-xtask binary.
     pub fn load(&self, prefix: Option<&str>) -> anyhow::Result<()> {
         let files = self.get_env_files();
         files.iter().for_each(|f| {
@@ -109,6 +124,86 @@ impl Environment {
     }
 }
 
+#[derive(EnumString, EnumIter, Default, Clone, Debug, PartialEq, clap::ValueEnum)]
+#[strum(serialize_all = "lowercase")]
+pub enum EnvironmentName {
+    /// Development environment (alias: dev).
+    #[default]
+    #[clap(alias = "dev")]
+    Development,
+    /// Staging environment (alias: stag).
+    #[clap(alias = "stag")]
+    Staging,
+    /// Testing environment (alias: test).
+    #[clap(alias = "test")]
+    Test,
+    /// Production environment (alias: prod).
+    #[clap(alias = "prod")]
+    Production,
+}
+
+impl Display for EnvironmentName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.medium())
+    }
+}
+
+impl EnvironmentName {
+    fn long(&self) -> &'static str {
+        match self {
+            EnvironmentName::Development => "development",
+            EnvironmentName::Staging => "staging",
+            EnvironmentName::Test => "test",
+            EnvironmentName::Production => "production",
+        }
+    }
+
+    fn medium(&self) -> &'static str {
+        match self {
+            EnvironmentName::Development => "dev",
+            EnvironmentName::Staging => "stag",
+            EnvironmentName::Test => "test",
+            EnvironmentName::Production => "prod",
+        }
+    }
+
+    fn short(&self) -> char {
+        match self {
+            EnvironmentName::Development => 'd',
+            EnvironmentName::Staging => 's',
+            EnvironmentName::Test => 't',
+            EnvironmentName::Production => 'p',
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EnvironmentIndex {
+    pub index: u8,
+}
+
+impl Default for EnvironmentIndex {
+    fn default() -> Self {
+        Self { index: 1 }
+    }
+}
+
+impl Display for EnvironmentIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.index == 1 {
+            write!(f, "")
+        } else {
+            write!(f, "{}", self.index)
+        }
+    }
+}
+
+impl From<u8> for EnvironmentIndex {
+    fn from(index: u8) -> Self {
+        Self { index }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,11 +212,11 @@ mod tests {
     use std::env;
 
     fn expected_vars(env: &Environment) -> Vec<(String, String)> {
-        let suffix = match env {
-            Environment::Development => "DEV",
-            Environment::Staging => "STAG",
-            Environment::Test => "TEST",
-            Environment::Production => "PROD",
+        let suffix = match env.name {
+            EnvironmentName::Development => "DEV",
+            EnvironmentName::Staging => "STAG",
+            EnvironmentName::Test => "TEST",
+            EnvironmentName::Production => "PROD",
         };
 
         vec![
@@ -138,10 +233,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment::Development)]
-    #[case::stag(Environment::Staging)]
-    #[case::test(Environment::Test)]
-    #[case::prod(Environment::Production)]
+    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 } })]
+    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 } })]
+    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 } })]
+    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 } })]
     #[serial]
     fn test_environment_load(#[case] env: Environment) {
         // Remove possible prior values
@@ -165,10 +260,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment::Development)]
-    #[case::stag(Environment::Staging)]
-    #[case::test(Environment::Test)]
-    #[case::prod(Environment::Production)]
+    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 } })]
+    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 } })]
+    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 } })]
+    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 } })]
     #[serial]
     fn test_environment_merge_env_files(#[case] env: Environment) {
         // Make sure we start from a clean state
@@ -208,7 +303,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_environment_merge_env_files_expansion() {
-        let env = Environment::Staging;
+        let env = Environment {
+            name: EnvironmentName::Staging,
+            index: EnvironmentIndex { index: 1 },
+        };
         // Clean any prior values that could interfere
         env::remove_var("LOG_LEVEL_TEST");
         env::remove_var("RUST_LOG_TEST");
