@@ -1,0 +1,13 @@
+[package]
+name = "xtask-tests"
+version = "3.2.0"
+edition = "2021"
+
+[dependencies]
+dotenvy = { workspace = true }
+log = { workspace = true }
+strum = { workspace = true }
+tracel-xtask = { path = "../tracel-xtask" }
+
+[dev-dependencies]
+rstest = { workspace = true }

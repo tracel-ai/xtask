@@ -36,7 +36,7 @@ fn test_xtask_example_status_success_and_returns_expected_output(
     #[case] expected_output: String,
     #[case] success: bool,
 ) {
-    let mut args = vec!["xtask"];
+    let mut args = vec!["xtask-tests"];
     args.extend(cargo_args);
     let output = Command::new("cargo")
         .args(args)

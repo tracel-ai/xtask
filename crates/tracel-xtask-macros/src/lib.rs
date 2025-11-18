@@ -137,7 +137,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Container",
         quote! {
             #[doc = r"Manage containers lifecycle, from build to deployment."]
-            Container(tracel_xtask::commands::docker::ContainerCmdArgs)
+            Container(tracel_xtask::commands::container::ContainerCmdArgs)
         },
     );
     variant_map.insert(

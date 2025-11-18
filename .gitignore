@@ -1,5 +1,5 @@
 /target
-xtask/target
+crates/xtask-tests/target
 
 .DS_Store
 .vscode
