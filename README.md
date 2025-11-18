@@ -190,8 +190,9 @@ Try it with `cx --help` at the root of the repository.
 
 All our repositories follow the same directory hierarchy:
 - a `crates` directory which contains all the crates of the workspace
+- a `crates/xtask-tests` a special crates that implements an xtask binary based on `tracel-xtask` and that can be used as a reference for extending xtaskcommands
 - an `examples` directory which holds all the examples crates
-- a `xtask` directory which is the binary crate for our xtask CLI using `tracel-xtask`
+- a `xtask` directory is a release of xtask CLI with all the base commands
 
 ### About tests
 
@@ -300,6 +301,8 @@ level of subcommands to keep the interface simple.
 In the following sections we will see how to create completely new commands as well how to extend existing base commands.
 
 ## Customization
+
+The crate `xtask-tests` contains examples of the following sections.
 
 ### Create a new command
 
