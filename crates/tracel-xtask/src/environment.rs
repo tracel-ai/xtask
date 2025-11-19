@@ -12,6 +12,7 @@ use crate::{group_error, group_info, utils::git};
 pub struct Environment {
     pub name: EnvironmentName,
     pub index: EnvironmentIndex,
+    pub explicit_index: bool,
 }
 
 impl Display for Environment {
@@ -25,19 +26,43 @@ impl Environment {
         Self {
             name,
             index: index.into(),
+            explicit_index: false,
+        }
+    }
+
+    /// Turn an non explicit environment into an explicit one.
+    /// An explicit environment will always append the index number to its display names.
+    /// Whereas a non-explicit one (default) only append the index if it is different than 1.
+    pub fn into_explicit(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            index: self.index().into(),
+            explicit_index: true,
         }
     }
 
     pub fn long(&self) -> String {
-        format!("{}{}", self.name.long(), self.index)
+        if self.explicit_index || self.index() != 1 {
+            format!("{}{}", self.name.long(), self.index)
+        } else {
+            format!("{}", self.name.long())
+        }
     }
 
     pub fn medium(&self) -> String {
-        format!("{}{}", self.name.medium(), self.index)
+        if self.explicit_index || self.index() != 1 {
+            format!("{}{}", self.name.medium(), self.index)
+        } else {
+            format!("{}", self.name.medium())
+        }
     }
 
     pub fn short(&self) -> String {
-        format!("{}{}", self.name.short(), self.index)
+        if self.explicit_index || self.index() != 1 {
+            format!("{}{}", self.name.short(), self.index)
+        } else {
+            format!("{}", self.name.short())
+        }
     }
 
     pub fn index(&self) -> u8 {
@@ -149,7 +174,7 @@ impl Display for EnvironmentName {
 }
 
 impl EnvironmentName {
-    fn long(&self) -> &'static str {
+    pub fn long(&self) -> &'static str {
         match self {
             EnvironmentName::Development => "development",
             EnvironmentName::Staging => "staging",
@@ -158,7 +183,7 @@ impl EnvironmentName {
         }
     }
 
-    fn medium(&self) -> &'static str {
+    pub fn medium(&self) -> &'static str {
         match self {
             EnvironmentName::Development => "dev",
             EnvironmentName::Staging => "stag",
@@ -167,7 +192,7 @@ impl EnvironmentName {
         }
     }
 
-    fn short(&self) -> char {
+    pub fn short(&self) -> char {
         match self {
             EnvironmentName::Development => 'd',
             EnvironmentName::Staging => 's',
@@ -190,11 +215,7 @@ impl Default for EnvironmentIndex {
 
 impl Display for EnvironmentIndex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.index == 1 {
-            write!(f, "")
-        } else {
-            write!(f, "{}", self.index)
-        }
+        write!(f, "{}", self.index)
     }
 }
 
@@ -233,10 +254,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 } })]
-    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 } })]
-    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 } })]
-    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 } })]
+    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
     #[serial]
     fn test_environment_load(#[case] env: Environment) {
         // Remove possible prior values
@@ -260,10 +281,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 } })]
-    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 } })]
-    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 } })]
-    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 } })]
+    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
     #[serial]
     fn test_environment_merge_env_files(#[case] env: Environment) {
         // Make sure we start from a clean state
@@ -303,10 +324,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_environment_merge_env_files_expansion() {
-        let env = Environment {
-            name: EnvironmentName::Staging,
-            index: EnvironmentIndex { index: 1 },
-        };
+        let env = Environment::new(EnvironmentName::Staging, 1);
         // Clean any prior values that could interfere
         env::remove_var("LOG_LEVEL_TEST");
         env::remove_var("RUST_LOG_TEST");

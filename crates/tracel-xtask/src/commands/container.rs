@@ -51,6 +51,9 @@ pub struct ContainerListSubCmdArgs {
     /// The tag reprensenting the latest tag (defaults to the environment name if ommited)
     #[arg(long)]
     pub latest_tag: Option<String>,
+    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if ommited)
+    #[arg(long)]
+    pub rollback_tag: Option<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -221,6 +224,14 @@ pub fn handle_command(
     }
 }
 
+fn promote_tag(tag: Option<String>, env: &Environment) -> String {
+    tag.unwrap_or(env.to_string())
+}
+
+fn rollback_tag(tag: Option<String>, env: &Environment) -> String {
+    tag.unwrap_or(format!("rollback_{env}"))
+}
+
 fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     let context_dir = build_args.context_dir.unwrap_or(git_repo_root_or_cwd()?);
     let build_file_path = if build_args.build_file.is_absolute() {
@@ -247,18 +258,19 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
 
 fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let ecr_repository = &list_args.repository;
-    let latest_tag = list_args.latest_tag.unwrap_or(env.to_string());
+    let latest_tag = promote_tag(list_args.latest_tag, env);
+    let rollback_tag = rollback_tag(list_args.rollback_tag, env);
     let latest_present =
         ecr_get_manifest(ecr_repository, &list_args.region, &latest_tag)?.is_some();
     let rollback_present =
-        ecr_get_manifest(ecr_repository, &list_args.region, "rollback")?.is_some();
+        ecr_get_manifest(ecr_repository, &list_args.region, &rollback_tag)?.is_some();
     let latest_commit_tag = if latest_present {
-        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "latest", &list_args.region)?
+        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, &latest_tag, &list_args.region)?
     } else {
         None
     };
     let rollback_tag = if rollback_present {
-        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, "rollback", &list_args.region)?
+        ecr_get_commit_sha_tag_from_alias_tag(ecr_repository, &rollback_tag, &list_args.region)?
     } else {
         None
     };
@@ -425,7 +437,7 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
 
 /// promote: point N to `latest` and move the previous `latest` to `rollback`
 fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
-    let promote_tag = promote_args.promote_tag.unwrap_or(env.to_string());
+    let promote_tag = promote_tag(promote_args.promote_tag, env);
     // Fetch current 'latest' and the target tag's manifest.
     let prev_latest_manifest =
         ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
@@ -462,9 +474,7 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
     .context("'{promote_tag}' should be updated to the target manifest")?;
     // If there was a previous 'latest', move it to 'rollback'.
     if let Some(prev) = prev_latest_manifest {
-        let rollback_tag = promote_args
-            .rollback_tag
-            .unwrap_or(format!("rollback_{env}"));
+        let rollback_tag = rollback_tag(promote_args.rollback_tag, env);
         // Only write rollback if it's different from the new 'latest'.
         ecr_put_manifest(
             &promote_args.repository,
@@ -484,9 +494,7 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
 
 /// rollback: promote current 'rollback_tag' container to 'promote_tag' and then remove 'rollback_tag'
 fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
-    let rollback_tag = rollback_args
-        .rollback_tag
-        .unwrap_or(format!("rollback_{env}"));
+    let rollback_tag = rollback_tag(rollback_args.rollback_tag, env);
     // Fetch the manifest of the 'rollback' tag
     let rb = ecr_get_manifest(
         &rollback_args.repository,
@@ -500,7 +508,7 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
         )
     })?;
     // If promoted container is different, update it; if it's already the same, skip write.
-    let promote_tag = rollback_args.promote_tag.unwrap_or(env.to_string());
+    let promote_tag = promote_tag(rollback_args.promote_tag, env);
     if ecr_get_manifest(
         &rollback_args.repository,
         &rollback_args.region,
