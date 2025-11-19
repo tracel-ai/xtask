@@ -38,7 +38,7 @@ impl IndexStyle for ExplicitIndex {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Environment<M = ImplicitIndex> {
     pub name: EnvironmentName,
     pub index: EnvironmentIndex,
