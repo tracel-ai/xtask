@@ -72,6 +72,16 @@ impl Environment<ImplicitIndex> {
     }
 }
 
+impl Environment<ExplicitIndex> {
+    pub fn into_implicit(self) -> Environment<ImplicitIndex> {
+        Environment {
+            name: self.name.clone(),
+            index: self.index().into(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<M: IndexStyle> Display for Environment<M> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.medium())
