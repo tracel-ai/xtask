@@ -122,7 +122,7 @@ pub fn init_xtask<C: clap::Subcommand>(
 ) -> anyhow::Result<(XtaskArgs<C>, Environment)> {
     let args = config.0;
     let env = config.1;
-    group_info!("Environment: {env}");
+    group_info!("Environment: {}", env.long());
     env.load(None)?;
     group_info!("Context: {}", args.context);
     // code coverage

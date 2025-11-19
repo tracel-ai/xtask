@@ -127,8 +127,6 @@ impl<M: IndexStyle> Environment<M> {
                         group_error!("error while loading '{}' file ({})", f, e);
                     }
                 }
-            } else {
-                group_info!("environment file '{}' does not exist, skipping...", f);
             }
         });
         Ok(())
