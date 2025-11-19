@@ -190,7 +190,6 @@ Try it with `cx --help` at the root of the repository.
 
 All our repositories follow the same directory hierarchy:
 - a `crates` directory which contains all the crates of the workspace
-- a `crates/xtask-tests` a special crates that implements an xtask binary based on `tracel-xtask` and that can be used as a reference for extending xtaskcommands
 - an `examples` directory which holds all the examples crates
 - a `xtask` directory is a release of xtask CLI with all the base commands
 
@@ -241,11 +240,17 @@ The following options are global and precede the actual command on the command l
 cargo xtask -e production build
 ```
 
-Its main role is to inform your custom commands or dispatch functions about the targeted environment which can be:
-- `dev` (default) for development,
-- `test` for test,
-- `stag` for staging,
-- `prod` for production.
+Its main role is to inform your custom commands or dispatch functions about the targeted environment. An environment
+has 3 different display names: a short one, a medium one and a long one.
+
+The available environments are listed below:
+
+| Environment | Short | Medium | Long        |
+|:------------|:------|:-------|:------------|
+| Development | d     | dev    | development |
+| Test        | t     | test   | test        |
+| Staging     | s     | stag   | staging     |
+| Production  | p     | prod   | production  |
 
 It also automatically loads the following environment variables files if they exists in the working directory:
 - `.env` for any set environment,
@@ -255,6 +260,17 @@ It also automatically loads the following environment variables files if they ex
   at the root of your repository).
 
 This parameter is passed to all the `handle_command` function as `env`.
+
+#### Environment Index
+
+By default the index is transparent because it is set to 1 and the first index does not appear in the environment name.
+So for instance the `stag` environment is actually the `stag1` environment but it is always printed `stag`.
+
+Any provided index greater than 1 is always explicit and always appear in the environment name.
+
+To turn an environment into an explicit environment you can call the function `into_explicit` on the environment
+which returns a new environment. This new environment always prints the index so instead of printing `s`, `stag`
+or `staging`, it will print `s1`, `stag1` and `staging1` explicitly.
 
 #### Context
 
@@ -869,18 +885,18 @@ The design, however, could later be refactored to support other cloud providers 
 
 ##### Deploy
 
-**Build of container** -> **Push to container registry** -> **Promote to `latest`** -> **Rollout**
+**Build of container** -> **Push to container registry** -> **Promote to `<env_medium>`** -> **Rollout**
 
 ##### Rollback
 
-**Rollback by promoting `rollback` to `latest`** -> **Rollout**
+**Rollback by promoting `rollback_<env_medium>` to `<env_medium>`** -> **Rollout**
 
 #### Prerequisites
 
 - **AWS CLI** setup with permissions for ECR and Auto Scaling.
 - **Docker** installed locally or on your CI runners.
 
-#### Example
+#### Examples
 
 First build the container locally:
 
@@ -912,6 +928,18 @@ To see the current `latest` and `rollback` images use the `list` subcommand:
 
 ```
 cargo xtask -e stag container list --region AWS_REGION --repository my_image
+```
+
+### Secrets
+
+This command handles secrets to view, edit and even write an env file with them. For now it only supports AWS Secrets Manager.
+
+#### Examples
+
+View secrets:
+
+```
+cargo xtask -e stag secrets view --region AWS_REGION my_secret
 ```
 
 ### Docker Compose
