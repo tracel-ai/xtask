@@ -48,10 +48,10 @@ pub struct ContainerListSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
-    /// The tag reprensenting the latest tag (defaults to the environment name if ommited)
+    /// The tag reprensenting the latest tag (defaults to the environment name if omitted)
     #[arg(long)]
     pub latest_tag: Option<String>,
-    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if ommited)
+    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }
@@ -105,10 +105,10 @@ pub struct ContainerPromoteSubCmdArgs {
     /// Build tag to promote for the given environmentd
     #[arg(long)]
     pub build_tag: String,
-    /// Promote tag applied by this command (defaults to the environment name if ommited)
+    /// Promote tag applied by this command (defaults to the environment name if omitted)
     #[arg(long)]
     pub promote_tag: Option<String>,
-    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if ommited)
+    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }
@@ -121,10 +121,10 @@ pub struct ContainerRollbackSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
-    /// Promote tag applied by this command (defaults to the environment name if ommited)
+    /// Promote tag applied by this command (defaults to the environment name if omitted)
     #[arg(long)]
     pub promote_tag: Option<String>,
-    /// Rollback tag to promote to promote tag (defaults to 'rollback_<environment>' if ommited)
+    /// Rollback tag to promote to promote tag (defaults to 'rollback_<environment>' if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }
