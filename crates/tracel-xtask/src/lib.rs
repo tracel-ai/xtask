@@ -55,6 +55,7 @@ pub mod prelude {
     pub use crate::environment::Environment;
     pub use crate::environment::EnvironmentIndex;
     pub use crate::environment::EnvironmentName;
+    pub use crate::environment::ExplicitIndex;
     pub use crate::group;
     pub use crate::group_info;
     pub use crate::handle_cleanup;

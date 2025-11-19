@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::{self, Display, Write as _},
+    marker::PhantomData,
     path::PathBuf,
 };
 
@@ -8,65 +9,86 @@ use strum::{EnumIter, EnumString};
 
 use crate::{group_error, group_info, utils::git};
 
+/// Implicit index which means that index '1' is omitted in display.
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct Environment {
-    pub name: EnvironmentName,
-    pub index: EnvironmentIndex,
-    pub explicit_index: bool,
+pub struct ImplicitIndex;
+
+/// Explicit index which means that index is always in display.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExplicitIndex;
+
+/// Style for how to format `{base}{index}`.
+pub trait IndexStyle {
+    fn format(base: &str, index: u8) -> String;
 }
 
-impl Display for Environment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.medium())
+impl IndexStyle for ImplicitIndex {
+    fn format(base: &str, index: u8) -> String {
+        if index == 1 {
+            base.to_string()
+        } else {
+            format!("{base}{index}")
+        }
     }
 }
 
-impl Environment {
+impl IndexStyle for ExplicitIndex {
+    fn format(base: &str, index: u8) -> String {
+        format!("{base}{index}")
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Environment<M = ImplicitIndex> {
+    pub name: EnvironmentName,
+    pub index: EnvironmentIndex,
+    _marker: PhantomData<M>,
+}
+
+impl<M> Environment<M> {
     pub fn new(name: EnvironmentName, index: u8) -> Self {
         Self {
             name,
             index: index.into(),
-            explicit_index: false,
-        }
-    }
-
-    /// Turn an non explicit environment into an explicit one.
-    /// An explicit environment will always append the index number to its display names.
-    /// Whereas a non-explicit one (default) only append the index if it is different than 1.
-    pub fn into_explicit(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            index: self.index().into(),
-            explicit_index: true,
-        }
-    }
-
-    pub fn long(&self) -> String {
-        if self.explicit_index || self.index() != 1 {
-            format!("{}{}", self.name.long(), self.index)
-        } else {
-            format!("{}", self.name.long())
-        }
-    }
-
-    pub fn medium(&self) -> String {
-        if self.explicit_index || self.index() != 1 {
-            format!("{}{}", self.name.medium(), self.index)
-        } else {
-            format!("{}", self.name.medium())
-        }
-    }
-
-    pub fn short(&self) -> String {
-        if self.explicit_index || self.index() != 1 {
-            format!("{}{}", self.name.short(), self.index)
-        } else {
-            format!("{}", self.name.short())
+            _marker: PhantomData,
         }
     }
 
     pub fn index(&self) -> u8 {
         self.index.index
+    }
+}
+
+impl Environment<ImplicitIndex> {
+    /// Turn an non explicit environment into an explicit one.
+    /// An explicit environment will always append the index number to its display names.
+    /// Whereas a non-explicit one (default) only append the index if it is different than 1.
+    pub fn into_explicit(self) -> Environment<ExplicitIndex> {
+        Environment {
+            name: self.name.clone(),
+            index: self.index().into(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<M: IndexStyle> Display for Environment<M> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.medium())
+    }
+}
+
+impl<M: IndexStyle> Environment<M> {
+    pub fn long(&self) -> String {
+        M::format(self.name.long(), self.index())
+    }
+
+    pub fn medium(&self) -> String {
+        M::format(self.name.medium(), self.index())
+    }
+
+    pub fn short(&self) -> String {
+        M::format(&self.name.short().to_string(), self.index())
     }
 
     pub fn get_dotenv_filename(&self) -> String {
@@ -232,7 +254,10 @@ mod tests {
     use serial_test::serial;
     use std::env;
 
-    fn expected_vars(env: &Environment) -> Vec<(String, String)> {
+    // For tests we always use the implicit style
+    type TestEnv = Environment<ImplicitIndex>;
+
+    fn expected_vars(env: &TestEnv) -> Vec<(String, String)> {
         let suffix = match env.name {
             EnvironmentName::Development => "DEV",
             EnvironmentName::Staging => "STAG",
@@ -254,12 +279,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::dev(TestEnv::new(EnvironmentName::Development, 1))]
+    #[case::stag(TestEnv::new(EnvironmentName::Staging, 1))]
+    #[case::test(TestEnv::new(EnvironmentName::Test, 1))]
+    #[case::prod(TestEnv::new(EnvironmentName::Production, 1))]
     #[serial]
-    fn test_environment_load(#[case] env: Environment) {
+    fn test_environment_load(#[case] env: TestEnv) {
         // Remove possible prior values
         for (key, _) in expected_vars(&env) {
             env::remove_var(key);
@@ -281,12 +306,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case::dev(Environment { name: EnvironmentName::Development, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::stag(Environment { name: EnvironmentName::Staging, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::test(Environment { name: EnvironmentName::Test, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
-    #[case::prod(Environment { name: EnvironmentName::Production, index: EnvironmentIndex { index: 1 }, explicit_index: false })]
+    #[case::dev(TestEnv::new(EnvironmentName::Development, 1))]
+    #[case::stag(TestEnv::new(EnvironmentName::Staging, 1))]
+    #[case::test(TestEnv::new(EnvironmentName::Test, 1))]
+    #[case::prod(TestEnv::new(EnvironmentName::Production, 1))]
     #[serial]
-    fn test_environment_merge_env_files(#[case] env: Environment) {
+    fn test_environment_merge_env_files(#[case] env: TestEnv) {
         // Make sure we start from a clean state
         for (key, _) in expected_vars(&env) {
             env::remove_var(key);
@@ -324,7 +349,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_environment_merge_env_files_expansion() {
-        let env = Environment::new(EnvironmentName::Staging, 1);
+        let env = Environment::<ImplicitIndex>::new(EnvironmentName::Staging, 1);
         // Clean any prior values that could interfere
         env::remove_var("LOG_LEVEL_TEST");
         env::remove_var("RUST_LOG_TEST");
