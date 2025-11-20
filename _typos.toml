@@ -2,3 +2,8 @@
 extend-exclude = [
     "target",
 ]
+
+[default.extend-words]
+OT = "OT"
+UE = "UE"
+ue = "ue"
