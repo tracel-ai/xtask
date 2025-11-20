@@ -1,6 +1,6 @@
 use std::process::Command;
 
-pub mod aws_cli;
+pub mod aws;
 pub mod cargo;
 pub mod cleanup;
 pub mod git;

@@ -62,7 +62,7 @@ pub mod prelude {
     pub use crate::init_xtask;
     pub use crate::parse_args;
     pub use crate::register_cleanup;
-    pub use crate::utils::aws_cli;
+    pub use crate::utils::aws;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::git;

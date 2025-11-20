@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Context;
 
-use super::process::{run_process, run_process_capture_stdout};
+use crate::{prelude::run_process, utils::process::run_process_capture_stdout};
 
 /// Run `aws` cli with passed arguments.
 pub fn aws_cli(
@@ -311,7 +311,6 @@ pub fn ecr_image_digest(
 /// for the given repository and tag.
 /// If the digest cannot be retrieved, return None.
 pub fn ecr_image_url(repository: &str, tag: &str, region: &str) -> anyhow::Result<Option<String>> {
-    use crate::utils::aws_cli::{aws_account_id, ecr_image_digest};
     let account_id = aws_account_id()?;
     if let Some(digest) = ecr_image_digest(repository, tag, region)? {
         Ok(Some(format!(

@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::prelude::{Context as XtaskContext, Environment};
-use crate::utils::aws_cli::{secretsmanager_get_secret_string, secretsmanager_put_secret_string};
+use crate::utils::aws::cli::{secretsmanager_get_secret_string, secretsmanager_put_secret_string};
 
 const FALLBACK_EDITOR: &str = "vi";
 

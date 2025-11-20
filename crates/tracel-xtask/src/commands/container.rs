@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::prelude::anyhow::Context as _;
 use crate::prelude::*;
-use crate::utils::aws_cli::{
+use crate::utils::aws::cli::{
     aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
     ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
     ecr_ensure_repo_exists, ecr_get_commit_sha_tag_from_alias_tag,
@@ -283,7 +283,7 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     // current latest
     match (latest_present, &latest_commit_tag) {
         (true, Some(t)) => {
-            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws::cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• latest: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         (true, None) => eprintln!("• latest: ✅\n  found but tag unknown"),
@@ -292,7 +292,7 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     // current rollback
     match (rollback_present, &rollback_tag) {
         (true, Some(t)) => {
-            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws::cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• rollback: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         (true, None) => eprintln!("• rollback: ✅\n  found but tag unknown"),
@@ -301,7 +301,7 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     // latest non-alias tag (so not latest or rollback tagged)
     match &last_pushed_tag {
         Some(t) => {
-            let url = aws_cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
+            let url = aws::cli::ecr_image_url(ecr_repository, t, &list_args.region)?.unwrap();
             eprintln!("• last pushed: ✅\n  🏷 {t}\n  🌐 {url}");
         }
         None => eprintln!("• last pushed: ❌"),
