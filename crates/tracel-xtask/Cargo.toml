@@ -24,7 +24,7 @@ regex = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 tracing-subscriber = { workspace = true }
-tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=4.1.0" }
+tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=4.1.1" }
 
 [dev-dependencies]
 rstest = { workspace = true }
