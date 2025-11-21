@@ -1,11 +1,5 @@
 /// Manage AWS Secrets Manager secrets.
-use std::{
-    collections::HashMap,
-    fmt::Write as _,
-    fs,
-    io::{self, Write},
-    path::PathBuf,
-};
+use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
 use crate::prelude::{Context as XtaskContext, Environment};
 use crate::utils::aws::cli::{secretsmanager_get_secret_string, secretsmanager_put_secret_string};
@@ -79,19 +73,28 @@ fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
 
 /// Fetch secret into a temp file, open editor,
 /// ask to commit or discard on close and then push a new version if confirmed.
+///
+/// Behavior:
+/// - If the secret is JSON, it is pretty-printed for editing and stored back
+///   minified on a single line.
+/// - If the secret is not JSON, it is treated as an opaque string.
 fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
     // 1) fetch current secret value
-    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
-    // 2) create temp file path
+    let original_raw = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    let original_raw_trimmed = original_raw.trim_end_matches('\n');
+    // 2) make things pretty if possible
+    let to_edit =
+        pretty_json(original_raw_trimmed).unwrap_or_else(|| original_raw_trimmed.to_string());
+    // 3) write the secrets to a temp file for editing
     let tmp_path = temp_file_path(&args.secret_id);
-    fs::write(&tmp_path, &original)?;
+    fs::write(&tmp_path, &to_edit)?;
     eprintln!(
         "Editing secret '{}' in region '{}' using temporary file:\n  {}",
         args.secret_id,
         args.region,
         tmp_path.display()
     );
-    // 3) open editor
+    // 4) open editor
     let editor = detect_editor();
     let mut parts = editor.split_whitespace();
     let cmd = parts.next().unwrap_or(FALLBACK_EDITOR);
@@ -109,27 +112,45 @@ fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
             "editor '{editor}' should exit successfully (exit status {status})"
         ));
     }
-    // 4) read updated contents of file and do some cleanup
-    let edited = fs::read_to_string(&tmp_path)?;
+    // 5) read updated contents of file and do some cleanup
+    let edited_raw = fs::read_to_string(&tmp_path)?;
     fs::remove_file(&tmp_path).ok();
-    // ff nothing changed, we're done.
-    if edited == original {
+    let edited_raw_trimmed = edited_raw.trim_end_matches('\n');
+    // Try to treat content as JSON on both sides
+    let original_norm_json = normalize_json(original_raw_trimmed);
+    let edited_norm_json = normalize_json(edited_raw_trimmed);
+    // If both are valid JSON, compare and store minified JSON
+    if let (Some(orig_norm), Some(edited_norm)) = (original_norm_json, edited_norm_json) {
+        if orig_norm == edited_norm {
+            eprintln!(
+                "No changes detected (JSON content unchanged), not pushing a new secret version."
+            );
+            return Ok(());
+        }
+        eprintln!("Secret JSON content has changed.");
+        if !confirm_push()? {
+            eprintln!("Aborting: new secret version was not pushed.");
+            return Ok(());
+        }
+        // Store minified JSON
+        secretsmanager_put_secret_string(&args.secret_id, &args.region, &edited_norm)?;
+        eprintln!(
+            "✅ New JSON version pushed for secret '{}' in region '{}'.",
+            args.secret_id, args.region
+        );
+        return Ok(());
+    }
+    // 6) Fallback for non-JSON secrets
+    if edited_raw_trimmed == original_raw_trimmed {
         eprintln!("No changes detected, not pushing a new secret version.");
         return Ok(());
     }
-    // 5) ask user for confirmation to commit changes
     eprintln!("Secret content has changed.");
-    print!("Do you want to push a new secret version? [y/N]: ");
-    io::stdout().flush().ok();
-    let mut answer = String::new();
-    io::stdin().read_line(&mut answer)?;
-    let answer = answer.trim().to_lowercase();
-    if answer != "y" && answer != "yes" {
+    if !confirm_push()? {
         eprintln!("Aborting: new secret version was not pushed.");
         return Ok(());
     }
-    // 6) Commit new version
-    secretsmanager_put_secret_string(&args.secret_id, &args.region, &edited)?;
+    secretsmanager_put_secret_string(&args.secret_id, &args.region, edited_raw_trimmed)?;
     eprintln!(
         "✅ New version pushed for secret '{}' in region '{}'.",
         args.secret_id, args.region
@@ -217,4 +238,29 @@ fn detect_editor() -> String {
     std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))
         .unwrap_or_else(|_| FALLBACK_EDITOR.to_string())
+}
+
+/// Try to pretty-print JSON
+fn pretty_json(s: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(s).ok()?;
+    serde_json::to_string_pretty(&value).ok()
+}
+
+/// Normalize JSON to a canonical minified form.
+fn normalize_json(s: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(s).ok()?;
+    serde_json::to_string(&value).ok()
+}
+
+/// Ask user to confirm pushing a new secret version.
+fn confirm_push() -> anyhow::Result<bool> {
+    use std::io::Write as _;
+
+    print!("Do you want to push a new secret version? [y/N]: ");
+    io::stdout().flush().ok();
+
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    let answer = answer.trim().to_lowercase();
+    Ok(answer == "y" || answer == "yes")
 }
