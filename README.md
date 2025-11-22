@@ -240,6 +240,8 @@ The following options are global and precede the actual command on the command l
 cargo xtask -e production build
 ```
 
+This `--environment` parameter is passed to all the `handle_command` function as `env`.
+
 Its main role is to inform your custom commands or dispatch functions about the targeted environment. An environment
 has 3 different display names: a short one, a medium one and a long one.
 
@@ -254,12 +256,19 @@ The available environments are listed below:
 
 It also automatically loads the following environment variables files if they exists in the working directory:
 - `.env` for any set environment,
+- `.env.secrets` containing secrets for any set environment,
 - `.env.{environment}` (example: `.env.dev`) for the non-sensitive configuration,
 - `.env.{environment}.secrets` (example `.env.dev.secrets`) for the sensitive configuration like password. These
   files must be added to the ignore file of your VCS tool (for git add `.env.*.secrets` to the `.gitignore` file
   at the root of your repository).
 
-This parameter is passed to all the `handle_command` function as `env`.
+The `.secrets` component in `.env.secrets` is called a `dotenv family`. There exists two additional `dotenv families`:
+- `.infra` for infrastructure related variable, this allows to nicely split application config from pure infra config,
+- `.infra.secrets` for infrastructure secrets.
+
+For each family both `.env.{family}` and `.env.{environment}.{family}` are sourced if they exists.
+
+At last, the display form used in dotenv filenames for the environment is the `medium` one (see table above).
 
 #### Environment Index
 

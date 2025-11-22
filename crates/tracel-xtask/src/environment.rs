@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use strum::{EnumIter, EnumString};
+use strum::{EnumIter, EnumString, IntoEnumIterator as _};
 
 use crate::{group_error, group_info, utils::git};
 
@@ -101,44 +101,67 @@ impl<M: IndexStyle> Environment<M> {
         M::format(&self.name.short().to_string(), self.index())
     }
 
+    /// Return the two .env files for a given family:
+    /// - Base: `.env`, `.env.<env_medium>`
+    /// - Secrets: `.env.secrets`, `.env.<env_medium>.secrets`
+    /// - Infra: `.env.infra`, `.env.<env_medium>.infra`
+    /// - InfraSecrets: `.env.infra.secrets`, `.env.<env_medium>.infra.secrets`
+    fn dotenv_files_for_family(&self, family: DotEnvFamily) -> [String; 2] {
+        let suffix = family.to_string();
+        let env_medium = self.medium();
+        if suffix.is_empty() {
+            // Base
+            [".env".to_owned(), format!(".env.{env_medium}")]
+        } else {
+            // Other families
+            [
+                format!(".env{suffix}"),
+                format!(".env.{env_medium}{suffix}"),
+            ]
+        }
+    }
+
+    /// Backward-compatible helper for env-specific base filename.
     pub fn get_dotenv_filename(&self) -> String {
-        format!(".env.{self}")
+        // second element of the Base family
+        self.dotenv_files_for_family(DotEnvFamily::Base)[1].clone()
     }
 
+    /// Backward-compatible helper for env-specific secrets filename.
     pub fn get_dotenv_secrets_filename(&self) -> String {
-        format!("{}.secrets", self.get_dotenv_filename())
+        // second element of the Secrets family
+        self.dotenv_files_for_family(DotEnvFamily::Secrets)[1].clone()
     }
 
-    pub fn get_env_files(&self) -> [String; 3] {
-        let filename = self.get_dotenv_filename();
-        let secrets_filename = self.get_dotenv_secrets_filename();
-        [
-            ".env".to_owned(),
-            filename.to_owned(),
-            secrets_filename.to_owned(),
-        ]
+    /// All possible .env files for this environment, by family.
+    /// Order matters: later files override earlier ones.
+    pub fn get_env_files(&self) -> Vec<String> {
+        DotEnvFamily::iter()
+            .flat_map(|family| self.dotenv_files_for_family(family))
+            .collect()
     }
 
     /// Load the .env environment files family.
     pub fn load(&self, prefix: Option<&str>) -> anyhow::Result<()> {
         let files = self.get_env_files();
-        files.iter().for_each(|f| {
+        for file in files {
             let path = if let Some(p) = prefix {
-                std::path::PathBuf::from(p).join(f)
+                PathBuf::from(p).join(&file)
             } else {
-                std::path::PathBuf::from(f)
+                PathBuf::from(&file)
             };
             if path.exists() {
-                match dotenvy::from_filename(f) {
+                match dotenvy::from_path(&path) {
                     Ok(_) => {
-                        group_info!("loading '{}' file...", f);
+                        group_info!("loading '{}' file...", path.display());
                     }
                     Err(e) => {
-                        group_error!("error while loading '{}' file ({})", f, e);
+                        group_error!("error while loading '{}' file ({})", path.display(), e);
                     }
                 }
             }
-        });
+        }
+
         Ok(())
     }
 
@@ -252,6 +275,25 @@ impl Display for EnvironmentIndex {
 impl From<u8> for EnvironmentIndex {
     fn from(index: u8) -> Self {
         Self { index }
+    }
+}
+
+#[derive(EnumString, EnumIter, Clone, Debug, PartialEq, clap::ValueEnum)]
+enum DotEnvFamily {
+    Base,
+    Secrets,
+    Infra,
+    InfraSecrets,
+}
+
+impl Display for DotEnvFamily {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DotEnvFamily::Base => write!(f, ""),
+            DotEnvFamily::Secrets => write!(f, ".secrets"),
+            DotEnvFamily::Infra => write!(f, ".infra"),
+            DotEnvFamily::InfraSecrets => write!(f, ".infra.secrets"),
+        }
     }
 }
 
