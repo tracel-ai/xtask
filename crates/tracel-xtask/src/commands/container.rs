@@ -637,7 +637,7 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
     Ok(())
 }
 
-/// rollout: rollout latest promoted container
+/// rollout: rollout latest promoted container for current environment
 fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
     use anyhow::Context;
     use std::{
@@ -662,12 +662,18 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
     )
     .context("instance refresh should start")?;
 
+    let console_url = format!(
+        "https://{region}.console.aws.amazon.com/ec2/home?region={region}#AutoScalingGroupDetails:id={asg};view=instanceRefresh",
+        region = args.region,
+        asg = args.asg,
+    );
+
     eprintln!("🚀 Started instance refresh");
     eprintln!("  ASG:     {}", args.asg);
     eprintln!("  Region:  {}", args.region);
     eprintln!("  Refresh: {}", refresh_id);
+    eprintln!("  Console: {}", console_url);
 
-    // Optional wait for completion with spinner
     if args.wait {
         let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let mut frame_index = 0;
@@ -675,9 +681,9 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
         let start = Instant::now();
         let timeout = Duration::from_secs(args.wait_timeout_secs);
         let poll = Duration::from_secs(args.wait_poll_secs);
+        const CLR_EOL: &str = "\x1b[K";
 
         loop {
-            // rotate spinner
             let spinner = spinner_frames[frame_index % spinner_frames.len()];
             frame_index += 1;
 
@@ -695,36 +701,38 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
                 None => ("🕐", "Waiting..."),
             };
 
-            // Print single-line spinner + status
+            // elapsed time in mm:ss
+            let elapsed = start.elapsed();
+            let elapsed_secs = elapsed.as_secs();
+            let min = elapsed_secs / 60;
+            let sec = elapsed_secs % 60;
+
             print!(
-                "\r{spinner}  {emoji}  Refreshing {asg} — Status: {msg:<20}",
-                asg = args.asg
+                "\r{spinner}  {emoji} ({min:02}:{sec:02}) Refreshing {asg} — Status: {msg:<20}{CLR_EOL}",
+                asg = args.asg,
+                msg = msg,
             );
             io::stdout().flush().ok();
 
-            // Check terminal states
             match status_opt.as_deref() {
                 Some("Successful") => {
-                    println!(
-                        "\r✅ Rollout completed successfully!{space}",
-                        space = " ".repeat(40)
-                    );
+                    println!("\r✅ Rollout completed successfully in {min:02}:{sec:02}!{CLR_EOL}");
                     return Ok(());
                 }
                 Some("Failed") => {
-                    println!("\r❌ Rollout failed.{space}", space = " ".repeat(40));
+                    println!("\r❌ Rollout failed after {min:02}:{sec:02}.{CLR_EOL}");
                     anyhow::bail!("rollout finished with status: Failed");
                 }
                 Some("Cancelled") => {
-                    println!("\r⚠️ Rollout cancelled.{space}", space = " ".repeat(40));
+                    println!("\r⚠️ Rollout cancelled after {min:02}:{sec:02}.{CLR_EOL}");
                     anyhow::bail!("rollout finished with status: Cancelled");
                 }
                 _ => {}
             }
 
-            if start.elapsed() >= timeout {
+            if elapsed >= timeout {
                 println!(
-                    "\r⏰  Timeout after {}s — rollout still not completed.",
+                    "\r⏰  Timeout after {min:02}:{sec:02} (limit: {}s).{CLR_EOL}",
                     args.wait_timeout_secs
                 );
                 anyhow::bail!("rollout timed out after {} seconds", args.wait_timeout_secs);
