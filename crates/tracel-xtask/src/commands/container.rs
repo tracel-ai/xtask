@@ -51,6 +51,10 @@ pub struct ContainerHostSubCmdArgs {
     /// Name of the Auto Scaling Group hosting the containers
     #[arg(long, value_name = "ASG_NAME")]
     pub asg: String,
+
+    /// Login user for the SSM interactive shell
+    #[arg(long, default_value = "ubuntu")]
+    pub user: String,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -312,11 +316,11 @@ fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
         );
     }
 
-    // 2) Start SSM session to that instance
-    ensure_ssm_document(&args.region)?;
+    // 2) Open session
+    ensure_ssm_document(&args.region, &args.user)?;
     eprintln!(
-        "🔌 Opening SSM session to instance '{}' in region '{}' (ASG '{}')...",
-        instance_id, args.region, args.asg
+        "🔌 Opening SSM session to instance '{}' in region '{}' (ASG '{}', user '{}')...",
+        instance_id, args.region, args.asg, args.user
     );
     let args_vec: Vec<&str> = vec![
         "ssm",
@@ -328,7 +332,6 @@ fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
         "--document-name",
         SSM_SESSION_DOC,
     ];
-
     run_process(
         "aws",
         &args_vec,
@@ -781,20 +784,23 @@ fn docker_cli(
     run_process("docker", &arg_refs, envs, path, error_msg)
 }
 
-/// document to be able to login as ubuntu in an SSM session
-fn ensure_ssm_document(region: &str) -> anyhow::Result<()> {
-    let document_json = r#"{
+/// document to be able to login as a specific user in an SSM session
+fn ensure_ssm_document(region: &str, login_user: &str) -> anyhow::Result<()> {
+    let document_json = format!(
+        r#"{{
         "schemaVersion": "1.0",
         "description": "Xtask interactive shell",
         "sessionType": "Standard_Stream",
-        "inputs": {
+        "inputs": {{
             "runAsEnabled": true,
-            "runAsDefaultUser": "ubuntu",
-            "shellProfile": {
+            "runAsDefaultUser": "{user}",
+            "shellProfile": {{
                 "linux": "cd ~; exec bash -l"
-            }
-        }
-    }"#;
+            }}
+        }}
+    }}"#,
+        user = login_user,
+    );
 
     // Check if document exists
     let check = std::process::Command::new("aws")
@@ -819,7 +825,7 @@ fn ensure_ssm_document(region: &str) -> anyhow::Result<()> {
                 "--name",
                 SSM_SESSION_DOC,
                 "--content",
-                document_json,
+                &document_json,
                 "--document-type",
                 "Session",
                 "--region",
@@ -845,7 +851,7 @@ fn ensure_ssm_document(region: &str) -> anyhow::Result<()> {
                 "--name",
                 SSM_SESSION_DOC,
                 "--content",
-                document_json,
+                &document_json,
                 "--document-version",
                 "$LATEST",
                 "--region",
@@ -853,10 +859,11 @@ fn ensure_ssm_document(region: &str) -> anyhow::Result<()> {
             ])
             .output()
             .context("update-document should run")?;
+
         if !update.status.success() {
             let stderr = String::from_utf8_lossy(&update.stderr);
 
-            // If content is identical, treat as success (no-op)
+            // If content is identical, treat as success
             if stderr.contains("DuplicateDocumentContent") {
                 eprintln!("ℹ️ SSM document '{SSM_SESSION_DOC}' is already up to date.");
                 return Ok(());
