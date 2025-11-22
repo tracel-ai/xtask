@@ -675,6 +675,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             quote! {
                 #[doc = r"Build a container."]
                 Build(ContainerBuildSubCmdArgs),
+                #[doc = r"Start a terminal session on a container host instance."]
+                Host(ContainerHostSubCmdArgs),
                 #[doc = r"Show current latest and rollback images in registry."]
                 List(ContainerListSubCmdArgs),
                 #[doc = r"Pull a container from a registry."]

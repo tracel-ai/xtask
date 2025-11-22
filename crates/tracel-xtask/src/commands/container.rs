@@ -41,6 +41,17 @@ pub struct ContainerBuildSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ContainerHostSubCmdArgs {
+    /// Region of the Auto Scaling Group / container host
+    #[arg(long)]
+    pub region: String,
+
+    /// Name of the Auto Scaling Group hosting the containers
+    #[arg(long, value_name = "ASG_NAME")]
+    pub asg: String,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct ContainerListSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
@@ -214,6 +225,7 @@ pub fn handle_command(
 ) -> anyhow::Result<()> {
     match args.get_command() {
         ContainerSubCommand::Build(build_args) => build(build_args),
+        ContainerSubCommand::Host(host_args) => host(host_args),
         ContainerSubCommand::List(list_args) => list(list_args, &env),
         ContainerSubCommand::Pull(pull_args) => pull(pull_args),
         ContainerSubCommand::Push(push_args) => push(push_args),
@@ -254,6 +266,79 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     }
 
     docker_cli(args, None, None, "docker build failed")
+}
+
+fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use std::process::Command;
+    // 1) Get a valid instance ID from the ASG (the first one returned in the list)
+    let describe_output = Command::new("aws")
+        .args([
+            "autoscaling",
+            "describe-auto-scaling-groups",
+            "--auto-scaling-group-names",
+            &args.asg,
+            "--region",
+            &args.region,
+            "--query",
+            "AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId | [0]",
+            "--output",
+            "text",
+        ])
+        .output()
+        .with_context(|| {
+            format!(
+                "Describing Auto Scaling Group '{}' in region '{}' should succeed",
+                args.asg, args.region
+            )
+        })?;
+    if !describe_output.status.success() {
+        let stderr = String::from_utf8_lossy(&describe_output.stderr);
+        anyhow::bail!(
+            "Describing Auto Scaling Group '{}' in region '{}' should succeed, but AWS CLI exited with:\n{}",
+            args.asg,
+            args.region,
+            stderr
+        );
+    }
+    let instance_id = String::from_utf8(describe_output.stdout)
+        .context("Parsing instance ID from AWS CLI output should succeed")?
+        .trim()
+        .to_string();
+    if instance_id.is_empty() || instance_id == "None" {
+        anyhow::bail!(
+            "Finding an InService instance in Auto Scaling Group '{}' should succeed, but none were found",
+            args.asg
+        );
+    }
+
+    // 2) Start SSM session to that instance
+    eprintln!(
+        "🔌 Opening SSM session to instance '{}' in region '{}' (ASG '{}')...",
+        instance_id, args.region, args.asg
+    );
+    let params = "command=bash -l";
+    let args: Vec<&str> = vec![
+        "ssm",
+        "start-session",
+        "--target",
+        instance_id.as_str(),
+        "--region",
+        args.region.as_str(),
+        "--document-name",
+        "AWS-StartInteractiveCommand",
+        "--parameters",
+        params,
+    ];
+    run_process(
+        "aws",
+        &args,
+        None,
+        None,
+        "SSM session to container host should start successfully",
+    )?;
+
+    Ok(())
 }
 
 fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
