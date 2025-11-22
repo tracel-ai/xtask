@@ -13,6 +13,8 @@ use crate::utils::aws::cli::{
 use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::run_process;
 
+const SSM_SESSION_DOC: &str = "Xtask-InteractiveShell";
+
 #[tracel_xtask_macros::declare_command_args(None, ContainerSubCommand)]
 pub struct ContainerCmdArgs {}
 
@@ -269,10 +271,8 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
 }
 
 fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
-    use anyhow::Context;
-    use std::process::Command;
     // 1) Get a valid instance ID from the ASG (the first one returned in the list)
-    let describe_output = Command::new("aws")
+    let describe_output = std::process::Command::new("aws")
         .args([
             "autoscaling",
             "describe-auto-scaling-groups",
@@ -313,12 +313,12 @@ fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
     }
 
     // 2) Start SSM session to that instance
+    ensure_ssm_document(&args.region)?;
     eprintln!(
         "🔌 Opening SSM session to instance '{}' in region '{}' (ASG '{}')...",
         instance_id, args.region, args.asg
     );
-    let params = "command=bash -l";
-    let args: Vec<&str> = vec![
+    let args_vec: Vec<&str> = vec![
         "ssm",
         "start-session",
         "--target",
@@ -326,13 +326,12 @@ fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
         "--region",
         args.region.as_str(),
         "--document-name",
-        "AWS-StartInteractiveCommand",
-        "--parameters",
-        params,
+        SSM_SESSION_DOC,
     ];
+
     run_process(
         "aws",
-        &args,
+        &args_vec,
         None,
         None,
         "SSM session to container host should start successfully",
@@ -780,4 +779,91 @@ fn docker_cli(
 ) -> anyhow::Result<()> {
     let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     run_process("docker", &arg_refs, envs, path, error_msg)
+}
+
+/// document to be able to login as ubuntu in an SSM session
+fn ensure_ssm_document(region: &str) -> anyhow::Result<()> {
+    let document_json = r#"{
+        "schemaVersion": "1.0",
+        "description": "Xtask interactive shell",
+        "sessionType": "Standard_Stream",
+        "inputs": {
+            "runAsEnabled": true,
+            "runAsDefaultUser": "ubuntu",
+            "shellProfile": {
+                "linux": "cd ~; exec bash -l"
+            }
+        }
+    }"#;
+
+    // Check if document exists
+    let check = std::process::Command::new("aws")
+        .args([
+            "ssm",
+            "describe-document",
+            "--name",
+            SSM_SESSION_DOC,
+            "--region",
+            region,
+        ])
+        .output()
+        .context("describe-document should run")?;
+
+    if !check.status.success() {
+        // Create doc
+        eprintln!("📄 Creating SSM document '{SSM_SESSION_DOC}'...");
+        let create = std::process::Command::new("aws")
+            .args([
+                "ssm",
+                "create-document",
+                "--name",
+                SSM_SESSION_DOC,
+                "--content",
+                document_json,
+                "--document-type",
+                "Session",
+                "--region",
+                region,
+            ])
+            .output()
+            .context("create-document should run")?;
+
+        if !create.status.success() {
+            let stderr = String::from_utf8_lossy(&create.stderr);
+            // In case of race
+            if !stderr.contains("AlreadyExistsException") {
+                anyhow::bail!("create-document failed:\n{stderr}");
+            }
+        }
+    } else {
+        // Update doc to ensure latest content
+        eprintln!("📄 Updating SSM document '{SSM_SESSION_DOC}' to latest content...");
+        let update = std::process::Command::new("aws")
+            .args([
+                "ssm",
+                "update-document",
+                "--name",
+                SSM_SESSION_DOC,
+                "--content",
+                document_json,
+                "--document-version",
+                "$LATEST",
+                "--region",
+                region,
+            ])
+            .output()
+            .context("update-document should run")?;
+        if !update.status.success() {
+            let stderr = String::from_utf8_lossy(&update.stderr);
+
+            // If content is identical, treat as success (no-op)
+            if stderr.contains("DuplicateDocumentContent") {
+                eprintln!("ℹ️ SSM document '{SSM_SESSION_DOC}' is already up to date.");
+                return Ok(());
+            }
+            anyhow::bail!("update-document failed:\n{stderr}");
+        }
+    }
+
+    Ok(())
 }
