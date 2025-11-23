@@ -159,7 +159,7 @@ fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
+pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     if args.secret_ids.is_empty() {
         eprintln!("No secrets provided.");
         return Ok(());
