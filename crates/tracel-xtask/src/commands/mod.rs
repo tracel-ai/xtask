@@ -8,6 +8,7 @@ pub mod dependencies;
 pub mod doc;
 pub mod docker_compose;
 pub mod fix;
+pub mod host;
 pub mod publish;
 pub mod secrets;
 pub mod test;

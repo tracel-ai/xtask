@@ -1,7 +1,7 @@
 /// Manage AWS Secrets Manager secrets.
 use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
-use crate::prelude::{Context as XtaskContext, Environment};
+use crate::prelude::{Context, Environment};
 use crate::utils::aws::cli::{
     secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
     secretsmanager_put_secret_string,
@@ -88,7 +88,7 @@ pub struct SecretsViewSubCmdArgs {
 pub fn handle_command(
     args: SecretsCmdArgs,
     _env: Environment,
-    _ctx: XtaskContext,
+    _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
         SecretsSubCommand::Create(create_args) => create(create_args),

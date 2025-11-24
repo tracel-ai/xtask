@@ -41,6 +41,8 @@ pub mod prelude {
     pub use crate::commands::docker_compose::DockerComposeSubCommand;
     pub use crate::commands::fix::FixCmdArgs;
     pub use crate::commands::fix::FixSubCommand;
+    pub use crate::commands::host::HostCmdArgs;
+    pub use crate::commands::host::HostSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::secrets::SecretsCmdArgs;
     pub use crate::commands::secrets::SecretsSubCommand;

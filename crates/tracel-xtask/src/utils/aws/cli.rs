@@ -528,3 +528,96 @@ pub fn secretsmanager_create_empty_secret(
 
     aws_cli(args, None, None, "aws secretsmanager create-secret failed")
 }
+
+// Systems Manager -----------------------------------------------------------
+
+/// document to be able to login as a specific user in an SSM session
+pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> anyhow::Result<()> {
+    let document_json = format!(
+        r#"{{
+        "schemaVersion": "1.0",
+        "description": "Xtask interactive shell",
+        "sessionType": "Standard_Stream",
+        "inputs": {{
+            "runAsEnabled": true,
+            "runAsDefaultUser": "{user}",
+            "shellProfile": {{
+                "linux": "cd ~; exec bash -l"
+            }}
+        }}
+    }}"#,
+        user = login_user,
+    );
+
+    // Check if document exists
+    let check = std::process::Command::new("aws")
+        .args([
+            "ssm",
+            "describe-document",
+            "--name",
+            doc_name,
+            "--region",
+            region,
+        ])
+        .output()
+        .context("describe-document should run")?;
+
+    if !check.status.success() {
+        // Create doc
+        eprintln!("📄 Creating SSM document '{doc_name}'...");
+        let create = std::process::Command::new("aws")
+            .args([
+                "ssm",
+                "create-document",
+                "--name",
+                doc_name,
+                "--content",
+                &document_json,
+                "--document-type",
+                "Session",
+                "--region",
+                region,
+            ])
+            .output()
+            .context("create-document should run")?;
+
+        if !create.status.success() {
+            let stderr = String::from_utf8_lossy(&create.stderr);
+            // In case of race
+            if !stderr.contains("AlreadyExistsException") {
+                anyhow::bail!("create-document failed:\n{stderr}");
+            }
+        }
+    } else {
+        // Update doc to ensure latest content
+        eprintln!("📄 Updating SSM document '{doc_name}' to latest content...");
+        let update = std::process::Command::new("aws")
+            .args([
+                "ssm",
+                "update-document",
+                "--name",
+                doc_name,
+                "--content",
+                &document_json,
+                "--document-version",
+                "$LATEST",
+                "--region",
+                region,
+            ])
+            .output()
+            .context("update-document should run")?;
+
+        if !update.status.success() {
+            let stderr = String::from_utf8_lossy(&update.stderr);
+
+            // If content is identical, treat as success
+            if stderr.contains("DuplicateDocumentContent") {
+                eprintln!("ℹ️ SSM document '{doc_name}' is already up to date.");
+                return Ok(());
+            }
+            anyhow::bail!("update-document failed:\n{stderr}");
+        }
+    }
+
+    Ok(())
+}

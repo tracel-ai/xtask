@@ -176,6 +176,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Host",
+        quote! {
+            #[doc = r"Commands related to an host like connecting, getting info, etc..."]
+            Host(tracel_xtask::commands::host::HostCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Publish",
         quote! {
             #[doc = r"Publish a crate to crates.io."]
@@ -749,6 +756,15 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Lint,
                 #[doc = r"Find typos in source code and fix them."]
                 Typos,
+            },
+        ),
+        (
+            "HostSubCommand",
+            quote! {
+                #[doc = r"Connect to the host."]
+                Connect(HostConnectSubCmdArgs),
+                #[doc = r"Fetch the private IP of the host if any."]
+                PrivateIp(HostPrivateIpSubCmdArgs),
             },
         ),
         (
