@@ -505,3 +505,26 @@ pub fn secretsmanager_put_secret_string(
 
     Ok(())
 }
+
+/// Create an empty Secrets Manager secret (metadata only, no initial version).
+pub fn secretsmanager_create_empty_secret(
+    name: &str,
+    region: &str,
+    description: Option<&str>,
+) -> anyhow::Result<()> {
+    let mut args = vec![
+        "secretsmanager".into(),
+        "create-secret".into(),
+        "--name".into(),
+        name.into(),
+        "--region".into(),
+        region.into(),
+    ];
+
+    if let Some(desc) = description {
+        args.push("--description".into());
+        args.push(desc.into());
+    }
+
+    aws_cli(args, None, None, "aws secretsmanager create-secret failed")
+}

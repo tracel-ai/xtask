@@ -754,6 +754,10 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
         (
             "SecretsSubCommand",
             quote! {
+                #[doc = r"Create an empty secret (metadata only, no version)."]
+                Create(SecretsCreateSubCmdArgs),
+                #[doc = r"Copy a secret value from one secret ID to another in the same region."]
+                Copy(SecretsCopySubCmdArgs),
                 #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
                 Edit(SecretsEditSubCmdArgs),
                 #[doc = r"Fetch the secrets and write an environment file to a specified path."]

@@ -2,7 +2,10 @@
 use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
 use crate::prelude::{Context as XtaskContext, Environment};
-use crate::utils::aws::cli::{secretsmanager_get_secret_string, secretsmanager_put_secret_string};
+use crate::utils::aws::cli::{
+    secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
+    secretsmanager_put_secret_string,
+};
 
 const FALLBACK_EDITOR: &str = "vi";
 
@@ -13,6 +16,36 @@ impl Default for SecretsSubCommand {
     fn default() -> Self {
         SecretsSubCommand::View(SecretsViewSubCmdArgs::default())
     }
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct SecretsCreateSubCmdArgs {
+    /// Region where the secret will be created
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret name to create (metadata only, no initial version)
+    #[arg(value_name = "SECRET_ID")]
+    pub secret_id: String,
+
+    /// Optional description for the secret
+    #[arg(long)]
+    pub description: Option<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct SecretsCopySubCmdArgs {
+    /// Region where the secrets live
+    #[arg(long)]
+    pub region: String,
+
+    /// Source secret identifier (name or ARN)
+    #[arg(long, value_name = "FROM_SECRET_ID")]
+    pub from: String,
+
+    /// Target secret identifier (name or ARN)
+    #[arg(long, value_name = "TO_SECRET_ID")]
+    pub to: String,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -58,16 +91,66 @@ pub fn handle_command(
     _ctx: XtaskContext,
 ) -> anyhow::Result<()> {
     match args.get_command() {
+        SecretsSubCommand::Create(create_args) => create(create_args),
+        SecretsSubCommand::Copy(copy_args) => copy(copy_args),
         SecretsSubCommand::Edit(edit_args) => edit(edit_args),
         SecretsSubCommand::EnvFile(env_args) => env_file(env_args),
         SecretsSubCommand::View(view_args) => view(view_args),
     }
 }
 
-/// `view` subcommand: fetch and print the secret.
-fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
-    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
-    println!("{value}");
+/// create an empty secret (metadata only, no version).
+fn create(args: SecretsCreateSubCmdArgs) -> anyhow::Result<()> {
+    secretsmanager_create_empty_secret(&args.secret_id, &args.region, args.description.as_deref())?;
+
+    eprintln!(
+        "✅ Created empty secret '{}' in region '{}'.",
+        args.secret_id, args.region
+    );
+    Ok(())
+}
+
+/// Copy a secret value from one secret ID to another in the same region.
+fn copy(args: SecretsCopySubCmdArgs) -> anyhow::Result<()> {
+    if args.from == args.to {
+        eprintln!(
+            "Source and target secrets are identical ('{}'), nothing to do.",
+            args.from
+        );
+        return Ok(());
+    }
+
+    eprintln!(
+        "Fetching source secret '{}' in region '{}'...",
+        args.from, args.region
+    );
+    let value = secretsmanager_get_secret_string(&args.from, &args.region)?;
+
+    // Check if the target already has a current version.
+    // If we can successfully fetch it, we consider that a current version exists
+    // and ask for confirmation before creating a new one.
+    let target_has_version = secretsmanager_get_secret_string(&args.to, &args.region).is_ok();
+    if target_has_version {
+        eprintln!(
+            "Secret '{}' already has a current version in region '{}'.",
+            args.to, args.region
+        );
+        if !confirm_push()? {
+            eprintln!("Aborting: new secret version was not pushed.");
+            return Ok(());
+        }
+    }
+
+    eprintln!(
+        "Writing target secret '{}' in region '{}'...",
+        args.to, args.region
+    );
+    secretsmanager_put_secret_string(&args.to, &args.region, &value)?;
+    eprintln!(
+        "✅ Copied secret value from '{}' to '{}'.",
+        args.from, args.to
+    );
+
     Ok(())
 }
 
@@ -216,6 +299,13 @@ pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
         print!("{buf}");
     }
 
+    Ok(())
+}
+
+/// `view` subcommand: fetch and print the secret.
+fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
+    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    println!("{value}");
     Ok(())
 }
 
