@@ -153,12 +153,7 @@ fn private_ip(args: HostPrivateIpSubCmdArgs, _env: Environment) -> anyhow::Resul
             "text",
         ])
         .output()
-        .with_context(|| {
-            format!(
-                "Describing host instance '{}' should succeed",
-                args.name
-            )
-        })?;
+        .with_context(|| format!("Describing host instance '{}' should succeed", args.name))?;
 
     if !describe_output.status.success() {
         let stderr = String::from_utf8_lossy(&describe_output.stderr);

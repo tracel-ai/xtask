@@ -783,4 +783,3 @@ fn docker_cli(
     let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     run_process("docker", &arg_refs, envs, path, error_msg)
 }
-

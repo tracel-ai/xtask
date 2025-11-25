@@ -522,10 +522,17 @@ fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `view` subcommand: fetch and print the secret.
+/// fetch and print the secret.
 fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
     let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
-    println!("{value}");
+    let trimmed = value.trim_end_matches('\n');
+
+    if let Some(pretty) = pretty_json(trimmed) {
+        println!("{pretty}");
+    } else {
+        println!("{value}");
+    }
+
     Ok(())
 }
 
