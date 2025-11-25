@@ -59,6 +59,10 @@ pub struct SecretsEditSubCmdArgs {
     /// Secret identifier (name or ARN)
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
+
+    /// Push the new secret version without asking for confirmation
+    #[arg(short = 'y', long = "yes")]
+    pub yes: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -96,6 +100,10 @@ pub struct SecretsPushSubCmdArgs {
     /// Secret identifier (name or ARN)
     #[arg(long, value_name = "SECRET_ID")]
     pub secret_id: String,
+
+    /// Push the new secret version without asking for confirmation
+    #[arg(short = 'y', long = "yes")]
+    pub yes: bool,
 
     /// Key-value updates in the form KEY=VALUE
     #[arg(value_name = "KEY=VALUE", num_args(1..), required = true)]
@@ -241,7 +249,7 @@ fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
             return Ok(());
         }
         eprintln!("Secret JSON content has changed.");
-        if !confirm_push()? {
+        if !args.yes && !confirm_push()? {
             eprintln!("Aborting: new secret version was not pushed.");
             return Ok(());
         }
@@ -259,7 +267,7 @@ fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
         return Ok(());
     }
     eprintln!("Secret content has changed.");
-    if !confirm_push()? {
+    if !args.yes && !confirm_push()? {
         eprintln!("Aborting: new secret version was not pushed.");
         return Ok(());
     }
@@ -503,7 +511,7 @@ fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
 
     // 3) Confirmation prompt
     eprintln!("Secret JSON content has changed.");
-    if !confirm_push()? {
+    if !args.yes && !confirm_push()? {
         eprintln!("Aborting: new secret version was not pushed.");
         return Ok(());
     }
