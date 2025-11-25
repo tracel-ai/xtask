@@ -529,6 +529,32 @@ pub fn secretsmanager_create_empty_secret(
     aws_cli(args, None, None, "aws secretsmanager create-secret failed")
 }
 
+/// List all versions (including deprecated ones) for a given secret as raw JSON.
+/// `secret_id` can be a name or an ARN.
+pub fn secretsmanager_list_secret_versions_json(
+    secret_id: &str,
+    region: &str,
+) -> anyhow::Result<String> {
+    let out = aws_cli_capture_stdout(
+        vec![
+            "secretsmanager".into(),
+            "list-secret-version-ids".into(),
+            "--secret-id".into(),
+            secret_id.into(),
+            "--region".into(),
+            region.into(),
+            "--include-deprecated".into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws secretsmanager list-secret-version-ids",
+        None,
+        None,
+    )?;
+
+    Ok(out.trim_end().to_string())
+}
+
 // Systems Manager -----------------------------------------------------------
 
 /// document to be able to login as a specific user in an SSM session

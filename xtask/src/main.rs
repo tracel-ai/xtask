@@ -11,6 +11,7 @@ use tracel_xtask::prelude::*;
     Doc,
     DockerCompose,
     Fix,
+    Host,
     Publish,
     Secrets,
     Test,

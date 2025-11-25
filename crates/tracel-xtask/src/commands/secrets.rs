@@ -1,10 +1,12 @@
 /// Manage AWS Secrets Manager secrets.
 use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
+use anyhow::Context as _;
+
 use crate::prelude::{Context, Environment};
 use crate::utils::aws::cli::{
     secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
-    secretsmanager_put_secret_string,
+    secretsmanager_list_secret_versions_json, secretsmanager_put_secret_string,
 };
 
 const FALLBACK_EDITOR: &str = "vi";
@@ -75,6 +77,32 @@ pub struct SecretsEnvFileSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct SecretsListSubCmdArgs {
+    /// Region where the secret lives
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret identifier (name or ARN)
+    #[arg(value_name = "SECRET_ID")]
+    pub secret_id: String,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct SecretsPushSubCmdArgs {
+    /// Region where the secret lives
+    #[arg(long)]
+    pub region: String,
+
+    /// Secret identifier (name or ARN)
+    #[arg(long, value_name = "SECRET_ID")]
+    pub secret_id: String,
+
+    /// Key-value updates in the form KEY=VALUE
+    #[arg(value_name = "KEY=VALUE", num_args(1..), required = true)]
+    pub kv: Vec<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct SecretsViewSubCmdArgs {
     /// Region where the secret lives
     #[arg(long)]
@@ -95,6 +123,8 @@ pub fn handle_command(
         SecretsSubCommand::Copy(copy_args) => copy(copy_args),
         SecretsSubCommand::Edit(edit_args) => edit(edit_args),
         SecretsSubCommand::EnvFile(env_args) => env_file(env_args),
+        SecretsSubCommand::List(list_args) => list(list_args),
+        SecretsSubCommand::Push(push_args) => push(push_args),
         SecretsSubCommand::View(view_args) => view(view_args),
     }
 }
@@ -298,6 +328,196 @@ pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     } else {
         print!("{buf}");
     }
+
+    Ok(())
+}
+
+/// list all versions of the secrets.
+fn list(args: SecretsListSubCmdArgs) -> anyhow::Result<()> {
+    eprintln!(
+        "Listing versions for secret '{}' in region '{}'...",
+        args.secret_id, args.region
+    );
+    let json = secretsmanager_list_secret_versions_json(&args.secret_id, &args.region)?;
+    let v: serde_json::Value = serde_json::from_str(&json).context(
+        "Parsing Secrets Manager list-secret-version-ids response as JSON should succeed",
+    )?;
+    let versions = v
+        .get("Versions")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "AWS response for secret '{}' should contain a 'Versions' array",
+                args.secret_id
+            )
+        })?;
+
+    if versions.is_empty() {
+        println!("No versions found for secret '{}'.", args.secret_id);
+        return Ok(());
+    }
+
+    struct Row {
+        id: String,
+        created: String,
+        stages: String,
+    }
+
+    let mut rows: Vec<Row> = Vec::new();
+    let mut id_w = "VersionId".len();
+    let mut created_w = "Created".len();
+    let mut stages_w = "Stages".len();
+
+    for ver in versions {
+        let id = ver
+            .get("VersionId")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let created = match ver.get("CreatedDate") {
+            Some(serde_json::Value::String(s)) => s.clone(),
+            Some(serde_json::Value::Number(n)) => n.to_string(),
+            Some(other) => other.to_string(),
+            None => "".to_string(),
+        };
+
+        let stages = ver
+            .get("VersionStages")
+            .and_then(|x| x.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+
+        id_w = id_w.max(id.len());
+        created_w = created_w.max(created.len());
+        stages_w = stages_w.max(stages.len());
+
+        rows.push(Row {
+            id,
+            created,
+            stages,
+        });
+    }
+
+    // Header
+    println!(
+        "{:<id_w$}  {:<created_w$}  {:<stages_w$}",
+        "VersionId",
+        "Created",
+        "Stages",
+        id_w = id_w,
+        created_w = created_w,
+        stages_w = stages_w,
+    );
+
+    // Separator
+    println!(
+        "{:-<id_w$}  {:-<created_w$}  {:-<stages_w$}",
+        "",
+        "",
+        "",
+        id_w = id_w,
+        created_w = created_w,
+        stages_w = stages_w,
+    );
+
+    // Rows
+    for r in rows {
+        println!(
+            "{:<id_w$}  {:<created_w$}  {:<stages_w$}",
+            r.id,
+            r.created,
+            r.stages,
+            id_w = id_w,
+            created_w = created_w,
+            stages_w = stages_w,
+        );
+    }
+
+    Ok(())
+}
+
+/// Push updates to a JSON secret by setting one or more KEY=VALUE pairs.
+/// The secret must be a JSON object and updated value is stored on a single line.
+fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
+    // 1) fetch current secrets
+    eprintln!(
+        "Fetching secret '{}' in region '{}'...",
+        args.secret_id, args.region
+    );
+    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    let original_trimmed = original.trim_end_matches('\n');
+    let mut value: serde_json::Value =
+        serde_json::from_str(original_trimmed).with_context(|| {
+            format!(
+                "Parsing secret '{}' as JSON should succeed to use the 'push' subcommand",
+                args.secret_id
+            )
+        })?;
+    let obj = value.as_object_mut().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Secret '{}' should be a JSON object to use the 'push' subcommand",
+            args.secret_id
+        )
+    })?;
+
+    // 2) Add key-value pairs to secret
+    let mut changed = false;
+    for kv in &args.kv {
+        let (key, val) = kv.split_once('=').ok_or_else(|| {
+            anyhow::anyhow!(
+                "Key/value argument '{kv}' should use the KEY=VALUE format for secret '{}'",
+                args.secret_id
+            )
+        })?;
+        let key = key.trim();
+        let val = val.trim();
+        if key.is_empty() {
+            anyhow::bail!(
+                "Key in '{kv}' should not be empty for secret '{}'",
+                args.secret_id
+            );
+        }
+        let existing = obj.get(key);
+        // If existing value is the same string, skip
+        if let Some(existing_val) = existing {
+            if existing_val.is_string() && existing_val.as_str() == Some(val) {
+                continue;
+            }
+        }
+        obj.insert(key.to_string(), serde_json::Value::String(val.to_string()));
+        changed = true;
+        eprintln!("  - Set {key}={val}");
+    }
+    if !changed {
+        eprintln!(
+            "No changes detected (JSON content unchanged), not pushing a new secret version."
+        );
+        return Ok(());
+    }
+
+    // 3) Confirmation prompt
+    eprintln!("Secret JSON content has changed.");
+    if !confirm_push()? {
+        eprintln!("Aborting: new secret version was not pushed.");
+        return Ok(());
+    }
+
+    // 4) Store the new version of the secrets as a minified JSON format
+    let normalized =
+        serde_json::to_string(&value).context("Serializing updated JSON secret should succeed")?;
+    secretsmanager_put_secret_string(&args.secret_id, &args.region, &normalized)?;
+    eprintln!(
+        "✅ Updated secret '{}' in region '{}' with {} key(s).",
+        args.secret_id,
+        args.region,
+        args.kv.len()
+    );
 
     Ok(())
 }

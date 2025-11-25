@@ -778,6 +778,10 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Edit(SecretsEditSubCmdArgs),
                 #[doc = r"Fetch the secrets and write an environment file to a specified path."]
                 EnvFile(SecretsEnvFileSubCmdArgs),
+                #[doc = r"List all versions of a secret."]
+                List(SecretsListSubCmdArgs),
+                #[doc = r"Push new key-value pairs to existing secrets."]
+                Push(SecretsPushSubCmdArgs),
                 #[doc = r"Show the latest version of a secret."]
                 View(SecretsViewSubCmdArgs),
             },
