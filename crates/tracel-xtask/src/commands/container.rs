@@ -271,7 +271,13 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
         args.insert(args.len() - 1, format!("--build-arg={kv}"));
     }
 
-    docker_cli(args, None, None, "docker build failed")
+    docker_cli(args, None, None, "docker build failed")?;
+
+    let image = build_args.image;
+    eprintln!("📦 Built container image: {image}");
+    eprintln!("🏷️ Image tag: {tag}");
+    eprintln!("🔗 Full name: {image}:{tag}");
+    Ok(())
 }
 
 fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
@@ -420,7 +426,14 @@ fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
     docker_args.push(full_ref.clone());
     // pull image
     docker_cli(docker_args, None, None, "docker pull should succeed")?;
+    let url = aws::cli::ecr_image_url(&args.repository, &args.tag, &args.region)?;
     eprintln!("✅ Pulled image: {full_ref}");
+    eprintln!("📥 Pulled image from ECR");
+    eprintln!("🗄️ ECR repository: {}", args.repository);
+    eprintln!("🏷️ Tag: {}", args.tag);
+    if let Some(url) = url {
+        eprintln!("🌐 Console URL: {url}");
+    }
     Ok(())
 }
 
@@ -452,73 +465,88 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
             eprintln!("✅ Added alias tag '{}'", explicit);
         }
         eprintln!("🎉 Push completed");
-        return Ok(());
-    }
+    } else {
+        // login
+        let account_id = aws_account_id()?;
+        ecr_docker_login(&account_id, &push_args.region)?;
 
-    // login
-    let account_id = aws_account_id()?;
-    ecr_docker_login(&account_id, &push_args.region)?;
-
-    // push image with primary tag (commit sha)
-    let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, push_args.region);
-    let repo_full = format!("{}/{}", registry, push_args.repository);
-    let primary_remote = format!("{repo_full}:{}", push_args.local_tag);
-    eprintln!(
-        "➡️  Preparing to push primary tag (commit): {}",
-        push_args.local_tag
-    );
-    docker_cli(
-        vec![
-            "tag".into(),
-            format!("{}:{}", push_args.image, push_args.local_tag),
-            primary_remote.clone(),
-        ],
-        None,
-        None,
-        "docker tag (primary) should succeed",
-    )?;
-    docker_cli(
-        vec!["push".into(), primary_remote.clone()],
-        None,
-        None,
-        "docker push (primary) should succeed",
-    )?;
-
-    // Collect any additional tags we should add in addition to the commit sha
-    let mut extra_tags: Vec<String> = Vec::new();
-    if push_args.auto_remote_tag {
-        let next = ecr_compute_next_numeric_tag(&push_args.repository, &push_args.region)?;
-        eprintln!("🔢 Auto monotonic tag computed: {}", next);
-        extra_tags.push(next.to_string());
-    }
-    if let Some(explicit) = &push_args.additional_tag {
-        eprintln!("🏷️  Adding explicit extra tag: {}", explicit);
-        extra_tags.push(explicit.clone());
-    }
-
-    // Push additional tags
-    for tag in &extra_tags {
-        let remote = format!("{repo_full}:{tag}");
+        // push image with primary tag (commit sha)
+        let registry = format!("{}.dkr.ecr.{}.amazonaws.com", account_id, push_args.region);
+        let repo_full = format!("{}/{}", registry, push_args.repository);
+        let primary_remote = format!("{repo_full}:{}", push_args.local_tag);
+        eprintln!(
+            "➡️  Preparing to push primary tag (commit): {}",
+            push_args.local_tag
+        );
         docker_cli(
             vec![
                 "tag".into(),
                 format!("{}:{}", push_args.image, push_args.local_tag),
-                remote.clone(),
+                primary_remote.clone(),
             ],
             None,
             None,
-            "docker tag should succeed",
+            "docker tag (primary) should succeed",
         )?;
         docker_cli(
-            vec!["push".into(), remote.clone()],
+            vec!["push".into(), primary_remote.clone()],
             None,
             None,
-            "docker push should succeed",
+            "docker push (primary) should succeed",
         )?;
-        eprintln!("✅ Added extra tag: {}", tag);
-    }
-    eprintln!("🎉 Push completed");
 
+        // Collect any additional tags we should add in addition to the commit sha
+        let mut extra_tags: Vec<String> = Vec::new();
+        if push_args.auto_remote_tag {
+            let next = ecr_compute_next_numeric_tag(&push_args.repository, &push_args.region)?;
+            eprintln!("🔢 Auto monotonic tag computed: {}", next);
+            extra_tags.push(next.to_string());
+        }
+        if let Some(explicit) = &push_args.additional_tag {
+            eprintln!("🏷️  Adding explicit extra tag: {}", explicit);
+            extra_tags.push(explicit.clone());
+        }
+
+        // Push additional tags
+        for tag in &extra_tags {
+            let remote = format!("{repo_full}:{tag}");
+            docker_cli(
+                vec![
+                    "tag".into(),
+                    format!("{}:{}", push_args.image, push_args.local_tag),
+                    remote.clone(),
+                ],
+                None,
+                None,
+                "docker tag should succeed",
+            )?;
+            docker_cli(
+                vec!["push".into(), remote.clone()],
+                None,
+                None,
+                "docker push should succeed",
+            )?;
+            eprintln!("✅ Added extra tag: {}", tag);
+        }
+        eprintln!("🎉 Push completed");
+    }
+
+    let url = aws::cli::ecr_image_url(
+        &push_args.repository,
+        &push_args.local_tag,
+        &push_args.region,
+    )?
+    .unwrap();
+    eprintln!(
+        "📤 Pushed image: {}:{}",
+        push_args.image, push_args.local_tag
+    );
+    eprintln!("🗄️ ECR repository: {}", push_args.repository);
+    eprintln!(
+        "🔗 Remote ref: {}:{}",
+        push_args.repository, push_args.local_tag
+    );
+    eprintln!("🌐 Console URL: {url}");
     Ok(())
 }
 
@@ -576,6 +604,21 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
         "✅ Promoted '{}' to '{promote_tag}' in repository '{}'.",
         promote_args.build_tag, promote_args.repository
     );
+
+    let url = aws::cli::ecr_image_url(
+        &promote_args.repository,
+        &promote_args.build_tag,
+        &promote_args.region,
+    )?
+    .unwrap();
+    eprintln!("🚀 Promoted!");
+    eprintln!("🗄️ Repository: {}", promote_args.repository);
+    eprintln!(
+        "🏷️ Tag → (build) {} → (latest) {promote_tag}",
+        promote_args.build_tag
+    );
+    eprintln!("↩️ Previous '{promote_tag}' container (if any) moved to 'rollback_{promote_tag}'");
+    eprintln!("🌐 Console URL: {url}");
     Ok(())
 }
 
@@ -636,6 +679,29 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
     )
     .context("failed to remove '{rollback_tag}' tag")?;
     eprintln!("🧹 Removed '{rollback_tag}' tag.");
+    eprintln!("⏪ Rolled back!");
+    eprintln!("🗄️ Repository: {}", rollback_args.repository);
+    let promote_commit_sha = aws::cli::ecr_get_commit_sha_tag_from_alias_tag(
+        &rollback_args.repository,
+        &promote_tag,
+        &rollback_args.region,
+    )?;
+    match promote_commit_sha {
+        Some(t) => {
+            let url =
+                aws::cli::ecr_image_url(&rollback_args.repository, &t, &rollback_args.region)?
+                    .unwrap();
+            eprintln!("✅ '{promote_tag}' now points to: {t}");
+            eprintln!("🌐 Console URL: {url}");
+        }
+        None => {
+            // This would be unusual since all the containers should be tagged with the commit sha
+            eprintln!(
+                "⚠️ '{promote_tag}' updated, but could not resolve the underlying commit SHA."
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -771,7 +837,13 @@ fn run(args: ContainerRunSubCmdArgs) -> anyhow::Result<()> {
     // Finally, the image (repo:tag, commit tag, whatever)
     cli_args.push(args.image.clone());
 
-    docker_cli(cli_args, None, None, "docker run should succeed")
+    docker_cli(cli_args, None, None, "docker run should succeed")?;
+
+    eprintln!("▶️ Running container: {}", args.image);
+    if let Some(ref env_file) = args.env_file {
+        eprintln!("📄 Using merged env file: {}", env_file.display());
+    }
+    Ok(())
 }
 
 fn docker_cli(
