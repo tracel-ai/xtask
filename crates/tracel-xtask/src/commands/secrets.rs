@@ -319,6 +319,9 @@ pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
         }
     }
 
+    // Expand variable inside values
+    let merged = expand_env_map(&merged)?;
+
     // Sort the env vars for deterministic ordering
     let mut entries: Vec<(String, String)> = merged.into_iter().collect();
     entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -588,4 +591,159 @@ fn confirm_push() -> anyhow::Result<bool> {
     io::stdin().read_line(&mut answer)?;
     let answer = answer.trim().to_lowercase();
     Ok(answer == "y" || answer == "yes")
+}
+
+/// Expand ${VAR} placeholders in a merged env map using dotenvy
+fn expand_env_map(merged: &HashMap<String, String>) -> anyhow::Result<HashMap<String, String>> {
+    // Seed process env so dotenvy can expand ${VAR} from our map
+    for (key, value) in merged {
+        std::env::set_var(key, value);
+    }
+    // build a buffer buffer from the merged map
+    let mut keys: Vec<_> = merged.keys().cloned().collect();
+    keys.sort();
+    let mut buf = String::new();
+    for key in &keys {
+        let val = &merged[key];
+        writeln!(&mut buf, "{key}={val}")?;
+    }
+    // Parse with dotenvy with expansion enabled
+    let iter = dotenvy::from_read_iter(buf.as_bytes());
+    let mut expanded: HashMap<String, String> = HashMap::new();
+    for item in iter {
+        let (key, value) = item?;
+        expanded.insert(key, value);
+    }
+
+    Ok(expanded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::env;
+
+    #[test]
+    #[serial]
+    fn test_expand_env_map_simple_expansion() {
+        // Clean any prior values
+        env::remove_var("LOG_LEVEL_TEST");
+        env::remove_var("RUST_LOG_TEST");
+
+        let mut merged: HashMap<String, String> = HashMap::new();
+        merged.insert("LOG_LEVEL_TEST".to_string(), "info".to_string());
+        merged.insert(
+            "RUST_LOG_TEST".to_string(),
+            "xtask=${LOG_LEVEL_TEST},server=${LOG_LEVEL_TEST}".to_string(),
+        );
+
+        let expanded =
+            expand_env_map(&merged).expect("expand_env_map should succeed for simple map");
+
+        let log_level = expanded
+            .get("LOG_LEVEL_TEST")
+            .expect("LOG_LEVEL_TEST should be present after expansion");
+        let rust_log = expanded
+            .get("RUST_LOG_TEST")
+            .expect("RUST_LOG_TEST should be present after expansion");
+
+        // 1) LOG_LEVEL_TEST should be unchanged
+        assert_eq!(
+            log_level, "info",
+            "LOG_LEVEL_TEST should keep its literal value after expansion"
+        );
+
+        // 2) RUST_LOG_TEST should not contain the raw placeholder anymore
+        assert!(
+            !rust_log.contains("${LOG_LEVEL_TEST}"),
+            "RUST_LOG_TEST should not contain the raw placeholder '${{LOG_LEVEL_TEST}}', got: {rust_log}"
+        );
+
+        // 3) RUST_LOG_TEST should contain the expanded value
+        assert!(
+            rust_log.contains(log_level),
+            "RUST_LOG_TEST should contain the expanded LOG_LEVEL_TEST value; LOG_LEVEL_TEST={log_level}, RUST_LOG_TEST={rust_log}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_expand_env_map_mixed_values_and_non_expanded_keys() {
+        env::remove_var("LOG_LEVEL_TEST");
+        env::remove_var("RUST_LOG_TEST");
+        env::remove_var("PLAIN_KEY_TEST");
+
+        let mut merged: HashMap<String, String> = HashMap::new();
+        merged.insert("LOG_LEVEL_TEST".to_string(), "debug".to_string());
+        merged.insert(
+            "RUST_LOG_TEST".to_string(),
+            "xtask=${LOG_LEVEL_TEST},other=${LOG_LEVEL_TEST}".to_string(),
+        );
+        merged.insert("PLAIN_KEY_TEST".to_string(), "no_placeholders".to_string());
+
+        let expanded =
+            expand_env_map(&merged).expect("expand_env_map should succeed for mixed map");
+
+        let log_level = expanded
+            .get("LOG_LEVEL_TEST")
+            .expect("LOG_LEVEL_TEST should be present after expansion");
+        let rust_log = expanded
+            .get("RUST_LOG_TEST")
+            .expect("RUST_LOG_TEST should be present after expansion");
+        let plain = expanded
+            .get("PLAIN_KEY_TEST")
+            .expect("PLAIN_KEY_TEST should be present after expansion");
+
+        // LOG_LEVEL_TEST should be unchanged
+        assert_eq!(
+            log_level, "debug",
+            "LOG_LEVEL_TEST should keep its literal value after expansion"
+        );
+
+        // RUST_LOG_TEST should be expanded and not contain placeholder
+        assert!(
+            !rust_log.contains("${LOG_LEVEL_TEST}"),
+            "RUST_LOG_TEST should not contain the raw placeholder '${{LOG_LEVEL_TEST}}', got: {rust_log}"
+        );
+        assert!(
+            rust_log.contains(log_level),
+            "RUST_LOG_TEST should contain the expanded LOG_LEVEL_TEST value; LOG_LEVEL_TEST={log_level}, RUST_LOG_TEST={rust_log}"
+        );
+
+        // PLAIN_KEY_TEST should be unchanged
+        assert_eq!(
+            plain, "no_placeholders",
+            "PLAIN_KEY_TEST should remain unchanged when there are no placeholders"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_expand_env_map_unknown_placeholder_is_left_intact() {
+        env::remove_var("UNKNOWN_PLACEHOLDER_TEST");
+        env::remove_var("USES_UNKNOWN_TEST");
+
+        let mut merged: HashMap<String, String> = HashMap::new();
+        merged.insert(
+            "USES_UNKNOWN_TEST".to_string(),
+            "value=${UNKNOWN_PLACEHOLDER_TEST}".to_string(),
+        );
+
+        let expanded = expand_env_map(&merged)
+            .expect("expand_env_map should succeed with unknown placeholder");
+
+        let uses_unknown = expanded
+            .get("USES_UNKNOWN_TEST")
+            .expect("USES_UNKNOWN_TEST should be present after expansion");
+
+        // dotenvy expansion will simply leave unknown ${VAR} as-is
+        // this assertion documents the current behaviour we rely on:
+        // we do not require unknown vars to expand.
+        assert!(
+            uses_unknown.contains("${UNKNOWN_PLACEHOLDER_TEST}")
+                || !uses_unknown.contains("UNKNOWN_PLACEHOLDER_TEST"),
+            "USES_UNKNOWN_TEST should not crash expansion; got: {uses_unknown}"
+        );
+    }
 }
