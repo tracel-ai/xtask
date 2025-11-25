@@ -751,7 +751,7 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
         Some(repo) => {
             let promote_tag = args.promote_tag.as_deref().unwrap_or("latest");
             ecr_get_commit_sha_tag_from_alias_tag(repo, promote_tag, &args.region)?
-                .map(|commit_tag| format!("  Container: {repo}:{commit_tag}"))
+                .map(|commit_tag| format!("  Image:   {repo}:{commit_tag}"))
         }
         None => None,
     };
