@@ -320,7 +320,7 @@ pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     }
 
     // Expand variable inside values
-    let merged = expand_env_map(&merged)?;
+    let merged = expand_env_map(&merged);
 
     // Sort the env vars for deterministic ordering
     let mut entries: Vec<(String, String)> = merged.into_iter().collect();
@@ -593,29 +593,50 @@ fn confirm_push() -> anyhow::Result<bool> {
     Ok(answer == "y" || answer == "yes")
 }
 
-/// Expand ${VAR} placeholders in a merged env map using dotenvy
-fn expand_env_map(merged: &HashMap<String, String>) -> anyhow::Result<HashMap<String, String>> {
-    // Seed process env so dotenvy can expand ${VAR} from our map
-    for (key, value) in merged {
-        std::env::set_var(key, value);
-    }
-    // build a buffer buffer from the merged map
-    let mut keys: Vec<_> = merged.keys().cloned().collect();
-    keys.sort();
-    let mut buf = String::new();
-    for key in &keys {
-        let val = &merged[key];
-        writeln!(&mut buf, "{key}={val}")?;
-    }
-    // Parse with dotenvy with expansion enabled
-    let iter = dotenvy::from_read_iter(buf.as_bytes());
-    let mut expanded: HashMap<String, String> = HashMap::new();
-    for item in iter {
-        let (key, value) = item?;
-        expanded.insert(key, value);
-    }
+/// Expand `${VAR}` placeholders in values using the given map.
+fn expand_value(input: &str, vars: &HashMap<String, String>) -> String {
+    let mut out = String::new();
+    let mut rest = input;
 
-    Ok(expanded)
+    while let Some(start) = rest.find("${") {
+        // keep everything before the placeholder
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        // find the closing brace
+        if let Some(end_rel) = after.find('}') {
+            let var_name = &after[..end_rel];
+            if let Some(val) = vars.get(var_name) {
+                // known var: substitute
+                out.push_str(val);
+            } else {
+                // unknown var: keep the placeholder as-is
+                out.push_str("${");
+                out.push_str(var_name);
+                out.push('}');
+            }
+            // continue after the closing brace
+            rest = &after[end_rel + 1..];
+        } else {
+            // no closing brace, keep the rest as-is
+            out.push_str(&rest[start..]);
+            rest = "";
+            break;
+        }
+    }
+    // trailing part without placeholders
+    out.push_str(rest);
+    out
+}
+
+/// Expand `${VAR}` placeholders in a merged env map.
+/// Note: this is a single pass expansion, preserving quotes and formatting.
+fn expand_env_map(merged: &HashMap<String, String>) -> HashMap<String, String> {
+    let mut expanded = HashMap::new();
+    for (key, value) in merged {
+        let new_val = expand_value(value, merged);
+        expanded.insert(key.clone(), new_val);
+    }
+    expanded
 }
 
 #[cfg(test)]
@@ -627,7 +648,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_expand_env_map_simple_expansion() {
-        // Clean any prior values
+        // Clean any prior values that might confuse debugging
         env::remove_var("LOG_LEVEL_TEST");
         env::remove_var("RUST_LOG_TEST");
 
@@ -638,8 +659,7 @@ mod tests {
             "xtask=${LOG_LEVEL_TEST},server=${LOG_LEVEL_TEST}".to_string(),
         );
 
-        let expanded =
-            expand_env_map(&merged).expect("expand_env_map should succeed for simple map");
+        let expanded = expand_env_map(&merged);
 
         let log_level = expanded
             .get("LOG_LEVEL_TEST")
@@ -648,19 +668,14 @@ mod tests {
             .get("RUST_LOG_TEST")
             .expect("RUST_LOG_TEST should be present after expansion");
 
-        // 1) LOG_LEVEL_TEST should be unchanged
         assert_eq!(
             log_level, "info",
             "LOG_LEVEL_TEST should keep its literal value after expansion"
         );
-
-        // 2) RUST_LOG_TEST should not contain the raw placeholder anymore
         assert!(
             !rust_log.contains("${LOG_LEVEL_TEST}"),
             "RUST_LOG_TEST should not contain the raw placeholder '${{LOG_LEVEL_TEST}}', got: {rust_log}"
         );
-
-        // 3) RUST_LOG_TEST should contain the expanded value
         assert!(
             rust_log.contains(log_level),
             "RUST_LOG_TEST should contain the expanded LOG_LEVEL_TEST value; LOG_LEVEL_TEST={log_level}, RUST_LOG_TEST={rust_log}"
@@ -682,8 +697,7 @@ mod tests {
         );
         merged.insert("PLAIN_KEY_TEST".to_string(), "no_placeholders".to_string());
 
-        let expanded =
-            expand_env_map(&merged).expect("expand_env_map should succeed for mixed map");
+        let expanded = expand_env_map(&merged);
 
         let log_level = expanded
             .get("LOG_LEVEL_TEST")
@@ -695,13 +709,7 @@ mod tests {
             .get("PLAIN_KEY_TEST")
             .expect("PLAIN_KEY_TEST should be present after expansion");
 
-        // LOG_LEVEL_TEST should be unchanged
-        assert_eq!(
-            log_level, "debug",
-            "LOG_LEVEL_TEST should keep its literal value after expansion"
-        );
-
-        // RUST_LOG_TEST should be expanded and not contain placeholder
+        assert_eq!(log_level, "debug");
         assert!(
             !rust_log.contains("${LOG_LEVEL_TEST}"),
             "RUST_LOG_TEST should not contain the raw placeholder '${{LOG_LEVEL_TEST}}', got: {rust_log}"
@@ -710,8 +718,6 @@ mod tests {
             rust_log.contains(log_level),
             "RUST_LOG_TEST should contain the expanded LOG_LEVEL_TEST value; LOG_LEVEL_TEST={log_level}, RUST_LOG_TEST={rust_log}"
         );
-
-        // PLAIN_KEY_TEST should be unchanged
         assert_eq!(
             plain, "no_placeholders",
             "PLAIN_KEY_TEST should remain unchanged when there are no placeholders"
@@ -730,20 +736,60 @@ mod tests {
             "value=${UNKNOWN_PLACEHOLDER_TEST}".to_string(),
         );
 
-        let expanded = expand_env_map(&merged)
-            .expect("expand_env_map should succeed with unknown placeholder");
+        let expanded = expand_env_map(&merged);
 
         let uses_unknown = expanded
             .get("USES_UNKNOWN_TEST")
             .expect("USES_UNKNOWN_TEST should be present after expansion");
 
-        // dotenvy expansion will simply leave unknown ${VAR} as-is
-        // this assertion documents the current behaviour we rely on:
-        // we do not require unknown vars to expand.
+        // Unknown placeholders should be preserved exactly
+        assert_eq!(
+            uses_unknown, "value=${UNKNOWN_PLACEHOLDER_TEST}",
+            "Unknown placeholder should be left intact"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_expand_env_map_preserves_quotes_around_values() {
+        env::remove_var("LOG_LEVEL_TEST");
+        env::remove_var("RUST_LOG_QUOTED_TEST");
+        env::remove_var("CRON_TEST");
+
+        let mut merged: HashMap<String, String> = HashMap::new();
+        merged.insert("LOG_LEVEL_TEST".to_string(), "info".to_string());
+        // placeholder inside double quotes
+        merged.insert(
+            "RUST_LOG_QUOTED_TEST".to_string(),
+            " \"xtask=${LOG_LEVEL_TEST},server=${LOG_LEVEL_TEST}\" ".to_string(),
+        );
+        // value that contains spaces and is already quoted
+        merged.insert("CRON_TEST".to_string(), "'0 0 0 * * *'".to_string());
+
+        let expanded = expand_env_map(&merged);
+
+        let rust_log = expanded
+            .get("RUST_LOG_QUOTED_TEST")
+            .expect("RUST_LOG_QUOTED_TEST should be present after expansion");
+        let cron = expanded
+            .get("CRON_TEST")
+            .expect("CRON_TEST should be present after expansion");
+
+        // RUST_LOG_QUOTED_TEST should still start and end with a double quote (after trimming)
+        let rust_trimmed = rust_log.trim();
         assert!(
-            uses_unknown.contains("${UNKNOWN_PLACEHOLDER_TEST}")
-                || !uses_unknown.contains("UNKNOWN_PLACEHOLDER_TEST"),
-            "USES_UNKNOWN_TEST should not crash expansion; got: {uses_unknown}"
+            rust_trimmed.starts_with('"') && rust_trimmed.ends_with('"'),
+            "RUST_LOG_QUOTED_TEST should still be double-quoted, got: {rust_log}"
+        );
+        assert!(
+            rust_trimmed.contains("xtask=info"),
+            "RUST_LOG_QUOTED_TEST should contain the expanded value; got: {rust_trimmed}"
+        );
+
+        // CRON_TEST should be unchanged, quotes preserved
+        assert_eq!(
+            cron, "'0 0 0 * * *'",
+            "CRON_TEST should keep its single quotes and content"
         );
     }
 }
