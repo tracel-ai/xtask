@@ -168,6 +168,14 @@ pub struct ContainerRolloutSubCmdArgs {
     #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
 
+    /// Container promote tag, defaults to 'latest'.
+    #[arg(long)]
+    pub promote_tag: Option<String>,
+
+    /// Container repository.
+    #[arg(long)]
+    pub repository: Option<String>,
+
     /// If set, skip replacing instances that already match the launch template/config
     #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().skip_matching)]
     pub skip_matching: bool,
@@ -216,6 +224,8 @@ impl Default for ContainerRolloutSubCmdArgs {
             strategy: "Rolling".to_string(),
             instance_warmup: 120,
             min_healthy_percentage: 90,
+            promote_tag: None,
+            repository: None,
             skip_matching: true,
             wait: false,
             wait_timeout_secs: 1800,
@@ -736,9 +746,22 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
         asg = args.asg,
     );
 
+    // Optional: show the concrete commit SHA tag of the container being rolled out
+    let container_line = match args.repository.as_deref() {
+        Some(repo) => {
+            let promote_tag = args.promote_tag.as_deref().unwrap_or("latest");
+            ecr_get_commit_sha_tag_from_alias_tag(repo, promote_tag, &args.region)?
+                .map(|commit_tag| format!("  Container: {repo}:{commit_tag}"))
+        }
+        None => None,
+    };
+
     eprintln!("🚀 Started instance refresh");
     eprintln!("  ASG:     {}", args.asg);
     eprintln!("  Region:  {}", args.region);
+    if let Some(line) = container_line {
+        eprintln!("{line}");
+    }
     eprintln!("  Refresh: {}", refresh_id);
     eprintln!("  Console: {}", console_url);
 
