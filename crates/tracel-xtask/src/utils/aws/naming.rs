@@ -41,6 +41,8 @@ pub enum ResourceKind {
     DataAmi,
     // Secrets
     SecretsManagerSecret,
+    // Storage
+    S3Bucket,
 }
 
 impl ResourceKind {
@@ -49,6 +51,7 @@ impl ResourceKind {
         use ResourceKind::*;
         Some(match self {
             Alb | Nlb | TargetGroup => 32,
+            S3Bucket => 63,
             IamRole => 64,
             LaunchTemplate | IamInstanceProfile | IamRolePolicy | Instance | Volume | Vpc
             | Subnet | SecretsManagerSecret => 128,
@@ -89,6 +92,7 @@ impl ResourceKind {
             Route53Zone => "r53zone",
             RouteTable => "rt",
             RouteTableAssociation => "rta",
+            S3Bucket => "bucket",
             SecurityGroup => "sg",
             SecurityGroupRule => "sgrule",
             Subnet => "subnet",
