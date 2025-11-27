@@ -1,6 +1,6 @@
 use std::process::Command as StdCommand;
 
-use crate::prelude::{run_process, Context, Environment};
+use crate::prelude::{Context, Environment, run_process};
 
 #[tracel_xtask_macros::declare_command_args(None, DockerComposeSubCommand)]
 pub struct DockerComposeCmdArgs {}

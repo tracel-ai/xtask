@@ -9,7 +9,7 @@ name = "tracel-xtask-macros"
 readme = "README.md"
 repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask-macros"
 version.workspace = true
-rust-version = "1.79"
+rust-version = "1.85"
 
 [lib]
 proc-macro = true

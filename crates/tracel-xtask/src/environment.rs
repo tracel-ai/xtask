@@ -184,7 +184,9 @@ impl<M: IndexStyle> Environment<M> {
             }
             for item in dotenvy::from_path_iter(&path)? {
                 let (key, value) = item?;
-                std::env::set_var(&key, &value);
+                unsafe {
+                    std::env::set_var(&key, &value);
+                }
                 merged.insert(key, value);
             }
         }
@@ -337,7 +339,9 @@ mod tests {
     fn test_environment_load(#[case] env: TestEnv) {
         // Remove possible prior values
         for (key, _) in expected_vars(&env) {
-            env::remove_var(key);
+            unsafe {
+                env::remove_var(key);
+            }
         }
 
         // Run the actual function under test
@@ -364,7 +368,9 @@ mod tests {
     fn test_environment_merge_env_files(#[case] env: TestEnv) {
         // Make sure we start from a clean state
         for (key, _) in expected_vars(&env) {
-            env::remove_var(key);
+            unsafe {
+                env::remove_var(key);
+            }
         }
         // Generate the merged env file
         let merged_path = env
@@ -401,9 +407,11 @@ mod tests {
     fn test_environment_merge_env_files_expansion() {
         let env = Environment::<ImplicitIndex>::new(EnvironmentName::Staging, 1);
         // Clean any prior values that could interfere
-        env::remove_var("LOG_LEVEL_TEST");
-        env::remove_var("RUST_LOG_TEST");
-        env::remove_var("RUST_LOG_STAG_TEST");
+        unsafe {
+            env::remove_var("LOG_LEVEL_TEST");
+            env::remove_var("RUST_LOG_TEST");
+            env::remove_var("RUST_LOG_STAG_TEST");
+        }
 
         let merged_path = env
             .merge_env_files()

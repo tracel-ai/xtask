@@ -7,7 +7,7 @@ use crate::{
     prelude::{Context, Environment},
     utils::{
         process::{run_process_for_package, run_process_for_workspace},
-        workspace::{get_workspace_members, WorkspaceMember, WorkspaceMemberType},
+        workspace::{WorkspaceMember, WorkspaceMemberType, get_workspace_members},
     },
 };
 

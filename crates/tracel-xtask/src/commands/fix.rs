@@ -9,7 +9,7 @@ use crate::{
         cargo::ensure_cargo_crate_is_installed,
         process::{run_process, run_process_for_package, run_process_for_workspace},
         prompt::ask_once,
-        workspace::{get_workspace_members, WorkspaceMemberType},
+        workspace::{WorkspaceMemberType, get_workspace_members},
     },
     versions::TYPOS_VERSION,
 };

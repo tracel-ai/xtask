@@ -666,7 +666,9 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
         .context("'{promote_tag}' should be updated to the '{rollback_tag}' manifest")?;
         eprintln!("✅ Promoted '{rollback_tag}' to '{promote_tag}'.");
     } else {
-        eprintln!("ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion...");
+        eprintln!(
+            "ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion..."
+        );
     }
     // Remove the 'rollback' tag so it no longer aliases this image.
     let filter = format!("imageTag={rollback_tag}");

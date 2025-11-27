@@ -23,7 +23,9 @@ pub mod prelude {
         pub use tracel_xtask_macros::extend_targets;
     }
 
+    pub use crate::XtaskArgs;
     pub use crate::commands as base_commands;
+    pub use crate::commands::Target;
     pub use crate::commands::build::BuildCmdArgs;
     pub use crate::commands::bump::BumpCmdArgs;
     pub use crate::commands::bump::BumpSubCommand;
@@ -53,7 +55,6 @@ pub mod prelude {
     pub use crate::commands::validate::ValidateCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
-    pub use crate::commands::Target;
     pub use crate::context::Context;
     pub use crate::endgroup;
     pub use crate::environment::Environment;

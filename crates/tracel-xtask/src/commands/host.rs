@@ -2,7 +2,7 @@ use std::process::Command;
 
 use crate::{
     context::Context,
-    prelude::{anyhow::Context as _, Environment, EnvironmentName},
+    prelude::{Environment, EnvironmentName, anyhow::Context as _},
     utils::{self, aws},
 };
 
@@ -87,7 +87,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
         let stderr = String::from_utf8_lossy(&describe_output.stderr);
         anyhow::bail!(
             "Describing database instance '{}' in region '{}' should succeed, but AWS CLI exited with:\n{}",
-             args.name,
+            args.name,
             args.region,
             stderr
         );
@@ -101,7 +101,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
     if instance_id.is_empty() || instance_id == "None" {
         anyhow::bail!(
             "Finding a running database instance named '{}' in region '{}' should succeed, but none were found",
-             args.name,
+            args.name,
             args.region
         );
     }

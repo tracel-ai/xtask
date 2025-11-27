@@ -1,9 +1,9 @@
 use crate::prelude::{Context, Environment};
 
 use super::{
+    Target,
     check::{CheckCmdArgs, CheckSubCommand},
     test::{TestCmdArgs, TestSubCommand},
-    Target,
 };
 
 #[tracel_xtask_macros::declare_command_args(None, None)]

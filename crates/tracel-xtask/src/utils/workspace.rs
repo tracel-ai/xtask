@@ -35,7 +35,8 @@ pub fn get_workspace_members(w_type: WorkspaceMemberType) -> Vec<WorkspaceMember
     // Parse the JSON output
     let metadata: Value = serde_json::from_slice(&output.stdout).expect("Failed to parse JSON");
     // Extract workspace members from the metadata
-    let workspaces = metadata["workspace_members"]
+
+    metadata["workspace_members"]
         .as_array()
         .expect("Expected an array of workspace members")
         .iter()
@@ -57,9 +58,7 @@ pub fn get_workspace_members(w_type: WorkspaceMemberType) -> Vec<WorkspaceMember
                 _ => None,
             }
         })
-        .collect();
-
-    workspaces
+        .collect()
 }
 
 /// Legacy cargo metadata format for member specs (rust < 1.77)

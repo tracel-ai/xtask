@@ -149,7 +149,7 @@ fn create(args: SecretsCreateSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// Copy a secret value from one secret ID to another in the same region.
-fn copy(args: SecretsCopySubCmdArgs) -> anyhow::Result<()> {
+pub fn copy(args: SecretsCopySubCmdArgs) -> anyhow::Result<()> {
     if args.from == args.to {
         eprintln!(
             "Source and target secrets are identical ('{}'), nothing to do.",
@@ -162,12 +162,13 @@ fn copy(args: SecretsCopySubCmdArgs) -> anyhow::Result<()> {
         "Fetching source secret '{}' in region '{}'...",
         args.from, args.region
     );
-    let value = secretsmanager_get_secret_string(&args.from, &args.region)?;
+    let value = secretsmanager_get_secret_string(&args.from, &args.region, "text")?;
 
     // Check if the target already has a current version.
     // If we can successfully fetch it, we consider that a current version exists
     // and ask for confirmation before creating a new one.
-    let target_has_version = secretsmanager_get_secret_string(&args.to, &args.region).is_ok();
+    let target_has_version =
+        secretsmanager_get_secret_string(&args.to, &args.region, "text").is_ok();
     if target_has_version {
         eprintln!(
             "Secret '{}' already has a current version in region '{}'.",
@@ -201,7 +202,7 @@ fn copy(args: SecretsCopySubCmdArgs) -> anyhow::Result<()> {
 /// - If the secret is not JSON, it is treated as an opaque string.
 fn edit(args: SecretsEditSubCmdArgs) -> anyhow::Result<()> {
     // 1) fetch current secret value
-    let original_raw = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    let original_raw = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
     let original_raw_trimmed = original_raw.trim_end_matches('\n');
     // 2) make things pretty if possible
     let to_edit =
@@ -289,7 +290,7 @@ pub fn env_file(args: SecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     let mut merged: HashMap<String, String> = HashMap::new();
     for id in &args.secret_ids {
         eprintln!("Fetching secret '{id}'...");
-        let s = secretsmanager_get_secret_string(id, &args.region)?;
+        let s = secretsmanager_get_secret_string(id, &args.region, "text")?;
         let s = s.trim();
         if s.is_empty() {
             continue;
@@ -455,13 +456,13 @@ fn list(args: SecretsListSubCmdArgs) -> anyhow::Result<()> {
 
 /// Push updates to a JSON secret by setting one or more KEY=VALUE pairs.
 /// The secret must be a JSON object and updated value is stored on a single line.
-fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
+pub fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
     // 1) fetch current secrets
     eprintln!(
         "Fetching secret '{}' in region '{}'...",
         args.secret_id, args.region
     );
-    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
     let original_trimmed = original.trim_end_matches('\n');
     let mut value: serde_json::Value =
         serde_json::from_str(original_trimmed).with_context(|| {
@@ -479,6 +480,7 @@ fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
 
     // 2) Add key-value pairs to secret
     let mut changed = false;
+    eprintln!("Changed entries to update:");
     for kv in &args.kv {
         let (key, val) = kv.split_once('=').ok_or_else(|| {
             anyhow::anyhow!(
@@ -498,14 +500,16 @@ fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
         // If existing value is the same string, skip
         if let Some(existing_val) = existing {
             if existing_val.is_string() && existing_val.as_str() == Some(val) {
+                // skip value if it has not changed
                 continue;
             }
         }
         obj.insert(key.to_string(), serde_json::Value::String(val.to_string()));
         changed = true;
-        eprintln!("  - Set {key}={val}");
+        eprintln!("  - {key}");
     }
     if !changed {
+        eprintln!("None.");
         eprintln!(
             "No changes detected (JSON content unchanged), not pushing a new secret version."
         );
@@ -535,7 +539,7 @@ fn push(args: SecretsPushSubCmdArgs) -> anyhow::Result<()> {
 
 /// fetch and print the secret.
 fn view(args: SecretsViewSubCmdArgs) -> anyhow::Result<()> {
-    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region)?;
+    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
     let trimmed = value.trim_end_matches('\n');
 
     if let Some(pretty) = pretty_json(trimmed) {
@@ -649,8 +653,10 @@ mod tests {
     #[serial]
     fn test_expand_env_map_simple_expansion() {
         // Clean any prior values that might confuse debugging
-        env::remove_var("LOG_LEVEL_TEST");
-        env::remove_var("RUST_LOG_TEST");
+        unsafe {
+            env::remove_var("LOG_LEVEL_TEST");
+            env::remove_var("RUST_LOG_TEST");
+        }
 
         let mut merged: HashMap<String, String> = HashMap::new();
         merged.insert("LOG_LEVEL_TEST".to_string(), "info".to_string());
@@ -685,9 +691,11 @@ mod tests {
     #[test]
     #[serial]
     fn test_expand_env_map_mixed_values_and_non_expanded_keys() {
-        env::remove_var("LOG_LEVEL_TEST");
-        env::remove_var("RUST_LOG_TEST");
-        env::remove_var("PLAIN_KEY_TEST");
+        unsafe {
+            env::remove_var("LOG_LEVEL_TEST");
+            env::remove_var("RUST_LOG_TEST");
+            env::remove_var("PLAIN_KEY_TEST");
+        }
 
         let mut merged: HashMap<String, String> = HashMap::new();
         merged.insert("LOG_LEVEL_TEST".to_string(), "debug".to_string());
@@ -727,8 +735,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_expand_env_map_unknown_placeholder_is_left_intact() {
-        env::remove_var("UNKNOWN_PLACEHOLDER_TEST");
-        env::remove_var("USES_UNKNOWN_TEST");
+        unsafe {
+            env::remove_var("UNKNOWN_PLACEHOLDER_TEST");
+            env::remove_var("USES_UNKNOWN_TEST");
+        }
 
         let mut merged: HashMap<String, String> = HashMap::new();
         merged.insert(
@@ -752,9 +762,11 @@ mod tests {
     #[test]
     #[serial]
     fn test_expand_env_map_preserves_quotes_around_values() {
-        env::remove_var("LOG_LEVEL_TEST");
-        env::remove_var("RUST_LOG_QUOTED_TEST");
-        env::remove_var("CRON_TEST");
+        unsafe {
+            env::remove_var("LOG_LEVEL_TEST");
+            env::remove_var("RUST_LOG_QUOTED_TEST");
+            env::remove_var("CRON_TEST");
+        }
 
         let mut merged: HashMap<String, String> = HashMap::new();
         merged.insert("LOG_LEVEL_TEST".to_string(), "info".to_string());
