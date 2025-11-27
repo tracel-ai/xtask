@@ -8,6 +8,7 @@ pub mod helpers;
 pub mod process;
 pub mod prompt;
 pub mod rustup;
+pub mod terraform;
 pub mod time;
 pub mod workspace;
 

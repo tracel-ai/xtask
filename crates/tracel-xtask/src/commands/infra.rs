@@ -1,0 +1,345 @@
+use anyhow::Context as _;
+use reqwest::Client;
+use std::{fs, io::Write as _, path::PathBuf};
+
+use crate::{
+    prelude::{Environment, ExplicitIndex},
+    utils::terraform,
+};
+
+const DEFAULT_PATH: &str = "./infra";
+
+#[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
+pub struct InfraCmdArgs {}
+
+impl Default for InfraSubCommand {
+    fn default() -> Self {
+        InfraSubCommand::Plan(InfraSubCmdArgs::default())
+    }
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
+struct InfraInstallSubCmdArgs {
+    /// Install a specific Terraform version (e.g. 1.9.6) and update the lockfile to that version
+    #[arg(long)]
+    version: Option<String>,
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
+pub struct InfraOutputSubCmdArgs {
+    /// Common infra args
+    #[command(flatten)]
+    pub common: InfraSubCmdArgs,
+
+    /// If specified, use JSON format for outputs format
+    #[arg(short, long)]
+    json: bool,
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
+struct InfraUninstallSubCmdArgs {
+    /// Uninstall all installed Terraform binaries under ~/.cache/xtask/terraform
+    #[arg(long)]
+    all: bool,
+    /// List installed terraform versions and exit
+    #[arg(short, long)]
+    list: bool,
+    /// Uninstall a specific Terraform version (e.g. 1.9.6)
+    #[arg(long)]
+    version: Option<String>,
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
+pub struct InfraSubCmdArgs {
+    /// Path where to generate or read the infra configuration.
+    #[arg(long, default_value = DEFAULT_PATH)]
+    pub path: PathBuf,
+
+    /// Path to the Terraform plan file used by `plan` and `apply`.
+    #[arg(long, default_value = "tfplan")]
+    pub out: PathBuf,
+}
+
+pub async fn handle_command(args: InfraCmdArgs, env: Environment) -> anyhow::Result<()> {
+    let env = env.into_explicit();
+    match args.get_command() {
+        InfraSubCommand::Apply(cmd_args) => {
+            apply(&cmd_args, &env)?;
+            Ok(())
+        }
+        InfraSubCommand::Destroy(cmd_args) => destroy(&cmd_args, &env),
+        InfraSubCommand::Init(cmd_args) => init(&cmd_args, &env),
+        InfraSubCommand::Install(cmd_args) => install(&cmd_args).await,
+        InfraSubCommand::List => list(),
+        InfraSubCommand::Output(cmd_args) => output(&cmd_args, &env),
+        InfraSubCommand::Plan(cmd_args) => plan(&cmd_args, &env),
+        InfraSubCommand::Uninstall(cmd_args) => uninstall(&cmd_args),
+        InfraSubCommand::Update => update().await,
+    }
+}
+
+// Commands ------------------------------------------------------------------
+
+/// Returns true if the user confirmed to apply the plan
+pub fn apply(cmd_args: &InfraSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<bool> {
+    let out = cmd_args.out.to_string_lossy().to_string();
+
+    // 1) Run plan
+    let plan_args = ["plan", "-out", out.as_str()];
+    terraform::call_terraform(&cmd_args.path, env, &plan_args)?;
+
+    // 2) Ask the user if they want to run apply.
+    eprintln!();
+    eprint!("Apply this Terraform plan? [y/N]: ");
+    std::io::stderr().flush()?;
+
+    let mut answer = String::new();
+    std::io::stdin()
+        .read_line(&mut answer)
+        .context("Failed to read confirmation from stdin")?;
+
+    let answer = answer.trim().to_ascii_lowercase();
+    let proceed = matches!(answer.as_str(), "y" | "yes");
+
+    if !proceed {
+        eprintln!("Skipping apply.");
+        return Ok(false);
+    }
+
+    // 3) User approved: apply the *saved* plan file (no re-planning).
+    let apply_args = ["apply", "-auto-approve", out.as_str()];
+    terraform::call_terraform(&cmd_args.path, env, &apply_args)?;
+
+    Ok(true)
+}
+
+fn destroy(cmd_args: &InfraSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
+    terraform::call_terraform(&cmd_args.path, env, &["destroy"])
+}
+
+fn init(cmd_args: &InfraSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
+    terraform::call_terraform(&cmd_args.path, env, &["init"])
+}
+
+async fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
+    let client = Client::builder()
+        .user_agent("tracel-xtask")
+        .build()
+        .context("Failed to build HTTP client")?;
+
+    let repo_root = std::env::current_dir().context("Failed to get current directory")?;
+
+    // Decide version + lock policy
+    enum LockAction<'a> {
+        /// Do not touch existing lock (already present).
+        Keep,
+        /// Write a new lock because there wasn't one.
+        WriteNew(&'a str),
+        /// Overwrite/update lock to this version (explicit user request).
+        WriteUpdate(&'a str),
+    }
+
+    let (version, lock_action) = if let Some(explicit) = args.version.as_deref() {
+        // Explicit version requested: install and update lockfile unconditionally
+        (explicit.to_string(), LockAction::WriteUpdate(explicit))
+    } else {
+        // No explicit version: follow lock if present, otherwise install latest
+        if let Some(locked) = terraform::read_locked_version(&repo_root)? {
+            (locked, LockAction::Keep)
+        } else {
+            let latest = terraform::fetch_latest_version(&client).await?;
+            (
+                latest.clone(),
+                LockAction::WriteNew(Box::leak(latest.into_boxed_str())),
+            )
+        }
+    };
+
+    let dest = terraform::terraform_bin_path(&version)?;
+    if dest.exists() {
+        eprintln!(
+            "terraform {} already installed at {}",
+            version,
+            dest.display()
+        );
+    } else {
+        eprintln!("Installing terraform {}...", version);
+        let bytes = terraform::download_terraform_zip(&client, &version).await?;
+        terraform::extract_and_install(&bytes, &dest)?;
+        eprintln!("Installed terraform {} to {}", version, dest.display());
+    }
+
+    // Apply lock policy
+    match lock_action {
+        LockAction::Keep => { /* do nothing */ }
+        LockAction::WriteNew(v) | LockAction::WriteUpdate(v) => {
+            terraform::write_lockfile(&repo_root, v)?;
+            eprintln!("Wrote {} with version {v}", terraform::LOCKFILE);
+        }
+    }
+
+    Ok(())
+}
+
+fn list() -> anyhow::Result<()> {
+    let repo_root = std::env::current_dir().context("Failed to get current directory")?;
+    let locked = terraform::read_locked_version(&repo_root)?;
+    terraform::print_installed_versions_with_lock(&locked)
+}
+
+pub fn output(
+    output_args: &InfraOutputSubCmdArgs,
+    env: &Environment<ExplicitIndex>,
+) -> anyhow::Result<()> {
+    let mut args = vec!["output"];
+    if output_args.json {
+        args.push("-json");
+    }
+    terraform::call_terraform(&output_args.common.path, env, &args)
+}
+
+fn plan(cmd_args: &InfraSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
+    let out = cmd_args.out.to_string_lossy().to_string();
+    let args = ["plan", "-out", out.as_str()];
+    terraform::call_terraform(&cmd_args.path, env, &args)
+}
+
+fn uninstall(args: &InfraUninstallSubCmdArgs) -> anyhow::Result<()> {
+    let repo_root = std::env::current_dir().context("Failed to get current directory")?;
+
+    // --list, print installed versions
+    if args.list {
+        let locked = terraform::read_locked_version(&repo_root)?;
+        return terraform::print_installed_versions_with_lock(&locked);
+    }
+
+    // --all, remove everything
+    if args.all {
+        let removed = terraform::uninstall_all_versions()?;
+        if removed == 0 {
+            eprintln!(
+                "No terraform binaries found in {}",
+                terraform::terraform_install_dir()?.display()
+            );
+        } else {
+            eprintln!("Removed {} terraform binaries.", removed);
+        }
+        // Remove lockfile if present
+        let lf = terraform::lockfile_path(&repo_root);
+        if lf.exists() {
+            fs::remove_file(&lf).ok();
+            eprintln!("Removed {}", lf.display());
+        }
+        return Ok(());
+    }
+
+    // --version, uninstall specific version
+    if let Some(ver) = &args.version {
+        let path = terraform::terraform_bin_path(ver)?;
+        if path.exists() {
+            fs::remove_file(&path)
+                .with_context(|| format!("Failed to remove {}", path.display()))?;
+            eprintln!("Removed {}", path.display());
+            // If lockfile matches this version, remove it too.
+            if terraform::read_locked_version(&repo_root)?.as_deref() == Some(ver.as_str()) {
+                let lf = terraform::lockfile_path(&repo_root);
+                if lf.exists() {
+                    fs::remove_file(&lf).ok();
+                    eprintln!("Removed {}", lf.display());
+                }
+            }
+        } else {
+            eprintln!("Terraform {} not found at {}", ver, path.display());
+        }
+        return Ok(());
+    }
+
+    // default if no option is provided:
+    // a) if lock exists, unninstall that version and delete the lockfile.
+    if let Some(locked) = terraform::read_locked_version(&repo_root)? {
+        let path = terraform::terraform_bin_path(&locked)?;
+        if path.exists() {
+            fs::remove_file(&path)
+                .with_context(|| format!("Failed to remove {}", path.display()))?;
+            eprintln!("Removed {}", path.display());
+        } else {
+            eprintln!(
+                "Locked terraform {} not found at {}",
+                locked,
+                path.display()
+            );
+        }
+        // Remove lockfile
+        let lf = terraform::lockfile_path(&repo_root);
+        if lf.exists() {
+            fs::remove_file(&lf).ok();
+            eprintln!("Removed {}", lf.display());
+        }
+        return Ok(());
+    }
+    // b) if no lock and exactly one version installed, uninstall that one.
+    let installed = terraform::list_installed_versions()?;
+    match installed.len() {
+        0 => {
+            eprintln!(
+                "No terraform binaries found in {}",
+                terraform::terraform_install_dir()?.display()
+            );
+            Ok(())
+        }
+        1 => {
+            let (ver, path) = &installed[0];
+            fs::remove_file(path)
+                .with_context(|| format!("Failed to remove {}", path.display()))?;
+            eprintln!("Removed {} ({})", path.display(), ver);
+            Ok(())
+        }
+        // c) if multiple versions installed and no lock, list them and exit without action.
+        _ => {
+            eprintln!(
+                "Multiple terraform versions are installed; specify one with --version or use --all:"
+            );
+            for (ver, path) in installed {
+                eprintln!("  {ver}\t{}", path.display());
+            }
+            Ok(())
+        }
+    }
+}
+
+async fn update() -> anyhow::Result<()> {
+    let client = Client::builder()
+        .user_agent("tracel-xtask")
+        .build()
+        .context("Failed to build HTTP client")?;
+
+    let repo_root = std::env::current_dir().context("Failed to get current directory")?;
+    let latest = terraform::fetch_latest_version(&client).await?;
+    let locked = terraform::read_locked_version(&repo_root)?;
+
+    if locked.as_deref() == Some(latest.as_str()) {
+        eprintln!("Terraform is already at latest: {}", latest);
+    } else {
+        let dest = terraform::terraform_bin_path(&latest)?;
+        if dest.exists() {
+            eprintln!(
+                "terraform {} already installed at {}",
+                latest,
+                dest.display()
+            );
+        } else {
+            eprintln!("Installing terraform {}...", &latest);
+            let bytes = terraform::download_terraform_zip(&client, &latest).await?;
+            terraform::extract_and_install(&bytes, &dest)?;
+            eprintln!("Installed terraform {} to {}", latest, dest.display());
+        }
+
+        terraform::write_lockfile(&repo_root, &latest)?;
+        match locked {
+            Some(prev) => eprintln!("Updated {} from {prev} -> {latest}", terraform::LOCKFILE),
+            None => eprintln!("Wrote {} with version {latest}", terraform::LOCKFILE),
+        }
+    }
+
+    Ok(())
+}

@@ -455,7 +455,12 @@ pub fn ecr_compute_next_numeric_tag(repository: &str, region: &str) -> anyhow::R
 
 /// Fetch the SecretString for a given secret.
 /// `secret_id` can be a name or an ARN.
-pub fn secretsmanager_get_secret_string(secret_id: &str, region: &str) -> anyhow::Result<String> {
+/// `out_format` can be either "text" or "json"
+pub fn secretsmanager_get_secret_string(
+    secret_id: &str,
+    region: &str,
+    out_format: &str,
+) -> anyhow::Result<String> {
     let out = aws_cli_capture_stdout(
         vec![
             "secretsmanager".into(),
@@ -467,7 +472,7 @@ pub fn secretsmanager_get_secret_string(secret_id: &str, region: &str) -> anyhow
             "--query".into(),
             "SecretString".into(),
             "--output".into(),
-            "text".into(),
+            out_format.into(),
         ],
         "aws secretsmanager get-secret-value",
         None,
@@ -553,6 +558,68 @@ pub fn secretsmanager_list_secret_versions_json(
     )?;
 
     Ok(out.trim_end().to_string())
+}
+
+/// Describe a Secrets Manager secret as raw JSON.
+pub fn secretsmanager_describe_secret(secret_id: &str, region: &str) -> anyhow::Result<String> {
+    let out = aws_cli_capture_stdout(
+        vec![
+            "secretsmanager".into(),
+            "describe-secret".into(),
+            "--secret-id".into(),
+            secret_id.into(),
+            "--region".into(),
+            region.into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws secretsmanager describe-secret",
+        None,
+        None,
+    )?;
+
+    Ok(out.trim_end().to_string())
+}
+
+/// Return Ok(true) if the secret exists, Ok(false) if it does not.
+pub fn secretsmanager_secret_exists(secret_id: &str, region: &str) -> anyhow::Result<bool> {
+    use std::process::Command;
+
+    let output = Command::new("aws")
+        .arg("secretsmanager")
+        .arg("describe-secret")
+        .arg("--secret-id")
+        .arg(secret_id)
+        .arg("--region")
+        .arg(region)
+        .output()
+        .with_context(|| {
+            format!(
+                "Invoking 'aws secretsmanager describe-secret' for '{}' in region '{}' should succeed",
+                secret_id, region
+            )
+        })?;
+
+    if output.status.success() {
+        // Secret exists
+        return Ok(true);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if stderr.contains("ResourceNotFoundException") {
+        // Secret does not exists
+        return Ok(false);
+    }
+
+    // other error
+    Err(anyhow::anyhow!(
+        "aws secretsmanager describe-secret for '{}' in region '{}' should succeed (exit status: {}, stderr: {})",
+        secret_id,
+        region,
+        output.status,
+        stderr.trim(),
+    ))
 }
 
 // Systems Manager -----------------------------------------------------------

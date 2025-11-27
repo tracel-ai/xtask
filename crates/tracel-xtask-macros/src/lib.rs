@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta, Variant,
+    ItemEnum, ItemStruct, Meta, Variant, parse_macro_input, punctuated::Punctuated, token::Comma,
 };
 
 // Targets
@@ -180,6 +180,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Commands related to an host like connecting, getting info, etc..."]
             Host(tracel_xtask::commands::host::HostCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "Infra",
+        quote! {
+            #[doc = r"Infrastructure management with terraform."]
+            Container(tracel_xtask::commands::infra::InfraCmdArgs)
         },
     );
     variant_map.insert(
@@ -765,6 +772,29 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Connect(HostConnectSubCmdArgs),
                 #[doc = r"Fetch the private IP of the host if any."]
                 PrivateIp(HostPrivateIpSubCmdArgs),
+            },
+        ),
+        (
+            "InfraSubCommand",
+            quote! {
+                #[doc = r"Apply infra changes."]
+                Apply(InfraSubCmdArgs),
+                #[doc = r"Create a destroy plan."]
+                Destroy(InfraSubCmdArgs),
+                #[doc = r"Initialize terraform."]
+                Init(InfraSubCmdArgs),
+                #[doc = r"Install the locked version of terraform or the latest version if there is no lock file yet."]
+                Install(InfraInstallSubCmdArgs),
+                #[doc = r"List all the installed versions of terraform."]
+                List,
+                #[doc = r"List outputs of a terraform state."]
+                Output(InfraOutputSubCmdArgs),
+                #[doc = r"Create a plan for infra changes."]
+                Plan(InfraSubCmdArgs),
+                #[doc = r"Uninstall the locked version of terraform."]
+                Uninstall(InfraUninstallSubCmdArgs),
+                #[doc = r"Update locked version of terraform to latest."]
+                Update,
             },
         ),
         (
