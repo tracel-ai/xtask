@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Context as _;
 use home::home_dir;
-use reqwest::Client;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
@@ -117,23 +117,21 @@ pub fn read_locked_version(repo_root: &Path) -> anyhow::Result<Option<String>> {
 
 /// Latest Terraform version via HashCorp checkpoint API.
 /// see https://checkpoint-api.hashicorp.com
-pub async fn fetch_latest_version(client: &Client) -> anyhow::Result<String> {
+pub fn fetch_latest_version(client: &Client) -> anyhow::Result<String> {
     let url = "https://checkpoint-api.hashicorp.com/v1/check/terraform";
     let resp: CheckpointResponse = client
         .get(url)
         .send()
-        .await
         .context("Failed to query HashCorp checkpoint API")?
         .error_for_status()
         .context("Non-success status from checkpoint API")?
         .json()
-        .await
         .context("Failed to parse checkpoint API JSON")?;
     Ok(resp.current_version)
 }
 
 /// Download terraform archive from hashicorp
-pub async fn download_terraform_zip(client: &Client, version: &str) -> anyhow::Result<Vec<u8>> {
+pub fn download_terraform_zip(client: &Client, version: &str) -> anyhow::Result<Vec<u8>> {
     let os = terraform_target_os();
     let arch = terraform_target_arch();
     let url = format!(
@@ -145,12 +143,11 @@ pub async fn download_terraform_zip(client: &Client, version: &str) -> anyhow::R
     let resp = client
         .get(&url)
         .send()
-        .await
         .with_context(|| format!("Failed to download {url}"))?
         .error_for_status()
         .with_context(|| format!("Non-success status while downloading {url}"))?;
 
-    let bytes = resp.bytes().await.context("Failed to read body")?;
+    let bytes = resp.bytes().context("Failed to read body")?;
     Ok(bytes.to_vec())
 }
 

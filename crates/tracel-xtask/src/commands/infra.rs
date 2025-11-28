@@ -1,8 +1,9 @@
 use anyhow::Context as _;
-use reqwest::Client;
+use reqwest::blocking::Client;
 use std::{fs, io::Write as _, path::PathBuf};
 
 use crate::{
+    context::Context,
     prelude::{Environment, ExplicitIndex},
     utils::terraform,
 };
@@ -60,7 +61,7 @@ pub struct InfraSubCmdArgs {
     pub out: PathBuf,
 }
 
-pub async fn handle_command(args: InfraCmdArgs, env: Environment) -> anyhow::Result<()> {
+pub fn handle_command(args: InfraCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     let env = env.into_explicit();
     match args.get_command() {
         InfraSubCommand::Apply(cmd_args) => {
@@ -69,12 +70,12 @@ pub async fn handle_command(args: InfraCmdArgs, env: Environment) -> anyhow::Res
         }
         InfraSubCommand::Destroy(cmd_args) => destroy(&cmd_args, &env),
         InfraSubCommand::Init(cmd_args) => init(&cmd_args, &env),
-        InfraSubCommand::Install(cmd_args) => install(&cmd_args).await,
+        InfraSubCommand::Install(cmd_args) => install(&cmd_args),
         InfraSubCommand::List => list(),
         InfraSubCommand::Output(cmd_args) => output(&cmd_args, &env),
         InfraSubCommand::Plan(cmd_args) => plan(&cmd_args, &env),
         InfraSubCommand::Uninstall(cmd_args) => uninstall(&cmd_args),
-        InfraSubCommand::Update => update().await,
+        InfraSubCommand::Update => update(),
     }
 }
 
@@ -121,7 +122,7 @@ fn init(cmd_args: &InfraSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow:
     terraform::call_terraform(&cmd_args.path, env, &["init"])
 }
 
-async fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
+fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
     let client = Client::builder()
         .user_agent("tracel-xtask")
         .build()
@@ -147,7 +148,7 @@ async fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
         if let Some(locked) = terraform::read_locked_version(&repo_root)? {
             (locked, LockAction::Keep)
         } else {
-            let latest = terraform::fetch_latest_version(&client).await?;
+            let latest = terraform::fetch_latest_version(&client)?;
             (
                 latest.clone(),
                 LockAction::WriteNew(Box::leak(latest.into_boxed_str())),
@@ -164,7 +165,7 @@ async fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
         );
     } else {
         eprintln!("Installing terraform {}...", version);
-        let bytes = terraform::download_terraform_zip(&client, &version).await?;
+        let bytes = terraform::download_terraform_zip(&client, &version)?;
         terraform::extract_and_install(&bytes, &dest)?;
         eprintln!("Installed terraform {} to {}", version, dest.display());
     }
@@ -255,7 +256,7 @@ fn uninstall(args: &InfraUninstallSubCmdArgs) -> anyhow::Result<()> {
     }
 
     // default if no option is provided:
-    // a) if lock exists, unninstall that version and delete the lockfile.
+    // a) if lock exists, uninstall that version and delete the lockfile.
     if let Some(locked) = terraform::read_locked_version(&repo_root)? {
         let path = terraform::terraform_bin_path(&locked)?;
         if path.exists() {
@@ -307,14 +308,14 @@ fn uninstall(args: &InfraUninstallSubCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-async fn update() -> anyhow::Result<()> {
+fn update() -> anyhow::Result<()> {
     let client = Client::builder()
         .user_agent("tracel-xtask")
         .build()
         .context("Failed to build HTTP client")?;
 
     let repo_root = std::env::current_dir().context("Failed to get current directory")?;
-    let latest = terraform::fetch_latest_version(&client).await?;
+    let latest = terraform::fetch_latest_version(&client)?;
     let locked = terraform::read_locked_version(&repo_root)?;
 
     if locked.as_deref() == Some(latest.as_str()) {
@@ -329,7 +330,7 @@ async fn update() -> anyhow::Result<()> {
             );
         } else {
             eprintln!("Installing terraform {}...", &latest);
-            let bytes = terraform::download_terraform_zip(&client, &latest).await?;
+            let bytes = terraform::download_terraform_zip(&client, &latest)?;
             terraform::extract_and_install(&bytes, &dest)?;
             eprintln!("Installed terraform {} to {}", latest, dest.display());
         }
