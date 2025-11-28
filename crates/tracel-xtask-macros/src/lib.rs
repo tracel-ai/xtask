@@ -186,7 +186,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         "Infra",
         quote! {
             #[doc = r"Infrastructure management with terraform."]
-            Container(tracel_xtask::commands::infra::InfraCmdArgs)
+            Infra(tracel_xtask::commands::infra::InfraCmdArgs)
         },
     );
     variant_map.insert(
