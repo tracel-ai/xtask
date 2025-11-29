@@ -42,25 +42,14 @@ pub fn state_path(
 }
 
 /// Call terraform with a command
-pub fn call_terraform(
-    path: &PathBuf,
-    env: &Environment<ExplicitIndex>,
-    args: &[&str],
-) -> anyhow::Result<()> {
-    // info!("Generating up to date config...");
-    // let config_args = ConfigSubCmdArgs {
-    //     common: cmd_args.clone(),
-    //     show: false,
-    // };
-    // config(&config_args, env)?;
+pub fn call_terraform(path: &Path, args: &[&str]) -> anyhow::Result<()> {
     let repo_root = std::env::current_dir().context("Failed to get current directory")?;
     let tf = locked_terraform_path(&repo_root)?;
-    let workdir = state_path(path, env)?;
     run_process(
         tf.as_str(),
         args,
         None,
-        Some(&workdir),
+        Some(path),
         "Error during terraform init.",
     )
 }

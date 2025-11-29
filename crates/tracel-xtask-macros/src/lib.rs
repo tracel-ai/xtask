@@ -791,6 +791,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Output(InfraOutputSubCmdArgs),
                 #[doc = r"Create a plan for infra changes."]
                 Plan(InfraSubCmdArgs),
+                #[doc = r"Call terraform providers command."]
+                Providers(InfraProvidersSubCmdArgs),
                 #[doc = r"Uninstall the locked version of terraform."]
                 Uninstall(InfraUninstallSubCmdArgs),
                 #[doc = r"Update locked version of terraform to latest."]
