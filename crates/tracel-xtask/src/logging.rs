@@ -4,7 +4,7 @@ use std::io::Write;
 /// GitHub Actions logging syntax when running on CI.
 pub fn init_logger() -> env_logger::Builder {
     let mut builder = env_logger::Builder::from_default_env();
-    builder.target(env_logger::Target::Stdout);
+    builder.target(env_logger::Target::Stderr);
 
     // Find and setup the correct log level
     builder.filter(None, get_log_level());

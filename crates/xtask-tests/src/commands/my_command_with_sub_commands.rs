@@ -15,8 +15,8 @@ pub enum MySubCommand {
 
 pub fn handle_command(args: MyCommandWithSubCommandsCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
-        MySubCommand::Command1 => println!("Execute Command 1 (default)"),
-        MySubCommand::Command2 => println!("Execute Command 2"),
+        MySubCommand::Command1 => eprintln!("Execute Command 1 (default)"),
+        MySubCommand::Command2 => eprintln!("Execute Command 2"),
     };
     Ok(())
 }

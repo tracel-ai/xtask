@@ -4,6 +4,6 @@ use tracel_xtask::prelude::*;
 struct MyCommandCmdArgs {}
 
 pub fn handle_command(_args: MyCommandCmdArgs) -> anyhow::Result<()> {
-    println!("Hello from my-command");
+    eprintln!("Hello from my-command");
     Ok(())
 }

@@ -42,7 +42,7 @@ fn test_xtask_example_status_success_and_returns_expected_output(
         .args(args)
         .output()
         .expect("cargo process should start");
-    let out = String::from_utf8_lossy(&output.stdout);
+    let out = String::from_utf8_lossy(&output.stderr);
     println!("{out}");
     assert_eq!(output.status.success(), success);
     assert!(out.contains(&expected_output));

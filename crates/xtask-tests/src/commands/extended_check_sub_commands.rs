@@ -16,7 +16,7 @@ pub fn handle_command(args: ExtendedCheckArgsCmdArgs) -> anyhow::Result<()> {
     match args.get_command() {
         ExtendedCheckSubcommand::MySubCommand => run_my_subcommand(args.clone()),
         ExtendedCheckSubcommand::All => {
-            println!("Executing all");
+            eprintln!("Executing all");
             ExtendedCheckSubcommand::iter()
                 .filter(|c| *c != ExtendedCheckSubcommand::All)
                 .try_for_each(|c| {
@@ -31,7 +31,7 @@ pub fn handle_command(args: ExtendedCheckArgsCmdArgs) -> anyhow::Result<()> {
                 })
         }
         command => {
-            println!("Executing {command}");
+            eprintln!("Executing {command}");
             // this should be uncommented but we skip the actual execution here because we use
             // this command in the integration test as well.
             // base_commands::check::handle_command(args.try_into().unwrap())
@@ -41,6 +41,6 @@ pub fn handle_command(args: ExtendedCheckArgsCmdArgs) -> anyhow::Result<()> {
 }
 
 fn run_my_subcommand(_args: ExtendedCheckArgsCmdArgs) -> Result<(), anyhow::Error> {
-    println!("Executing new subcommand");
+    eprintln!("Executing new subcommand");
     Ok(())
 }

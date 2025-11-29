@@ -14,9 +14,9 @@ pub fn handle_command(
     ctx: Context,
 ) -> anyhow::Result<()> {
     if args.debug {
-        println!("debug enabled");
+        eprintln!("debug enabled");
     } else {
-        println!("debug disabled");
+        eprintln!("debug disabled");
     }
     base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), ctx.clone())
 }

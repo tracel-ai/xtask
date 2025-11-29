@@ -21,8 +21,8 @@ pub fn handle_command(
     ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
-        BuildSubcommand::Command1 => println!("Executing build sub command 1"),
-        BuildSubcommand::Command2 => println!("Executing build sub command 2"),
+        BuildSubcommand::Command1 => eprintln!("Executing build sub command 1"),
+        BuildSubcommand::Command2 => eprintln!("Executing build sub command 2"),
     }
     base_commands::build::handle_command(args.try_into().unwrap(), env.clone(), ctx.clone())
 }

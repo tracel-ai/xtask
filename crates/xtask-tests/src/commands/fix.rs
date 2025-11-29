@@ -77,14 +77,14 @@ fn run_new_subcommand_fix(
     if answer.unwrap() {
         group!("Subcommand");
         if subcmd_args.debug {
-            println!("Debug mode enabled.")
+            eprintln!("Debug mode enabled.")
         }
         match args.target {
-            FixTarget::AllPackages => println!("Executing new subcommand on all packages."),
-            FixTarget::Crates => println!("Executing new subcommand on all crates."),
-            FixTarget::Examples => println!("Executing new subcommand on all examples."),
-            FixTarget::Workspace => println!("Executing new subcommand on workspace."),
-            FixTarget::CI => println!("Executing new subcommand on CI."),
+            FixTarget::AllPackages => eprintln!("Executing new subcommand on all packages."),
+            FixTarget::Crates => eprintln!("Executing new subcommand on all crates."),
+            FixTarget::Examples => eprintln!("Executing new subcommand on all examples."),
+            FixTarget::Workspace => eprintln!("Executing new subcommand on workspace."),
+            FixTarget::CI => eprintln!("Executing new subcommand on CI."),
         }
         endgroup!();
     }

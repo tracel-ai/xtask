@@ -12,13 +12,13 @@ struct ExtendedTargetCmdArgs {}
 pub fn handle_command(args: ExtendedTargetCmdArgs) -> anyhow::Result<()> {
     match args.target {
         // Default targets
-        MyTarget::AllPackages => println!("You chose the target: all-packages"),
-        MyTarget::Crates => println!("You chose the target: crates"),
-        MyTarget::Examples => println!("You chose the target: examples"),
-        MyTarget::Workspace => println!("You chose the target: workspace"),
+        MyTarget::AllPackages => eprintln!("You chose the target: all-packages"),
+        MyTarget::Crates => eprintln!("You chose the target: crates"),
+        MyTarget::Examples => eprintln!("You chose the target: examples"),
+        MyTarget::Workspace => eprintln!("You chose the target: workspace"),
 
         // Additional target
-        MyTarget::Frontend => println!("You chose the target: frontend"),
+        MyTarget::Frontend => eprintln!("You chose the target: frontend"),
     };
     Ok(())
 }
