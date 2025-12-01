@@ -22,9 +22,9 @@ use strum::{Display, EnumIter, EnumString};
 
 pub const CARGO_NIGHTLY_MSG: &str = "You must use 'cargo +nightly' to run nightly checks.
 Install a nightly toolchain with 'rustup toolchain install nightly'.";
-pub const WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS: &str = "--target workspace ignores the arguments --exclude and --only. Use --target all-packages instead.";
+pub const WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS: &str = "'--target workspace' ignores the arguments '--exclude' and '--only'. Use '--target crates' instead.";
 pub const WARN_IGNORED_ONLY_ARGS: &str =
-    "--target workspace ignores the arguments --only. Use --target all-packages instead.";
+    "'--target workspace' ignores the arguments '--only'. Use '--target crates' instead.";
 
 #[tracel_xtask_macros::declare_targets]
 pub enum Target {}
