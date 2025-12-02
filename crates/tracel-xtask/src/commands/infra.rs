@@ -7,12 +7,14 @@ use crate::{context::Context, prelude::Environment, utils::terraform};
 const DEFAULT_PATH: &str = "./infra";
 
 #[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
-pub struct InfraCmdArgs {}
+pub struct InfraCmdArgs {
+    /// Path where to generate or read the infra configuration.
+    #[arg(long, default_value = DEFAULT_PATH)]
+    pub path: PathBuf,
 
-impl Default for InfraSubCommand {
-    fn default() -> Self {
-        InfraSubCommand::Plan(InfraSubCmdArgs::default())
-    }
+    /// Path to the Terraform plan file used by `plan` and `apply`.
+    #[arg(long, default_value = "tfplan")]
+    pub out: PathBuf,
 }
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
@@ -24,10 +26,6 @@ struct InfraInstallSubCmdArgs {
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
 pub struct InfraOutputSubCmdArgs {
-    /// Common infra args
-    #[command(flatten)]
-    pub common: InfraSubCmdArgs,
-
     /// If specified, use JSON format for outputs format
     #[arg(short, long)]
     json: bool,
@@ -35,10 +33,6 @@ pub struct InfraOutputSubCmdArgs {
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
 pub struct InfraProvidersSubCmdArgs {
-    /// Common infra args
-    #[command(flatten)]
-    pub common: InfraSubCmdArgs,
-
     /// The command to pass to provider.
     command: TerraformProvidersCommand,
 }
@@ -63,30 +57,19 @@ struct InfraUninstallSubCmdArgs {
     version: Option<String>,
 }
 
-#[derive(clap::Args, Clone, Default, PartialEq)]
-pub struct InfraSubCmdArgs {
-    /// Path where to generate or read the infra configuration.
-    #[arg(long, default_value = DEFAULT_PATH)]
-    pub path: PathBuf,
-
-    /// Path to the Terraform plan file used by `plan` and `apply`.
-    #[arg(long, default_value = "tfplan")]
-    pub out: PathBuf,
-}
-
 pub fn handle_command(args: InfraCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
-        InfraSubCommand::Apply(cmd_args) => {
-            apply(&cmd_args)?;
+        InfraSubCommand::Apply => {
+            apply(&args)?;
             Ok(())
         }
-        InfraSubCommand::Destroy(cmd_args) => destroy(&cmd_args),
-        InfraSubCommand::Init(cmd_args) => init(&cmd_args),
+        InfraSubCommand::Destroy => destroy(&args),
+        InfraSubCommand::Init => init(&args),
         InfraSubCommand::Install(cmd_args) => install(&cmd_args),
         InfraSubCommand::List => list(),
-        InfraSubCommand::Output(cmd_args) => output(&cmd_args),
-        InfraSubCommand::Providers(cmd_args) => providers(&cmd_args),
-        InfraSubCommand::Plan(cmd_args) => plan(&cmd_args),
+        InfraSubCommand::Output(cmd_args) => output(&args, &cmd_args),
+        InfraSubCommand::Providers(cmd_args) => providers(&args, &cmd_args),
+        InfraSubCommand::Plan => plan(&args),
         InfraSubCommand::Uninstall(cmd_args) => uninstall(&cmd_args),
         InfraSubCommand::Update => update(),
     }
@@ -95,12 +78,12 @@ pub fn handle_command(args: InfraCmdArgs, _env: Environment, _ctx: Context) -> a
 // Commands ------------------------------------------------------------------
 
 /// Returns true if the user confirmed to apply the plan
-pub fn apply(cmd_args: &InfraSubCmdArgs) -> anyhow::Result<bool> {
-    let out = cmd_args.out.to_string_lossy().to_string();
+pub fn apply(args: &InfraCmdArgs) -> anyhow::Result<bool> {
+    let out = args.out.to_string_lossy().to_string();
 
     // 1) Run plan
-    let plan_args = ["plan", "-out", out.as_str()];
-    terraform::call_terraform(&cmd_args.path, &plan_args)?;
+    let tf_args = ["plan", "-out", out.as_str()];
+    terraform::call_terraform(&args.path, &tf_args)?;
 
     // 2) Ask the user if they want to run apply.
     eprintln!();
@@ -122,17 +105,17 @@ pub fn apply(cmd_args: &InfraSubCmdArgs) -> anyhow::Result<bool> {
 
     // 3) User approved: apply the *saved* plan file (no re-planning).
     let apply_args = ["apply", "-auto-approve", out.as_str()];
-    terraform::call_terraform(&cmd_args.path, &apply_args)?;
+    terraform::call_terraform(&args.path, &apply_args)?;
 
     Ok(true)
 }
 
-fn destroy(cmd_args: &InfraSubCmdArgs) -> anyhow::Result<()> {
-    terraform::call_terraform(&cmd_args.path, &["destroy"])
+pub fn destroy(args: &InfraCmdArgs) -> anyhow::Result<()> {
+    terraform::call_terraform(&args.path, &["destroy"])
 }
 
-fn init(cmd_args: &InfraSubCmdArgs) -> anyhow::Result<()> {
-    terraform::call_terraform(&cmd_args.path, &["init"])
+pub fn init(args: &InfraCmdArgs) -> anyhow::Result<()> {
+    terraform::call_terraform(&args.path, &["init"])
 }
 
 fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
@@ -201,26 +184,26 @@ fn list() -> anyhow::Result<()> {
     terraform::print_installed_versions_with_lock(&locked)
 }
 
-pub fn output(output_args: &InfraOutputSubCmdArgs) -> anyhow::Result<()> {
-    let mut args = vec!["output"];
+pub fn output(args: &InfraCmdArgs, output_args: &InfraOutputSubCmdArgs) -> anyhow::Result<()> {
+    let mut tf_args = vec!["output"];
     if output_args.json {
-        args.push("-json");
+        tf_args.push("-json");
     }
-    terraform::call_terraform(&output_args.common.path, &args)
+    terraform::call_terraform(&args.path, &tf_args)
 }
 
-fn plan(cmd_args: &InfraSubCmdArgs) -> anyhow::Result<()> {
-    let out = cmd_args.out.to_string_lossy().to_string();
-    let args = ["plan", "-out", out.as_str()];
-    terraform::call_terraform(&cmd_args.path, &args)
+pub fn plan(args: &InfraCmdArgs) -> anyhow::Result<()> {
+    let out = args.out.to_string_lossy().to_string();
+    let tf_args = ["plan", "-out", out.as_str()];
+    terraform::call_terraform(&args.path, &tf_args)
 }
 
-fn providers(provider_args: &InfraProvidersSubCmdArgs) -> anyhow::Result<()> {
-    let mut args = vec!["providers"];
+fn providers(args: &InfraCmdArgs, provider_args: &InfraProvidersSubCmdArgs) -> anyhow::Result<()> {
+    let mut tf_args = vec!["providers"];
     match provider_args.command {
         TerraformProvidersCommand::Schema => {
-            args.extend(vec!["schema", "-json", "-no-color"]);
-            terraform::call_terraform(&provider_args.common.path, &args)
+            tf_args.extend(vec!["schema", "-json", "-no-color"]);
+            terraform::call_terraform(&args.path, &tf_args)
         }
     }
 }

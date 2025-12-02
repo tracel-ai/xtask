@@ -778,19 +778,20 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             "InfraSubCommand",
             quote! {
                 #[doc = r"Apply infra changes."]
-                Apply(InfraSubCmdArgs),
+                Apply,
                 #[doc = r"Create a destroy plan."]
-                Destroy(InfraSubCmdArgs),
+                Destroy,
                 #[doc = r"Initialize terraform."]
-                Init(InfraSubCmdArgs),
+                Init,
                 #[doc = r"Install the locked version of terraform or the latest version if there is no lock file yet."]
                 Install(InfraInstallSubCmdArgs),
                 #[doc = r"List all the installed versions of terraform."]
                 List,
                 #[doc = r"List outputs of a terraform state."]
                 Output(InfraOutputSubCmdArgs),
+                #[default]
                 #[doc = r"Create a plan for infra changes."]
-                Plan(InfraSubCmdArgs),
+                Plan,
                 #[doc = r"Call terraform providers command."]
                 Providers(InfraProvidersSubCmdArgs),
                 #[doc = r"Uninstall the locked version of terraform."]
