@@ -4,19 +4,28 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
 use syn::{
-    ItemEnum, ItemStruct, Meta, Variant, parse_macro_input, punctuated::Punctuated, token::Comma,
+    parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta, Path, Variant
 };
 
 // Targets
 // =======
 
-fn generate_target_enum(input: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(input as ItemEnum);
+fn generate_target_enum(item: &ItemEnum) -> TokenStream {
     let enum_name = &item.ident;
-    let original_variants = &item.variants;
+
+    // Remove #[alias(...)] attributes from the actual generated enum
+    let original_variants = strip_alias_attributes(&item.variants);
 
     let output = quote! {
-        #[derive(strum::EnumString, strum::EnumIter, Default, strum::Display, Clone, PartialEq, clap::ValueEnum)]
+        #[derive(
+            strum::EnumString,
+            strum::EnumIter,
+            Default,
+            strum::Display,
+            Clone,
+            PartialEq,
+            clap::ValueEnum,
+        )]
         #[strum(serialize_all = "lowercase")]
         pub enum #enum_name {
             #[doc = r"Targets all crates and examples using cargo --package."]
@@ -31,39 +40,114 @@ fn generate_target_enum(input: TokenStream) -> TokenStream {
             #original_variants
         }
     };
+
     TokenStream::from(output)
 }
 
-fn generate_target_tryinto(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(input as ItemEnum);
+fn generate_target_tryinto(item: &ItemEnum) -> TokenStream {
+    use proc_macro2::Span;
     let item_ident = &item.ident;
+    // Base targets we know how to map to tracel_xtask::commands::Target
+    const BASES: &[&str] = &["AllPackages", "Crates", "Examples", "Workspace"];
+    // groups["Workspace"] = [Workspace, Backend, ...]
+    let mut groups: HashMap<&'static str, Vec<syn::Ident>> = HashMap::new();
+    for name in BASES {
+        groups.insert(
+            name,
+            vec![syn::Ident::new(name, Span::call_site())],
+        );
+    }
+    // Collect aliases from the original enum
+    for variant in &item.variants {
+        let from_ident = &variant.ident;
+        for attr in &variant.attrs {
+            if !attr.path().is_ident("alias") {
+                continue;
+            }
+            // Expect #[alias(xxxxx)]
+            let alias_target_path: Path = match attr.parse_args() {
+                Ok(p) => p,
+                Err(e) => return TokenStream::from(e.to_compile_error()),
+            };
+            let Some(to_ident) = alias_target_path.get_ident() else {
+                let msg = "alias attribute expects a simple identifier, e.g. #[alias(Workspace)]";
+                return TokenStream::from(quote! { compile_error!(#msg); });
+            };
+
+            let to_name = to_ident.to_string();
+            if !BASES.contains(&to_name.as_str()) {
+                let msg = format!(
+                    "alias can only refer to one of the base targets: {:?}. Found `{}`",
+                    BASES, to_name
+                );
+                return TokenStream::from(quote! { compile_error!(#msg); });
+            }
+
+            if let Some(vec) = groups.get_mut(to_name.as_str()) {
+                vec.push(from_ident.clone());
+            }
+        }
+    }
+
+    // Build match arms: ExtendedTarget::Workspace | ExtendedTarget::Backend => Target::Workspace
+    let mut arms = Vec::new();
+    for (base_name, idents) in groups {
+        let target_variant = syn::Ident::new(base_name, Span::call_site());
+        let mut idents_iter = idents.iter();
+        let first = match idents_iter.next() {
+            Some(f) => f,
+            None => continue,
+        };
+        // build pattern: Enum::First | Enum::Other | Enum::Another ...
+        let mut pattern = quote! { #item_ident::#first };
+        for ident in idents_iter {
+            pattern = quote! { #pattern | #item_ident::#ident };
+        }
+        let rhs = quote! { tracel_xtask::commands::Target::#target_variant };
+        arms.push(quote! {
+            #pattern => Ok(#rhs),
+        });
+    }
+
     let tryinto = quote! {
         impl std::convert::TryInto<tracel_xtask::commands::Target> for #item_ident {
             type Error = anyhow::Error;
             fn try_into(self) -> Result<tracel_xtask::commands::Target, Self::Error> {
                 match self {
-                    #item_ident::AllPackages => Ok(tracel_xtask::commands::Target::AllPackages),
-                    #item_ident::Crates => Ok(tracel_xtask::commands::Target::Crates),
-                    #item_ident::Examples => Ok(tracel_xtask::commands::Target::Examples),
-                    #item_ident::Workspace => Ok(tracel_xtask::commands::Target::Workspace),
-                    _ => Err(anyhow::anyhow!("{} target is not supported.", self))
+                    #(#arms)*
+                    _ => Err(anyhow::anyhow!("{} target is not supported.", self)),
                 }
             }
         }
     };
+
     TokenStream::from(tryinto)
 }
 
 #[proc_macro_attribute]
 pub fn declare_targets(_args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_target_enum(input)
+    let item = parse_macro_input!(input as ItemEnum);
+    generate_target_enum(&item)
 }
 
 #[proc_macro_attribute]
-pub fn extend_targets(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut output = generate_target_enum(input);
-    output.extend(generate_target_tryinto(args, output.clone()));
+pub fn extend_targets(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemEnum);
+    let mut output = generate_target_enum(&item);
+    output.extend(generate_target_tryinto(&item));
     output
+}
+
+fn strip_alias_attributes(variants: &Punctuated<Variant, Comma>) -> Punctuated<Variant, Comma> {
+    let mut cleaned = Punctuated::new();
+
+    for v in variants {
+        let mut v2 = v.clone();
+        v2.attrs.retain(|attr| !attr.path().is_ident("alias"));
+        cleaned.push(v2);
+    }
+
+    cleaned
 }
 
 // Commands
