@@ -26,7 +26,7 @@ pub struct SecretsCreateSubCmdArgs {
     #[arg(long)]
     pub region: String,
 
-    /// Secret name to create (metadata only, no initial version)
+    /// Secret name to create with an initial empty JSON value
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
 
@@ -137,12 +137,14 @@ pub fn handle_command(
     }
 }
 
-/// create an empty secret (metadata only, no version).
+/// Create a secret and attach an initial empty JSON (`{}`) version as plain text.
 fn create(args: SecretsCreateSubCmdArgs) -> anyhow::Result<()> {
+    // create the secret metadata
     secretsmanager_create_empty_secret(&args.secret_id, &args.region, args.description.as_deref())?;
-
+    // add a first version as an empty JSON object.
+    secretsmanager_put_secret_string(&args.secret_id, &args.region, "{}")?;
     eprintln!(
-        "✅ Created empty secret '{}' in region '{}'.",
+        "✅ Created secret '{}' in region '{}' with an initial empty JSON value.",
         args.secret_id, args.region
     );
     Ok(())
