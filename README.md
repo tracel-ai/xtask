@@ -483,6 +483,25 @@ cargo xtask extended-target --help
 cargo xtask extended-target --target frontend
 ```
 
+### Target aliases
+
+When extending a command we can mark a new variant as an _alias_ of base target (the default ones).
+
+This example defines `Backend` target as the same as `Worspace` target for all the base commands:
+
+```rust
+use tracel_xtask::prelude::*;
+
+#[macros::extend_targets]
+pub enum MyTarget {
+    /// Target the backend component of the monorepo, same thing as Workspace
+    #[alias(Workspace)]
+    Backend,
+    /// Target the frontend component of the monorepo.
+    Frontend,
+}
+```
+
 ### Extend a base command
 
 To extend an existing command we use the `macros::extend_command_args` attribute which takes three parameters:
