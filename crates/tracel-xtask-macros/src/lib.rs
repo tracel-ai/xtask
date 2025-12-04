@@ -4,7 +4,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, token::Comma, ItemEnum, ItemStruct, Meta, Path, Variant
+    ItemEnum, ItemStruct, Meta, Path, Variant, parse_macro_input, punctuated::Punctuated,
+    token::Comma,
 };
 
 // Targets
@@ -52,10 +53,7 @@ fn generate_target_tryinto(item: &ItemEnum) -> TokenStream {
     // groups["Workspace"] = [Workspace, Backend, ...]
     let mut groups: HashMap<&'static str, Vec<syn::Ident>> = HashMap::new();
     for name in BASES {
-        groups.insert(
-            name,
-            vec![syn::Ident::new(name, Span::call_site())],
-        );
+        groups.insert(name, vec![syn::Ident::new(name, Span::call_site())]);
     }
     // Collect aliases from the original enum
     for variant in &item.variants {

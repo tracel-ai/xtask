@@ -2,6 +2,7 @@ pub(crate) mod extended_build_args;
 pub(crate) mod extended_build_new_sub_commands;
 pub(crate) mod extended_check_sub_commands;
 pub(crate) mod extended_target;
+pub(crate) mod extended_target_alias;
 pub(crate) mod extended_test_args;
 pub(crate) mod fix;
 pub(crate) mod my_command;

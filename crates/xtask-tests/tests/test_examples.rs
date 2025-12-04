@@ -8,6 +8,8 @@ use rstest::rstest;
 #[case::create_custom_command_with_sub_commands_variant_1(&["my-command-with-sub-command", "command1"], "Execute Command 1 (default)", true)]
 #[case::create_custom_command_with_sub_commands_variant_2(&["my-command-with-sub-command", "command2"], "Execute Command 2", true)]
 #[case::create_custom_command_with_extended_target_default(&["extended-target"], "You chose the target: workspace", true)]
+#[case::create_custom_command_with_extended_target_alias_backend(&["extended-target-alias" , "--target", "backend"], "You chose the target: workspace", true)]
+#[case::create_custom_command_with_extended_target_alias_workspace(&["extended-target-alias" , "--target", "workspace"], "You chose the target: workspace", true)]
 #[case::create_custom_command_with_extended_target_all_packages(&["extended-target", "--target", "all-packages"], "You chose the target: all-packages", true)]
 #[case::create_custom_command_with_extended_target_crates(&["extended-target", "--target", "crates"], "You chose the target: crates", true)]
 #[case::create_custom_command_with_extended_target_examples(&["extended-target", "--target", "examples"], "You chose the target: examples", true)]

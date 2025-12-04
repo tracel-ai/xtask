@@ -29,8 +29,10 @@ pub enum Command {
     ),
     /// Example of a new command which extends sub commands of a base command.
     ExtendedCheckSubCommands(commands::extended_check_sub_commands::ExtendedCheckArgsCmdArgs),
-    /// Example of a new command which extendeds target
+    /// Example of a new command which extends target
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
+    /// Example of a new command which extends the target with an alias
+    ExtendedTargetAlias(commands::extended_target_alias::ExtendedTargetAliasCmdArgs),
     /// Example of a new command which extends a base command arguments which has subcommands.
     ExtendedTestArgs(commands::extended_test_args::ExtendedTestArgsCmdArgs),
     /// Comprehensive example of an extended Fix command with an additional target and subcommand
@@ -64,6 +66,9 @@ fn main() -> anyhow::Result<()> {
         }
         Command::ExtendedFix(cmd_args) => commands::fix::handle_command(cmd_args, None),
         Command::ExtendedTarget(cmd_args) => commands::extended_target::handle_command(cmd_args),
+        Command::ExtendedTargetAlias(cmd_args) => {
+            commands::extended_target_alias::handle_command(cmd_args)
+        }
         Command::MyCommand(cmd_args) => commands::my_command::handle_command(cmd_args),
         Command::MyCommandWithSubCommand(cmd_args) => {
             commands::my_command_with_sub_commands::handle_command(cmd_args)
