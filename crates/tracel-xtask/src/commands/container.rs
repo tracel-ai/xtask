@@ -164,6 +164,10 @@ pub struct ContainerRolloutSubCmdArgs {
     #[arg(long, value_name = "SECS", default_value_t = ContainerRolloutSubCmdArgs::default().instance_warmup)]
     pub instance_warmup: u64,
 
+    /// Maximum healthy percentage during the rollout
+    #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().max_healthy_percentage)]
+    pub max_healthy_percentage: u8,
+
     /// Minimum healthy percentage during the rollout
     #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
@@ -222,11 +226,12 @@ impl Default for ContainerRolloutSubCmdArgs {
             region: String::new(),
             asg: String::new(),
             strategy: "Rolling".to_string(),
-            instance_warmup: 120,
-            min_healthy_percentage: 90,
+            instance_warmup: 60,
+            max_healthy_percentage: 125,
+            min_healthy_percentage: 100,
             promote_tag: None,
             repository: None,
-            skip_matching: true,
+            skip_matching: false,
             wait: false,
             wait_timeout_secs: 1800,
             wait_poll_secs: 10,
@@ -728,6 +733,7 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
     // Build preferences JSON strictly from flags
     let preferences = serde_json::json!({
         "InstanceWarmup": args.instance_warmup,
+        "MaxHealthyPercentage": args.max_healthy_percentage,
         "MinHealthyPercentage": args.min_healthy_percentage,
         "SkipMatching": args.skip_matching,
     })
