@@ -9,15 +9,68 @@ use anyhow::Context;
 
 use crate::{prelude::run_process, utils::process::run_process_capture_stdout};
 
+/// Run a process, discarding stdout and inheriting stderr.
+/// Fail on non-zero exit.
+fn run_process_quiet(cmd: &mut Command, error_msg: &str) -> anyhow::Result<()> {
+    // Discard stdout to avoid noise in our CLI output.
+    cmd.stdout(Stdio::null());
+
+    let status = cmd.status().with_context(|| {
+        format!(
+            "{error_msg} (failed to spawn '{}')",
+            cmd.get_program().to_string_lossy()
+        )
+    })?;
+
+    if !status.success() {
+        anyhow::bail!("{error_msg} (exit status {status})");
+    }
+
+    Ok(())
+}
+
 /// Run `aws` cli with passed arguments.
+/// Uses the generic `run_process`, but injects AWS env vars to disable pager/auto-prompt.
 pub fn aws_cli(
     args: Vec<String>,
     envs: Option<HashMap<&str, &str>>,
     path: Option<&Path>,
     error_msg: &str,
 ) -> anyhow::Result<()> {
+    let mut merged_envs: HashMap<&str, &str> = envs.unwrap_or_default();
+    merged_envs.insert("AWS_PAGER", "");
+    merged_envs.insert("AWS_CLI_AUTO_PROMPT", "off");
+
     let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    run_process("aws", &arg_refs, envs, path, error_msg)
+    run_process("aws", &arg_refs, Some(merged_envs), path, error_msg)
+}
+
+/// Run `aws` cli with passed arguments, discarding stdout but keeping stderr.
+/// Useful for commands where you only care about success/failure, not output.
+pub fn aws_cli_quiet(
+    args: Vec<String>,
+    envs: Option<HashMap<&str, &str>>,
+    path: Option<&Path>,
+    error_msg: &str,
+) -> anyhow::Result<()> {
+    let mut cmd = Command::new("aws");
+
+    if let Some(p) = path {
+        cmd.current_dir(p);
+    }
+    if let Some(e) = envs {
+        cmd.envs(e);
+    }
+
+    // Always disable AWS pager and auto-prompt for our wrappers.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    for a in &args {
+        cmd.arg(a);
+    }
+
+    run_process_quiet(&mut cmd, error_msg)
 }
 
 /// Run `aws` cli and capture stdout.
@@ -29,15 +82,22 @@ pub fn aws_cli_capture_stdout(
     path: Option<&Path>,
 ) -> anyhow::Result<String> {
     let mut cmd = Command::new("aws");
+
     if let Some(p) = path {
         cmd.current_dir(p);
     }
     if let Some(e) = envs {
         cmd.envs(e);
     }
+
+    // Always disable AWS pager and auto-prompt for our wrappers.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
     for a in &args {
         cmd.arg(a);
     }
+
     run_process_capture_stdout(&mut cmd, label)
 }
 
@@ -48,10 +108,15 @@ pub fn aws_cli_try_capture_stdout(
     args: Vec<String>,
     label: &str,
 ) -> anyhow::Result<Option<String>> {
-    let out = Command::new("aws")
-        .args(&args)
-        .output()
-        .with_context(|| label.to_string())?;
+    let mut cmd = Command::new("aws");
+
+    // Always disable AWS pager and auto-prompt for our wrappers.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    cmd.args(&args);
+
+    let out = cmd.output().with_context(|| label.to_string())?;
     if !out.status.success() {
         return Ok(None);
     }
@@ -146,7 +211,8 @@ pub fn ec2_autoscaling_latest_instance_refresh_status(
 // ECR -----------------------------------------------------------------------
 
 pub fn ecr_ensure_repo_exists(repository: &str, region: &str) -> anyhow::Result<()> {
-    if aws_cli(
+    // We do not care about stdout for these calls; only success/failure.
+    if aws_cli_quiet(
         vec![
             "ecr".into(),
             "describe-repositories".into(),
@@ -157,7 +223,7 @@ pub fn ecr_ensure_repo_exists(repository: &str, region: &str) -> anyhow::Result<
         ],
         None,
         None,
-        "aws ecr describe-repositories failed",
+        "aws ecr describe-repositories should succeed",
     )
     .is_ok()
     {
@@ -165,7 +231,7 @@ pub fn ecr_ensure_repo_exists(repository: &str, region: &str) -> anyhow::Result<
         return Ok(());
     }
     // create the repository
-    aws_cli(
+    aws_cli_quiet(
         vec![
             "ecr".into(),
             "create-repository".into(),
@@ -176,7 +242,7 @@ pub fn ecr_ensure_repo_exists(repository: &str, region: &str) -> anyhow::Result<
         ],
         None,
         None,
-        "aws ecr create-repository failed",
+        "aws ecr create-repository should succeed",
     )
 }
 
@@ -254,7 +320,7 @@ pub fn ecr_put_manifest(
     tag: &str,
     manifest: &str,
 ) -> anyhow::Result<()> {
-    aws_cli(
+    aws_cli_quiet(
         vec![
             "ecr".into(),
             "put-image".into(),
@@ -269,7 +335,7 @@ pub fn ecr_put_manifest(
         ],
         None,
         None,
-        "aws ecr put-image failed",
+        "aws ecr put-image should succeed",
     )
 }
 
@@ -451,6 +517,44 @@ pub fn ecr_compute_next_numeric_tag(repository: &str, region: &str) -> anyhow::R
     Ok(max_seen.saturating_add(1).max(1))
 }
 
+/// Quietly delete an ECR tag (batch-delete-image), discarding stdout but keeping stderr
+/// and failing on non-zero exit.
+pub fn aws_ecr_delete_tag_quiet(
+    repository: &str,
+    region: &str,
+    image_id: &str,     // e.g. "imageTag=rollback_stag"
+    rollback_tag: &str, // for error messages
+) -> anyhow::Result<()> {
+    let mut cmd = Command::new("aws");
+    cmd.arg("ecr")
+        .arg("batch-delete-image")
+        .arg("--repository-name")
+        .arg(repository)
+        .arg("--image-ids")
+        .arg(image_id)
+        .arg("--region")
+        .arg(region);
+
+    // Disable AWS pager and auto-prompt so we never get an interactive UI.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    // Discard stdout to avoid JSON noise, keep stderr inherited.
+    cmd.stdout(Stdio::null());
+
+    let status = cmd.status().with_context(|| {
+        format!(
+            "removing '{rollback_tag}' tag should succeed (failed to spawn aws ecr batch-delete-image)"
+        )
+    })?;
+
+    if !status.success() {
+        anyhow::bail!("removing '{rollback_tag}' tag should succeed (exit status {status})");
+    }
+
+    Ok(())
+}
+
 // Secrets Manager ------------------------------------------------------------
 
 /// Fetch the SecretString for a given secret.
@@ -490,15 +594,21 @@ pub fn secretsmanager_put_secret_string(
     secret_string: &str,
 ) -> anyhow::Result<()> {
     // we avoid using `aws_cli` here to prevent logging the secret value in the process command line.
-    let status = Command::new("aws")
-        .arg("secretsmanager")
+    let mut cmd = Command::new("aws");
+    cmd.arg("secretsmanager")
         .arg("put-secret-value")
         .arg("--secret-id")
         .arg(secret_id)
         .arg("--region")
         .arg(region)
         .arg("--secret-string")
-        .arg(secret_string)
+        .arg(secret_string);
+
+    // Disable AWS pager and auto-prompt.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    let status = cmd
         .status()
         .with_context(|| "aws secretsmanager put-secret-value should succeed".to_string())?;
 
@@ -531,7 +641,7 @@ pub fn secretsmanager_create_empty_secret(
         args.push(desc.into());
     }
 
-    aws_cli(args, None, None, "aws secretsmanager create-secret failed")
+    aws_cli_quiet(args, None, None, "aws secretsmanager create-secret failed")
 }
 
 /// List all versions (including deprecated ones) for a given secret as raw JSON.
@@ -583,22 +693,24 @@ pub fn secretsmanager_describe_secret(secret_id: &str, region: &str) -> anyhow::
 
 /// Return Ok(true) if the secret exists, Ok(false) if it does not.
 pub fn secretsmanager_secret_exists(secret_id: &str, region: &str) -> anyhow::Result<bool> {
-    use std::process::Command;
-
-    let output = Command::new("aws")
-        .arg("secretsmanager")
+    let mut cmd = Command::new("aws");
+    cmd.arg("secretsmanager")
         .arg("describe-secret")
         .arg("--secret-id")
         .arg(secret_id)
         .arg("--region")
-        .arg(region)
-        .output()
-        .with_context(|| {
-            format!(
-                "Invoking 'aws secretsmanager describe-secret' for '{}' in region '{}' should succeed",
-                secret_id, region
-            )
-        })?;
+        .arg(region);
+
+    // Disable AWS pager and auto-prompt.
+    cmd.env("AWS_PAGER", "");
+    cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    let output = cmd.output().with_context(|| {
+        format!(
+            "Invoking 'aws secretsmanager describe-secret' for '{}' in region '{}' should succeed",
+            secret_id, region
+        )
+    })?;
 
     if output.status.success() {
         // Secret exists
@@ -608,7 +720,7 @@ pub fn secretsmanager_secret_exists(secret_id: &str, region: &str) -> anyhow::Re
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if stderr.contains("ResourceNotFoundException") {
-        // Secret does not exists
+        // Secret does not exist
         return Ok(false);
     }
 
@@ -643,22 +755,25 @@ pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> an
     );
 
     // Check if document exists
-    let check = std::process::Command::new("aws")
-        .args([
-            "ssm",
-            "describe-document",
-            "--name",
-            doc_name,
-            "--region",
-            region,
-        ])
-        .output()
-        .context("describe-document should run")?;
+    let mut check_cmd = std::process::Command::new("aws");
+    check_cmd.args([
+        "ssm",
+        "describe-document",
+        "--name",
+        doc_name,
+        "--region",
+        region,
+    ]);
+    check_cmd.env("AWS_PAGER", "");
+    check_cmd.env("AWS_CLI_AUTO_PROMPT", "off");
+
+    let check = check_cmd.output().context("describe-document should run")?;
 
     if !check.status.success() {
         // Create doc
         eprintln!("📄 Creating SSM document '{doc_name}'...");
-        let create = std::process::Command::new("aws")
+        let mut create_cmd = std::process::Command::new("aws");
+        create_cmd
             .args([
                 "ssm",
                 "create-document",
@@ -671,8 +786,10 @@ pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> an
                 "--region",
                 region,
             ])
-            .output()
-            .context("create-document should run")?;
+            .env("AWS_PAGER", "")
+            .env("AWS_CLI_AUTO_PROMPT", "off");
+
+        let create = create_cmd.output().context("create-document should run")?;
 
         if !create.status.success() {
             let stderr = String::from_utf8_lossy(&create.stderr);
@@ -684,7 +801,8 @@ pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> an
     } else {
         // Update doc to ensure latest content
         eprintln!("📄 Updating SSM document '{doc_name}' to latest content...");
-        let update = std::process::Command::new("aws")
+        let mut update_cmd = std::process::Command::new("aws");
+        update_cmd
             .args([
                 "ssm",
                 "update-document",
@@ -697,8 +815,10 @@ pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> an
                 "--region",
                 region,
             ])
-            .output()
-            .context("update-document should run")?;
+            .env("AWS_PAGER", "")
+            .env("AWS_CLI_AUTO_PROMPT", "off");
+
+        let update = update_cmd.output().context("update-document should run")?;
 
         if !update.status.success() {
             let stderr = String::from_utf8_lossy(&update.stderr);

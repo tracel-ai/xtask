@@ -119,7 +119,7 @@ pub struct ContainerPromoteSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
-    /// Build tag to promote for the given environmentd
+    /// Build tag to promote for the given environment
     #[arg(long)]
     pub build_tag: String,
     /// Promote tag applied by this command (defaults to the environment name if omitted)
@@ -286,7 +286,7 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
         args.insert(args.len() - 1, format!("--build-arg={kv}"));
     }
 
-    docker_cli(args, None, None, "docker build failed")?;
+    docker_cli(args, None, None, "docker build should succeed")?;
 
     let image = build_args.image;
     eprintln!("📦 Built container image: {image}");
@@ -454,7 +454,7 @@ fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
 
 fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
-    // check if the container as already been pushed
+    // check if the container has already been pushed
     if let Some(existing_manifest) = ecr_get_manifest(
         &push_args.repository,
         &push_args.region,
@@ -568,6 +568,10 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
 /// promote: point N to `latest` and move the previous `latest` to `rollback`
 fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let promote_tag = promote_tag(promote_args.promote_tag, env);
+    eprintln!(
+        "Promoting '{}' to '{}'...",
+        &promote_args.repository, &promote_tag
+    );
     // Fetch current 'latest' and the target tag's manifest.
     let prev_latest_manifest =
         ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
@@ -616,17 +620,15 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
     }
 
     eprintln!(
-        "✅ Promoted '{}' to '{promote_tag}' in repository '{}'.",
-        promote_args.build_tag, promote_args.repository
+        "✅ Promoted '{}' to '{promote_tag}'.",
+        promote_args.build_tag
     );
-
     let url = aws::cli::ecr_image_url(
         &promote_args.repository,
         &promote_args.build_tag,
         &promote_args.region,
     )?
     .unwrap();
-    eprintln!("🚀 Promoted!");
     eprintln!("🗄️ Repository: {}", promote_args.repository);
     eprintln!(
         "🏷️ Tag → (build) {} → (latest) {promote_tag}",
@@ -675,26 +677,15 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
             "ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion..."
         );
     }
+
     // Remove the 'rollback' tag so it no longer aliases this image.
     let filter = format!("imageTag={rollback_tag}");
-    let aws_args: Vec<&str> = vec![
-        "ecr",
-        "batch-delete-image",
-        "--repository-name",
+    aws::cli::aws_ecr_delete_tag_quiet(
         &rollback_args.repository,
-        "--image-ids",
-        &filter,
-        "--region",
         &rollback_args.region,
-    ];
-    run_process(
-        "aws",
-        &aws_args,
-        None,
-        None,
-        "removing '{rollback_tag}' tag should succeed",
-    )
-    .context("failed to remove '{rollback_tag}' tag")?;
+        &filter,
+        &rollback_tag,
+    )?;
     eprintln!("🧹 Removed '{rollback_tag}' tag.");
     eprintln!("⏪ Rolled back!");
     eprintln!("🗄️ Repository: {}", rollback_args.repository);
