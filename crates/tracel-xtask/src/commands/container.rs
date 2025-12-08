@@ -11,7 +11,7 @@ use crate::utils::aws::cli::{
     ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest, ecr_put_manifest,
 };
 use crate::utils::git::git_repo_root_or_cwd;
-use crate::utils::process::run_process;
+use crate::utils::process::{run_process, run_process_capture_stdout};
 
 const SSM_SESSION_DOC: &str = "Xtask-Container-InteractiveShell";
 
@@ -109,6 +109,9 @@ pub struct ContainerPushSubCmdArgs {
     /// When set, also add the next monotonic tag alongside the commit SHA
     #[arg(long)]
     pub auto_remote_tag: bool,
+    /// Required container platform (e.g. linux/amd64). If set, the local image must match.
+    #[arg(long)]
+    pub platform: Option<ContainerPlatform>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -235,6 +238,21 @@ impl Default for ContainerRolloutSubCmdArgs {
             wait: false,
             wait_timeout_secs: 1800,
             wait_poll_secs: 10,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
+pub enum ContainerPlatform {
+    LinuxAmd64,
+    LinuxArm64,
+}
+
+impl std::fmt::Display for ContainerPlatform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContainerPlatform::LinuxAmd64 => write!(f, "linux/amd64"),
+            ContainerPlatform::LinuxArm64 => write!(f, "linux/arm64"),
         }
     }
 }
@@ -453,7 +471,16 @@ fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
 }
 
 fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
+    // check for repository existenz
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
+    // check for correct container platform
+    if let Some(ref required) = push_args.platform {
+        ensure_local_image_platform(
+            &push_args.image,
+            &push_args.local_tag,
+            &required.to_string(),
+        )?;
+    }
     // check if the container has already been pushed
     if let Some(existing_manifest) = ecr_get_manifest(
         &push_args.repository,
@@ -876,4 +903,34 @@ fn docker_cli(
 ) -> anyhow::Result<()> {
     let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     run_process("docker", &arg_refs, envs, path, error_msg)
+}
+
+fn docker_image_platform(reference: &str) -> anyhow::Result<String> {
+    let mut cmd = std::process::Command::new("docker");
+    cmd.arg("inspect")
+        .arg("--format={{.Os}}/{{.Architecture}}")
+        .arg(reference);
+
+    let out = run_process_capture_stdout(&mut cmd, "docker inspect image platform")?;
+    Ok(out.trim().to_string())
+}
+
+fn ensure_local_image_platform(
+    image: &str,
+    tag: &str,
+    expected_platform: &str,
+) -> anyhow::Result<()> {
+    let reference = format!("{image}:{tag}");
+    let actual = docker_image_platform(&reference)
+        .with_context(|| format!("docker inspect for image '{reference}' should succeed"))?;
+
+    if actual != expected_platform {
+        anyhow::bail!(
+            "Local image '{reference}' platform should be '{expected}', found '{actual}'",
+            expected = expected_platform,
+            actual = actual,
+        );
+    }
+
+    Ok(())
 }
