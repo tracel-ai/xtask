@@ -208,6 +208,41 @@ pub fn ec2_autoscaling_latest_instance_refresh_status(
         .filter(|s| !s.is_empty() && s != "None"))
 }
 
+pub fn ec2_autoscaling_rollback_instance_refresh(asg: &str, region: &str) -> anyhow::Result<()> {
+    use crate::prelude::anyhow::Context as _;
+    use std::process::Command;
+
+    let output = Command::new("aws")
+        .args([
+            "autoscaling",
+            "rollback-instance-refresh",
+            "--auto-scaling-group-name",
+            asg,
+            "--region",
+            region,
+        ])
+        .output()
+        .with_context(|| {
+            format!(
+                "Rollback of instance refresh for Auto Scaling Group '{}' in region '{}' should succeed",
+                asg, region
+            )
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "Rollback of instance refresh for Auto Scaling Group '{}' in region '{}' should succeed, \
+             but AWS CLI exited with:\n{}",
+            asg,
+            region,
+            stderr
+        );
+    }
+
+    Ok(())
+}
+
 // ECR -----------------------------------------------------------------------
 
 pub fn ecr_ensure_repo_exists(repository: &str, region: &str) -> anyhow::Result<()> {

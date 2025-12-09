@@ -270,7 +270,7 @@ pub fn handle_command(
         ContainerSubCommand::Push(push_args) => push(push_args),
         ContainerSubCommand::Promote(promote_args) => promote(promote_args, &env),
         ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env),
-        ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args),
+        ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args, &env),
         ContainerSubCommand::Run(run_args) => run(run_args),
     }
 }
@@ -681,7 +681,8 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
             rollback_args.repository
         )
     })?;
-    // If promoted container is different, update it; if it's already the same, skip write.
+    // If promoted container is different, update it.
+    // If it's already the same, skip write.
     let promote_tag = promote_tag(rollback_args.promote_tag, env);
     if ecr_get_manifest(
         &rollback_args.repository,
@@ -741,7 +742,7 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
 }
 
 /// rollout: rollout latest promoted container for current environment
-fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
+fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     use anyhow::Context;
     use std::{
         io::{self, Write},
@@ -750,63 +751,69 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
 
     // Build preferences JSON strictly from flags
     let preferences = serde_json::json!({
-        "InstanceWarmup": args.instance_warmup,
-        "MaxHealthyPercentage": args.max_healthy_percentage,
-        "MinHealthyPercentage": args.min_healthy_percentage,
-        "SkipMatching": args.skip_matching,
+        "InstanceWarmup": rollout_args.instance_warmup,
+        "MaxHealthyPercentage": rollout_args.max_healthy_percentage,
+        "MinHealthyPercentage": rollout_args.min_healthy_percentage,
+        "SkipMatching": rollout_args.skip_matching,
     })
     .to_string();
 
     // Kick off the refresh
     let refresh_id = ec2_autoscaling_start_instance_refresh(
-        &args.asg,
-        &args.region,
-        &args.strategy,
+        &rollout_args.asg,
+        &rollout_args.region,
+        &rollout_args.strategy,
         Some(&preferences),
     )
     .context("instance refresh should start")?;
 
     let console_url = format!(
         "https://{region}.console.aws.amazon.com/ec2/home?region={region}#AutoScalingGroupDetails:id={asg};view=instanceRefresh",
-        region = args.region,
-        asg = args.asg,
+        region = rollout_args.region,
+        asg = rollout_args.asg,
     );
 
-    // Optional: show the concrete commit SHA tag of the container being rolled out
-    let container_line = match args.repository.as_deref() {
+    // show the concrete commit SHA tag of the container being rolled out
+    let promote_tag = promote_tag(rollout_args.promote_tag, env);
+    let container_line = match rollout_args.repository.as_deref() {
         Some(repo) => {
-            let promote_tag = args.promote_tag.as_deref().unwrap_or("latest");
-            ecr_get_commit_sha_tag_from_alias_tag(repo, promote_tag, &args.region)?
+            ecr_get_commit_sha_tag_from_alias_tag(repo, &promote_tag, &rollout_args.region)?
                 .map(|commit_tag| format!("  Image:   {repo}:{commit_tag}"))
         }
         None => None,
     };
 
     eprintln!("🚀 Started instance refresh");
-    eprintln!("  ASG:     {}", args.asg);
-    eprintln!("  Region:  {}", args.region);
+    eprintln!("  ASG:     {}", rollout_args.asg);
+    eprintln!("  Region:  {}", rollout_args.region);
     if let Some(line) = container_line {
         eprintln!("{line}");
     }
     eprintln!("  Refresh: {}", refresh_id);
     eprintln!("  Console: {}", console_url);
 
-    if args.wait {
+    if rollout_args.wait {
+        use anyhow::Context as _;
         let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let mut frame_index = 0;
 
-        let start = Instant::now();
-        let timeout = Duration::from_secs(args.wait_timeout_secs);
-        let poll = Duration::from_secs(args.wait_poll_secs);
+        let mut start = Instant::now();
+        let timeout = Duration::from_secs(rollout_args.wait_timeout_secs);
+        let poll = Duration::from_secs(rollout_args.wait_poll_secs);
         const CLR_EOL: &str = "\x1b[K";
+
+        // Track whether we already triggered a container rollback
+        let mut rollback_triggered = false;
 
         loop {
             let spinner = spinner_frames[frame_index % spinner_frames.len()];
             frame_index += 1;
 
-            let status_opt =
-                ec2_autoscaling_latest_instance_refresh_status(&args.asg, &args.region)
-                    .context("instance refresh status should be retrievable")?;
+            let status_opt = ec2_autoscaling_latest_instance_refresh_status(
+                &rollout_args.asg,
+                &rollout_args.region,
+            )
+            .context("instance refresh status should be retrievable")?;
 
             let (emoji, msg) = match status_opt.as_deref() {
                 Some("Pending") => ("⏳", "Pending"),
@@ -818,7 +825,7 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
                 None => ("🕐", "Waiting..."),
             };
 
-            // elapsed time in mm:ss
+            // elapsed time in mm:ss (within current window)
             let elapsed = start.elapsed();
             let elapsed_secs = elapsed.as_secs();
             let min = elapsed_secs / 60;
@@ -826,7 +833,7 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
 
             print!(
                 "\r{spinner}  {emoji} ({min:02}:{sec:02}) Refreshing {asg} — Status: {msg:<20}{CLR_EOL}",
-                asg = args.asg,
+                asg = rollout_args.asg,
                 msg = msg,
             );
             io::stdout().flush().ok();
@@ -848,11 +855,51 @@ fn rollout(args: ContainerRolloutSubCmdArgs) -> anyhow::Result<()> {
             }
 
             if elapsed >= timeout {
-                println!(
-                    "\r⏰  Timeout after {min:02}:{sec:02} (limit: {}s).{CLR_EOL}",
-                    args.wait_timeout_secs
-                );
-                anyhow::bail!("rollout timed out after {} seconds", args.wait_timeout_secs);
+                if !rollback_triggered {
+                    // FIRST TIMEOUT → trigger container rollback and restart the timer
+                    println!(
+                        "\r⏰ Timeout after {min:02}:{sec:02} (limit: {}s).{CLR_EOL}",
+                        rollout_args.wait_timeout_secs
+                    );
+                    eprintln!(
+                        "🛟 Rolling back container state while keeping the current instance refresh..."
+                    );
+
+                    let rollback_tag = rollback_tag(None, env);
+                    if let Some(ref repo) = rollout_args.repository {
+                        let rb_args = ContainerRollbackSubCmdArgs {
+                            region: rollout_args.region.clone(),
+                            repository: repo.clone(),
+                            promote_tag: Some(promote_tag.clone()),
+                            rollback_tag: Some(rollback_tag),
+                        };
+
+                        rollback(rb_args, env).context("Container rollback should succeed")?;
+
+                        rollback_triggered = true;
+                        // restart the timer for a second window
+                        start = Instant::now();
+                        continue;
+                    } else {
+                        eprintln!(
+                            "⚠️ No container repository was provided to 'rollout', skipping container rollback."
+                        );
+                        anyhow::bail!(
+                            "rollout timed out after {} seconds and no container repository was provided to roll back",
+                            rollout_args.wait_timeout_secs
+                        );
+                    }
+                } else {
+                    // SECOND TIMEOUT → hard error out
+                    println!(
+                        "\r⏰ Timeout after container rollback: {min:02}:{sec:02} (extra limit: {}s).{CLR_EOL}",
+                        rollout_args.wait_timeout_secs
+                    );
+                    anyhow::bail!(
+                        "rollout still not successful after container rollback and an additional {} seconds",
+                        rollout_args.wait_timeout_secs
+                    );
+                }
             }
 
             std::thread::sleep(poll);
