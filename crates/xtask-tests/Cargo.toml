@@ -1,6 +1,6 @@
 [package]
 name = "xtask-tests"
-version = "4.6.1"
+version = "4.7.0"
 edition = "2021"
 
 [dependencies]
