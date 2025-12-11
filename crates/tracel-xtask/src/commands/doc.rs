@@ -14,21 +14,7 @@ use crate::{
 use super::Target;
 
 #[tracel_xtask_macros::declare_command_args(Target, DocSubCommand)]
-pub struct DocCmdArgs {
-    #[doc = r"Comma-separated list of features to enable."]
-    #[arg(
-        short = 'f',
-        long,
-        value_name = "FEATURES,FEATURES,...",
-        value_delimiter = ',',
-        required = false
-    )]
-    pub features: Vec<String>,
-
-    #[doc = r"Define whether to use default features."]
-    #[arg(long, default_value_t = false, required = false)]
-    pub no_default_features: bool,
-}
+pub struct DocCmdArgs {}
 
 pub fn handle_command(args: DocCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {

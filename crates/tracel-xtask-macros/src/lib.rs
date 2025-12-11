@@ -387,6 +387,23 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
             },
         ),
         (
+            "DocCmdArgs",
+            quote! {
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
+            },
+        ),
+        (
             "CheckCmdArgs",
             quote! {
                 #[doc = r"Ignore audit errors."]
