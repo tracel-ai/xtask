@@ -34,7 +34,13 @@ pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> a
             }
         }
         CheckSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
-        CheckSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+        CheckSubCommand::Lint => run_lint(
+            &args.target,
+            &args.exclude,
+            &args.only,
+            &args.features,
+            args.no_default_features,
+        ),
         CheckSubCommand::Typos => {
             let res = run_typos();
             if res.is_err() && args.ignore_typos {
@@ -55,6 +61,8 @@ pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> a
                         only: args.only.clone(),
                         ignore_audit: args.ignore_audit,
                         ignore_typos: args.ignore_typos,
+                        features: args.features.clone(),
+                        no_default_features: args.no_default_features,
                     },
                     _env.clone(),
                     _ctx.clone(),
@@ -124,20 +132,33 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
     Ok(())
 }
 
-fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Result<()> {
+fn run_lint(
+    target: &Target,
+    excluded: &[String],
+    only: &[String],
+    features: &[String],
+    no_default_features: bool,
+) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Lint Workspace");
+            let mut cmd_args = vec!["clippy", "--no-deps", "--color=always"];
+
+            if no_default_features {
+                cmd_args.push("--no-default-features");
+            }
+
+            let features_str = features.join(",");
+            if !features.is_empty() {
+                cmd_args.push("--features");
+                cmd_args.push(&features_str);
+            }
+
+            cmd_args.extend(&["--", "--deny", "warnings"]);
+
             run_process_for_workspace(
                 "cargo",
-                &[
-                    "clippy",
-                    "--no-deps",
-                    "--color=always",
-                    "--",
-                    "--deny",
-                    "warnings",
-                ],
+                &cmd_args,
                 &[],
                 None,
                 None,
@@ -156,19 +177,31 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
 
             for member in members {
                 group!("Lint: {}", member.name);
+                let mut cmd_args = vec![
+                    "clippy",
+                    "clippy",
+                    "--no-deps",
+                    "--color=always",
+                    "-p",
+                    &member.name,
+                ];
+
+                if no_default_features {
+                    cmd_args.push("--no-default-features");
+                }
+
+                let features_str = features.join(",");
+                if !features.is_empty() {
+                    cmd_args.push("--features");
+                    cmd_args.push(&features_str);
+                }
+
+                cmd_args.extend(&["--", "--deny", "warnings"]);
+
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &[
-                        "clippy",
-                        "--no-deps",
-                        "--color=always",
-                        "-p",
-                        &member.name,
-                        "--",
-                        "--deny",
-                        "warnings",
-                    ],
+                    &cmd_args,
                     excluded,
                     only,
                     &format!("Lint fix execution failed for {}", &member.name),
@@ -181,7 +214,7 @@ fn run_lint(target: &Target, excluded: &[String], only: &[String]) -> anyhow::Re
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_lint(&t, excluded, only))?;
+                .try_for_each(|t| run_lint(&t, excluded, only, features, no_default_features))?;
         }
     }
     Ok(())

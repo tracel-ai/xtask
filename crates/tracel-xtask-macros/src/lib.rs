@@ -355,6 +355,52 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Build artifacts in release mode."]
                 #[arg(short, long, required = false)]
                 pub release: bool,
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
+            },
+        ),
+        (
+            "FixCmdArgs",
+            quote! {
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
+            },
+        ),
+        (
+            "DocCmdArgs",
+            quote! {
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
             },
         ),
         (
@@ -366,6 +412,18 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Ignore typos errors."]
                 #[arg(long = "ignore-typos", required = false)]
                 pub ignore_typos: bool,
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
             },
         ),
         (
@@ -447,6 +505,18 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Build in release mode."]
                 #[arg(short = 'r', long = "release", required = false)]
                 pub release: bool,
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
             },
         ),
     ])

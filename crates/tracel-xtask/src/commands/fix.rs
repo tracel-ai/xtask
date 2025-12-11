@@ -37,7 +37,13 @@ pub fn handle_command(
         match args.get_command() {
             FixSubCommand::Audit => run_audit(),
             FixSubCommand::Format => run_format(&args.target, &args.exclude, &args.only),
-            FixSubCommand::Lint => run_lint(&args.target, &args.exclude, &args.only),
+            FixSubCommand::Lint => run_lint(
+                &args.target,
+                &args.exclude,
+                &args.only,
+                &args.features,
+                args.no_default_features,
+            ),
             FixSubCommand::Typos => run_typos(),
             FixSubCommand::All => FixSubCommand::iter()
                 .filter(|c| *c != FixSubCommand::All)
@@ -48,6 +54,8 @@ pub fn handle_command(
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),
+                            features: args.features.clone(),
+                            no_default_features: args.no_default_features,
                         },
                         _env.clone(),
                         _ctx.clone(),
@@ -120,23 +128,41 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Re
     Ok(())
 }
 
-fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyhow::Result<()> {
+fn run_lint(
+    target: &Target,
+    excluded: &Vec<String>,
+    only: &Vec<String>,
+    features: &[String],
+    no_default_features: bool,
+) -> anyhow::Result<()> {
     match target {
         Target::Workspace => {
             group!("Lint Workspace");
+
+            let mut cmd_args = vec![
+                "clippy",
+                "--no-deps",
+                "--fix",
+                "--allow-dirty",
+                "--allow-staged",
+                "--color=always",
+            ];
+
+            if no_default_features {
+                cmd_args.push("--no-default-features");
+            }
+
+            let features_str = features.join(",");
+            if !features.is_empty() {
+                cmd_args.push("--features");
+                cmd_args.push(&features_str);
+            }
+
+            cmd_args.extend(&["--", "--deny", "warnings"]);
+
             run_process_for_workspace(
                 "cargo",
-                &[
-                    "clippy",
-                    "--no-deps",
-                    "--fix",
-                    "--allow-dirty",
-                    "--allow-staged",
-                    "--color=always",
-                    "--",
-                    "--deny",
-                    "warnings",
-                ],
+                &cmd_args,
                 &[],
                 None,
                 None,
@@ -154,22 +180,34 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
             };
             for member in members {
                 group!("Lint: {}", member.name);
+
+                let mut cmd_args = vec![
+                    "clippy",
+                    "--no-deps",
+                    "--fix",
+                    "--allow-dirty",
+                    "--allow-staged",
+                    "--color=always",
+                    "-p",
+                    &member.name,
+                ];
+
+                if no_default_features {
+                    cmd_args.push("--no-default-features");
+                }
+
+                let features_str = features.join(",");
+                if !features.is_empty() {
+                    cmd_args.push("--features");
+                    cmd_args.push(&features_str);
+                }
+
+                cmd_args.extend(&["--", "--deny", "warnings"]);
+
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &[
-                        "clippy",
-                        "--no-deps",
-                        "--fix",
-                        "--allow-dirty",
-                        "--allow-staged",
-                        "--color=always",
-                        "-p",
-                        &member.name,
-                        "--",
-                        "--deny",
-                        "warnings",
-                    ],
+                    &cmd_args,
                     excluded,
                     only,
                     &format!("Lint fix execution failed for {}", &member.name),
@@ -182,7 +220,7 @@ fn run_lint(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> anyh
         Target::AllPackages => {
             Target::iter()
                 .filter(|t| *t != Target::AllPackages && *t != Target::Workspace)
-                .try_for_each(|t| run_lint(&t, excluded, only))?;
+                .try_for_each(|t| run_lint(&t, excluded, only, features, no_default_features))?;
         }
     }
     Ok(())
