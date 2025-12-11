@@ -31,6 +31,17 @@ pub(crate) fn run_build(target: &Target, args: &BuildCmdArgs) -> anyhow::Result<
             if args.release {
                 cmd_args.push("--release");
             }
+
+            if args.no_default_features {
+                cmd_args.push("--no-default-features");
+            }
+
+            let features_str = args.features.join(",");
+            if !args.features.is_empty() {
+                cmd_args.push("--features");
+                cmd_args.push(&features_str);
+            }
+
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
@@ -55,6 +66,17 @@ pub(crate) fn run_build(target: &Target, args: &BuildCmdArgs) -> anyhow::Result<
                 if args.release {
                     cmd_args.push("--release");
                 }
+
+                if args.no_default_features {
+                    cmd_args.push("--no-default-features");
+                }
+
+                let features_str = args.features.join(",");
+                if !args.features.is_empty() {
+                    cmd_args.push("--features");
+                    cmd_args.push(&features_str);
+                }
+
                 run_process_for_package(
                     "cargo",
                     &member.name,
