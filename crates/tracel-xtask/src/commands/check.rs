@@ -142,14 +142,7 @@ fn run_lint(
     match target {
         Target::Workspace => {
             group!("Lint Workspace");
-            let mut cmd_args = vec![
-                "clippy",
-                "--no-deps",
-                "--color=always",
-                "--",
-                "--deny",
-                "warnings",
-            ];
+            let mut cmd_args = vec!["clippy", "--no-deps", "--color=always"];
 
             if no_default_features {
                 cmd_args.push("--no-default-features");
@@ -160,6 +153,8 @@ fn run_lint(
                 cmd_args.push("--features");
                 cmd_args.push(&features_str);
             }
+
+            cmd_args.extend(&["--", "--deny", "warnings"]);
 
             run_process_for_workspace(
                 "cargo",
@@ -182,19 +177,31 @@ fn run_lint(
 
             for member in members {
                 group!("Lint: {}", member.name);
+                let mut cmd_args = vec![
+                    "clippy",
+                    "clippy",
+                    "--no-deps",
+                    "--color=always",
+                    "-p",
+                    &member.name,
+                ];
+
+                if no_default_features {
+                    cmd_args.push("--no-default-features");
+                }
+
+                let features_str = features.join(",");
+                if !features.is_empty() {
+                    cmd_args.push("--features");
+                    cmd_args.push(&features_str);
+                }
+
+                cmd_args.extend(&["--", "--deny", "warnings"]);
+
                 run_process_for_package(
                     "cargo",
                     &member.name,
-                    &[
-                        "clippy",
-                        "--no-deps",
-                        "--color=always",
-                        "-p",
-                        &member.name,
-                        "--",
-                        "--deny",
-                        "warnings",
-                    ],
+                    &cmd_args,
                     excluded,
                     only,
                     &format!("Lint fix execution failed for {}", &member.name),

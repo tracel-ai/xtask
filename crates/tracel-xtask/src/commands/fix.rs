@@ -146,9 +146,6 @@ fn run_lint(
                 "--allow-dirty",
                 "--allow-staged",
                 "--color=always",
-                "--",
-                "--deny",
-                "warnings",
             ];
 
             if no_default_features {
@@ -160,6 +157,8 @@ fn run_lint(
                 cmd_args.push("--features");
                 cmd_args.push(&features_str);
             }
+
+            cmd_args.extend(&["--", "--deny", "warnings"]);
 
             run_process_for_workspace(
                 "cargo",
@@ -191,9 +190,6 @@ fn run_lint(
                     "--color=always",
                     "-p",
                     &member.name,
-                    "--",
-                    "--deny",
-                    "warnings",
                 ];
 
                 if no_default_features {
@@ -205,6 +201,8 @@ fn run_lint(
                     cmd_args.push("--features");
                     cmd_args.push(&features_str);
                 }
+
+                cmd_args.extend(&["--", "--deny", "warnings"]);
 
                 run_process_for_package(
                     "cargo",
