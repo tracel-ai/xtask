@@ -50,6 +50,8 @@ pub fn handle_command(args: ExtendedFixCmdArgs, mut answer: Option<bool>) -> any
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),
+                            features: args.features.clone(),
+                            no_default_features: args.no_default_features,
                         },
                         Some(answer),
                     )
