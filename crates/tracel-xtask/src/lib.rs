@@ -44,8 +44,12 @@ pub mod prelude {
     pub use crate::commands::fix::FixSubCommand;
     pub use crate::commands::host::HostCmdArgs;
     pub use crate::commands::host::HostSubCommand;
+
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraSubCommand;
+
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::secrets::SecretsCmdArgs;
     pub use crate::commands::secrets::SecretsSubCommand;
@@ -80,7 +84,10 @@ pub mod prelude {
     pub use crate::utils::rustup::rustup_add_component;
     pub use crate::utils::rustup::rustup_add_target;
     pub use crate::utils::rustup::rustup_get_installed_targets;
+
+    #[cfg(feature = "infra")]
     pub use crate::utils::terraform;
+
     pub use crate::utils::time::format_duration;
     // does not re-export strum has it is incompatible with strum macros expansions
 }
