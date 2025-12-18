@@ -8,7 +8,10 @@ pub mod helpers;
 pub mod process;
 pub mod prompt;
 pub mod rustup;
+
+#[cfg(feature = "infra")]
 pub mod terraform;
+
 pub mod time;
 pub mod workspace;
 

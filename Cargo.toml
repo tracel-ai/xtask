@@ -4,10 +4,7 @@
 # https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
 resolver = "2"
 
-members = [
-    "crates/*",
-    "xtask",
-]
+members = ["crates/*", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -18,7 +15,9 @@ readme = "README.md"
 [workspace.dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.39", features = ["derive"] }
-derive_more = { version = "2.0.1", features = ["display"], default-features = false }
+derive_more = { version = "2.0.1", features = [
+    "display",
+], default-features = false }
 ctrlc = "3.4.7"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
@@ -29,12 +28,19 @@ proc-macro2 = "1.0.95"
 quote = "1.0.40"
 rand = { version = "0.9.1" }
 regex = "1.11.1"
-reqwest = { version = "0.12.24", features = ["blocking", "json"] }
+reqwest = { version = "0.12.24", features = [
+    "blocking",
+    "json",
+], default-features = false }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
-strum = {version = "0.27.1", features = ["derive"]}
-syn = {version = "~2.0" , features = ["full"]}
-toml = { version = "0.9.8", default-features = false, features = ["display", "parse", "serde"] }
+strum = { version = "0.27.1", features = ["derive"] }
+syn = { version = "~2.0", features = ["full"] }
+toml = { version = "0.9.8", default-features = false, features = [
+    "display",
+    "parse",
+    "serde",
+] }
 zip = "6.0.0"
 
 # for tests

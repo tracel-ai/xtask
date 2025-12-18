@@ -1,6 +1,11 @@
 [package]
 authors = ["Tracel Technologies Inc."]
-categories = ["command-line-interface", "command-line-utilities", "development-tools", "development-tools::cargo-plugins"]
+categories = [
+    "command-line-interface",
+    "command-line-utilities",
+    "development-tools",
+    "development-tools::cargo-plugins",
+]
 description = "Reusable and Extensible xtask commands to manage repositories."
 keywords = ["xtask", "cli", "cargo", "extensible"]
 edition.workspace = true
@@ -10,6 +15,10 @@ readme.workspace = true
 repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask"
 version.workspace = true
 rust-version = "1.85"
+
+[features]
+default = []
+infra = ["reqwest"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -22,13 +31,14 @@ home = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 toml = { workspace = true }
 tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=4.8.0" }
 zip = { workspace = true }
+
+reqwest = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

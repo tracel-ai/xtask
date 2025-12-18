@@ -9,7 +9,10 @@ pub mod doc;
 pub mod docker_compose;
 pub mod fix;
 pub mod host;
+
+#[cfg(feature = "infra")]
 pub mod infra;
+
 pub mod publish;
 pub mod secrets;
 pub mod test;
