@@ -50,17 +50,24 @@ pub fn handle_command(
     group!("Publishing crate '{}'...", &crate_name);
     let local_version = local_version(&crate_name)?;
     info!("Local version: {local_version}");
-    match remote_version(&crate_name)? {
-        Some(remote_version) => {
-            info!("Found remote version: {remote_version}");
-            if local_version == remote_version {
-                info!("Remote version is up to date, skipping publishing!");
-                endgroup!();
-                return Ok(());
-            }
+    if let Some(remote_version) = remote_version(&crate_name)? {
+        info!("Found remote version: {remote_version}");
+        if local_version == remote_version {
+            info!("Remote version is up to date, skipping publishing!");
+            endgroup!();
+            return Ok(());
         }
-        None => info!("This is the first version to be published on crates.io!"),
     }
+
+    // `cargo search` only returns the latest version, double check specific version
+    if remote_has_version(&crate_name, &local_version) {
+        info!("Remote version {local_version} exists, skipping publishing!");
+        endgroup!();
+        return Ok(());
+    } else {
+        info!("This is the first version to be published on crates.io!");
+    }
+
     publish(crate_name, args.dry_run_only)?;
     endgroup!();
 
@@ -188,6 +195,14 @@ fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
         }
     }
     Ok(None)
+}
+
+// Check if specified version exists using crates.io API
+fn remote_has_version(crate_name: &str, version: &str) -> bool {
+    let url = format!("https://crates.io/api/v1/crates/{crate_name}/{version}");
+    let resp = ureq::get(&url).call();
+
+    resp.is_ok()
 }
 
 fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
