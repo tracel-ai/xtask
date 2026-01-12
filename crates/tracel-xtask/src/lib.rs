@@ -13,6 +13,7 @@ pub mod prelude {
     pub use env_logger;
     pub use rand;
     pub use serde_json;
+    pub use ureq;
 
     pub mod macros {
         pub use tracel_xtask_macros::base_commands;

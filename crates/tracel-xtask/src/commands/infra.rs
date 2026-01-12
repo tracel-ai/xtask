@@ -1,5 +1,4 @@
 use anyhow::Context as _;
-use reqwest::blocking::Client;
 use std::{fs, io::Write as _, path::PathBuf};
 
 use crate::{context::Context, prelude::Environment, utils::terraform};
@@ -119,11 +118,7 @@ pub fn init(args: &InfraCmdArgs) -> anyhow::Result<()> {
 }
 
 fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
-    let client = Client::builder()
-        .user_agent("tracel-xtask")
-        .build()
-        .context("Failed to build HTTP client")?;
-
+    let agent = ureq::agent();
     let repo_root = std::env::current_dir().context("Failed to get current directory")?;
 
     // Decide version + lock policy
@@ -144,7 +139,7 @@ fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
         if let Some(locked) = terraform::read_locked_version(&repo_root)? {
             (locked, LockAction::Keep)
         } else {
-            let latest = terraform::fetch_latest_version(&client)?;
+            let latest = terraform::fetch_latest_version(&agent)?;
             (
                 latest.clone(),
                 LockAction::WriteNew(Box::leak(latest.into_boxed_str())),
@@ -161,7 +156,7 @@ fn install(args: &InfraInstallSubCmdArgs) -> anyhow::Result<()> {
         );
     } else {
         eprintln!("Installing terraform {}...", version);
-        let bytes = terraform::download_terraform_zip(&client, &version)?;
+        let bytes = terraform::download_terraform_zip(&agent, &version)?;
         terraform::extract_and_install(&bytes, &dest)?;
         eprintln!("Installed terraform {} to {}", version, dest.display());
     }
@@ -312,13 +307,9 @@ fn uninstall(args: &InfraUninstallSubCmdArgs) -> anyhow::Result<()> {
 }
 
 fn update() -> anyhow::Result<()> {
-    let client = Client::builder()
-        .user_agent("tracel-xtask")
-        .build()
-        .context("Failed to build HTTP client")?;
-
+    let agent = ureq::agent();
     let repo_root = std::env::current_dir().context("Failed to get current directory")?;
-    let latest = terraform::fetch_latest_version(&client)?;
+    let latest = terraform::fetch_latest_version(&agent)?;
     let locked = terraform::read_locked_version(&repo_root)?;
 
     if locked.as_deref() == Some(latest.as_str()) {
@@ -333,7 +324,7 @@ fn update() -> anyhow::Result<()> {
             );
         } else {
             eprintln!("Installing terraform {}...", &latest);
-            let bytes = terraform::download_terraform_zip(&client, &latest)?;
+            let bytes = terraform::download_terraform_zip(&agent, &latest)?;
             terraform::extract_and_install(&bytes, &dest)?;
             eprintln!("Installed terraform {} to {}", latest, dest.display());
         }
