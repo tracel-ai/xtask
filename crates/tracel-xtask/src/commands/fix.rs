@@ -145,6 +145,7 @@ fn run_lint(
                 "--fix",
                 "--allow-dirty",
                 "--allow-staged",
+                "--allow-no-vcs",
                 "--color=always",
             ];
 
