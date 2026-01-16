@@ -3,7 +3,7 @@ use std::{fs, io::Write as _, path::PathBuf};
 
 use crate::{context::Context, prelude::Environment, utils::terraform};
 
-const DEFAULT_PATH: &str = "./infra";
+const DEFAULT_PATH: &str = "./.tfstates";
 
 #[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
 pub struct InfraCmdArgs {
