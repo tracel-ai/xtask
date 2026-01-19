@@ -70,7 +70,7 @@ pub fn warning_prompt(answer: Option<bool>, args: &FixCmdArgs) -> Option<bool> {
             "This will run the check with autofix mode enabled.",
         ));
     };
-    return answer;
+    answer
 }
 
 pub(crate) fn run_audit() -> anyhow::Result<()> {
