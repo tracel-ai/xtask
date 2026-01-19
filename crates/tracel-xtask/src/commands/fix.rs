@@ -25,14 +25,7 @@ pub fn handle_command(
     _ctx: Context,
     mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
-    if answer.is_none() {
-        if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-            warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
-        }
-        answer = Some(ask_once(
-            "This will run the check with autofix mode enabled.",
-        ));
-    };
+    answer = warning_prompt(answer, &args);
     if answer.unwrap() {
         match args.get_command() {
             FixSubCommand::Audit => run_audit(),
@@ -66,6 +59,18 @@ pub fn handle_command(
     } else {
         Ok(())
     }
+}
+
+pub fn warning_prompt(answer: Option<bool>, args: &FixCmdArgs) -> Option<bool> {
+    if answer.is_none() {
+        if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
+            warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
+        }
+        return Some(ask_once(
+            "This will run the check with autofix mode enabled.",
+        ));
+    };
+    return answer;
 }
 
 pub(crate) fn run_audit() -> anyhow::Result<()> {
