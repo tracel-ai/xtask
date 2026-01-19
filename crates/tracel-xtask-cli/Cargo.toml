@@ -1,0 +1,18 @@
+[package]
+authors = ["Tracel Technologies Inc."]
+categories = ["command-line-interface", "command-line-utilities", "development-tools", "development-tools::cargo-plugins"]
+description = "CLI entrypoint for Tracel xtask"
+edition.workspace = true
+keywords = ["xtask", "cli", "cargo"]
+license.workspace = true
+name = "tracel-xtask-cli"
+readme.workspace = true
+repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask-cli"
+version = "0.0.1"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true

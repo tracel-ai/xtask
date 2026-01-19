@@ -2,14 +2,14 @@
 authors = ["Tracel Technologies Inc."]
 categories = ["command-line-interface", "command-line-utilities", "development-tools", "development-tools::cargo-plugins"]
 description = "Reusable and Extensible xtask commands to manage repositories."
-keywords = ["xtask", "cli", "cargo", "extensible"]
 edition.workspace = true
+keywords = ["xtask", "cli", "cargo", "extensible"]
 license.workspace = true
 name = "tracel-xtask"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask"
-version.workspace = true
 rust-version = "1.85"
+version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
