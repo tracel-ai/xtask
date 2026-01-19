@@ -25,6 +25,16 @@ jobs:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
   # --------------------------------------------------------------------------------
+  tracel-xtask-cli:
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v4
+    with:
+      crate: tracel-xtask-cli
+    needs:
+      - tracel-xtask
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+
+  # --------------------------------------------------------------------------------
   linux-binary:
     name: Build and Release
     runs-on: ubuntu-latest
