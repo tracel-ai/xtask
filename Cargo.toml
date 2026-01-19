@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/*",
-    "xtask",
+    "xtask-core",
 ]
 
 [workspace.package]

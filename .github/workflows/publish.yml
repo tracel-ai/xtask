@@ -37,20 +37,20 @@ jobs:
           rust-toolchain: stable
           cache-key: stable-linux
       # --------------------------------------------------------------------------------
-      - name: Build xtask
+      - name: Build xtask-core
         run: |
-          cargo build --release -p xtask
+          cargo build --release -p xtask-core
       # --------------------------------------------------------------------------------
-      - name: Package xtask binary
+      - name: Package xtask-core binary
         run: |
           mkdir -p dist
-          cp target/release/xtask dist/xtask-linux-x86_64
-          tar -C dist -czf dist/xtask-linux-x86_64.tar.gz xtask-linux-x86_64
+          cp target/release/xtask-core dist/xtask-core-linux-x86_64
+          tar -C dist -czf dist/xtask-core-linux-x86_64.tar.gz xtask-core-linux-x86_64
       # --------------------------------------------------------------------------------
       - name: Upload binary to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: dist/xtask-linux-x86_64.tar.gz
+          files: dist/xtask-core-linux-x86_64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
