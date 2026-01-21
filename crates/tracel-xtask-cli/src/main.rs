@@ -1,4 +1,3 @@
-use anyhow::{Context as _, anyhow, bail};
 use std::{
     env,
     ffi::{OsStr, OsString},
@@ -23,53 +22,49 @@ fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{err:#}");
+            eprintln!("{err}");
             ExitCode::from(1)
         }
     }
 }
 
-fn run() -> anyhow::Result<ExitCode> {
+fn run() -> Result<ExitCode, String> {
     let mut args: Vec<OsString> = env::args_os().skip(1).collect();
     // Snap to git root to make it work from anywhere in the repo
-    let git_root = git_toplevel().context("xtask should run inside a git repository")?;
-
+    let git_root = git_toplevel()
+        .map_err(|e| format!("xtask should run inside a git repository: {e}"))?;
     // Help mode
     if is_help_invocation(&args) {
         return show_all_help(&git_root);
     }
-
     // Discover workspaces and dispatch commands
-    // If the first argument matches a child workspace directory name, use it (this is a monorepo)
-    // else if a root workspace exists then run there (not a monorepo)
-    // in any other care we error out
     let discovery = discover_workspaces(&git_root)?;
     let target = match first_arg_basename(&args) {
         Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
             // monorepo
             args.remove(0);
-            let ws = discovery
+            discovery
                 .children
                 .into_iter()
                 .find(|ws| ws.dir_name == name)
-                .expect("already checked workspace exists");
-            ws.path
+                .expect("workspace existence already checked")
+                .path
         }
         _ => {
             if let Some(root) = discovery.root {
                 // standard repository
                 root
             } else {
-                bail!(
+                return Err(format!(
                     "No xtask workspace found at git root, and the first argument does not match any monorepo workspace.\n\
                      Git root: {}\n\
                      Try: xtask -h",
                     git_root.display()
-                );
+                ));
             }
         }
     };
-    // dispatch
+
     exec_cargo_xtask(&target, &args)
 }
 
@@ -80,6 +75,7 @@ fn is_help_invocation(args: &[OsString]) -> bool {
 
 fn first_arg_basename(args: &[OsString]) -> Option<String> {
     let s = args.first()?.to_string_lossy();
+
     if s.starts_with('-')
         || s.contains(std::path::MAIN_SEPARATOR)
         || s.contains('/')
@@ -87,78 +83,78 @@ fn first_arg_basename(args: &[OsString]) -> Option<String> {
     {
         return None;
     }
+
     Some(s.to_string())
 }
 
-fn git_toplevel() -> anyhow::Result<PathBuf> {
+fn git_toplevel() -> Result<PathBuf, String> {
     let out = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
-        .context("failed to execute git")?;
+        .map_err(|e| format!("failed to execute git: {e}"))?;
     if !out.status.success() {
-        return Err(anyhow!(
-            "git rev-parse --show-toplevel failed (are you inside a git repository?)"
-        ));
+        return Err(
+            "git rev-parse --show-toplevel failed (are you inside a git repository?)".into(),
+        );
     }
-    let s = String::from_utf8(out.stdout).context("git output should be valid UTF-8")?;
+
+    let s = String::from_utf8(out.stdout)
+        .map_err(|_| "git output should be valid UTF-8".to_string())?;
     let p = s.trim();
     if p.is_empty() {
-        bail!("git toplevel path is empty");
+        return Err("git toplevel path is empty".into());
     }
+
     Ok(PathBuf::from(p))
 }
 
-fn discover_workspaces(git_root: &Path) -> anyhow::Result<Discovery> {
+fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
     let mut root = None;
     if is_workspace_root(git_root)? {
         root = Some(git_root.to_path_buf());
     }
-
     let mut children = Vec::new();
-    for entry in fs::read_dir(git_root).with_context(|| {
+    let entries = fs::read_dir(git_root).map_err(|e| {
         format!(
-            "failed to read git root directory listing: {}",
+            "failed to read git root directory listing {}: {e}",
             git_root.display()
         )
-    })? {
-        let entry = entry.context("failed to read directory entry")?;
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
         let path = entry.path();
 
         if !path.is_dir() {
             continue;
         }
 
-        // Only immediate children.
         let dir_name = entry.file_name().to_string_lossy().to_string();
 
         if is_workspace_root(&path)? {
             children.push(Workspace { path, dir_name });
         }
     }
-
     children.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
 
     Ok(Discovery { root, children })
 }
 
-fn is_workspace_root(dir: &Path) -> anyhow::Result<bool> {
+fn is_workspace_root(dir: &Path) -> Result<bool, String> {
     let cargo_toml = dir.join("Cargo.toml");
     let xtask_dir = dir.join("xtask");
 
     Ok(cargo_toml.is_file() && xtask_dir.is_dir())
 }
 
-fn show_all_help(git_root: &Path) -> anyhow::Result<ExitCode> {
+fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
     let discovery = discover_workspaces(git_root)?;
-
     if discovery.root.is_none() && discovery.children.is_empty() {
-        bail!(
+        return Err(format!(
             "No xtask workspaces found under git root: {}",
             git_root.display()
-        );
+        ));
     }
-
-    // Print a simple top-level help that includes each workspace `cargo xtask -h`.
     if let Some(root) = discovery.root {
         println!("== xtask @ {} ==", root.display());
         run_help_one(&root)?;
@@ -174,14 +170,18 @@ fn show_all_help(git_root: &Path) -> anyhow::Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn run_help_one(dir: &Path) -> anyhow::Result<()> {
+fn run_help_one(dir: &Path) -> Result<(), String> {
     let status = Command::new("cargo")
         .arg("xtask")
         .arg("--help")
         .current_dir(dir)
         .status()
-        .with_context(|| format!("failed to execute cargo xtask --help in {}", dir.display()))?;
-
+        .map_err(|e| {
+            format!(
+                "failed to execute cargo xtask --help in {}: {e}",
+                dir.display()
+            )
+        })?;
     if !status.success() {
         eprintln!(
             "warning: cargo xtask --help failed in {} (exit code {:?})",
@@ -193,15 +193,14 @@ fn run_help_one(dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn exec_cargo_xtask(dir: &Path, args: &[OsString]) -> anyhow::Result<ExitCode> {
+fn exec_cargo_xtask(dir: &Path, args: &[OsString]) -> Result<ExitCode, String> {
     let mut cmd = Command::new("cargo");
     cmd.arg("xtask");
     cmd.args(args);
     cmd.current_dir(dir);
-
     let status = cmd
         .status()
-        .with_context(|| format!("failed to execute cargo xtask in {}", dir.display()))?;
+        .map_err(|e| format!("failed to execute cargo xtask in {}: {e}", dir.display()))?;
 
     Ok(exit_code_from_status(status))
 }
@@ -209,7 +208,6 @@ fn exec_cargo_xtask(dir: &Path, args: &[OsString]) -> anyhow::Result<ExitCode> {
 fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
     match status.code() {
         Some(code) if (0..=255).contains(&code) => ExitCode::from(code as u8),
-        Some(_) => ExitCode::from(1),
-        None => ExitCode::from(1), // terminated by signal on Unix; keep it simple
+        _ => ExitCode::from(1),
     }
 }

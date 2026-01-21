@@ -13,6 +13,3 @@ version = "0.0.1"
 [[bin]]
 name = "xtask"
 path = "src/main.rs"
-
-[dependencies]
-anyhow.workspace = true

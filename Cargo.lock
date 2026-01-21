@@ -1588,9 +1588,6 @@ dependencies = [
 [[package]]
 name = "tracel-xtask-cli"
 version = "0.0.1"
-dependencies = [
- "anyhow",
-]
 
 [[package]]
 name = "tracel-xtask-macros"
