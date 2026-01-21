@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::io::Write as _;
 /// Manage containers.
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
@@ -257,6 +258,47 @@ impl std::fmt::Display for ContainerPlatform {
             ContainerPlatform::LinuxArm64 => write!(f, "linux/arm64"),
         }
     }
+}
+
+/// Wrapper used only for display purposes.
+pub struct ManifestDigestDisplay<'a>(pub &'a str);
+
+impl<'a> std::fmt::Display for ManifestDigestDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match manifest_digest_short8(self.0) {
+            Ok(Some(d)) => write!(f, "{d}"),
+            _ => write!(f, "<unknown>"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OciIndex {
+    manifests: Vec<OciDescriptor>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OciDescriptor {
+    digest: String,
+}
+
+/// Extract the first 8 hex chars of the sha256 digest from an OCI manifest JSON.
+fn manifest_digest_short8(manifest_json: &str) -> anyhow::Result<Option<String>> {
+    let index: OciIndex = match serde_json::from_str(manifest_json) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
+
+    let digest = index.manifests.first().map(|m| m.digest.as_str());
+    let digest = match digest {
+        Some(d) => d,
+        None => return Ok(None),
+    };
+
+    let hex = digest.strip_prefix("sha256:").unwrap_or(digest);
+    Ok(Some(hex.chars().take(8).collect()))
 }
 
 pub fn handle_command(
@@ -607,7 +649,10 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
         ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
             .context("current '{promote_tag}' manifest should be retrievable")?;
     if let Some(ref current) = current_latest_manifest {
-        eprintln!("Found previously promoted image with tag '{promote_tag}': {current}");
+        eprintln!(
+            "Found previously promoted image with tag '{promote_tag}': {}",
+            ManifestDigestDisplay(current),
+        );
     }
     let to_promote_manifest = ecr_get_manifest(
         &promote_args.repository,
@@ -621,7 +666,10 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
             promote_args.repository
         )
     })?;
-    eprintln!("Found new image to promote with tag '{promote_tag}': {to_promote_manifest}");
+    eprintln!(
+        "Found new image to promote with tag '{promote_tag}': {}",
+        ManifestDigestDisplay(&to_promote_manifest),
+    );
 
     // If 'latest' tag is already the target manifest then do nothing
     if let Some(ref current) = current_latest_manifest {
@@ -649,7 +697,8 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
             && rollback_manifest == current_manifest
         {
             eprintln!(
-                "⚠️ Tag '{rollback_tag}' is already assigned to manifest '{current_manifest}', this should not happen and might indicate a bug!",
+                "⚠️ Tag '{rollback_tag}' is already assigned to manifest '{}', this should not happen and might indicate a bug!",
+                ManifestDigestDisplay(&current_manifest),
             );
         } else {
             // Update rollback manifest
@@ -732,7 +781,10 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
         .context(format!(
             "'{promote_tag}' should be updated to the '{rollback_tag}' manifest"
         ))?;
-        eprintln!("✅ Promoted '{rollback_tag}' manifest '{current_rb_manifest}' to '{promote_tag}'.");
+        eprintln!(
+            "✅ Promoted '{rollback_tag}' manifest '{}' to '{promote_tag}'.",
+            ManifestDigestDisplay(&current_rb_manifest),
+        );
     } else {
         eprintln!(
             "ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion..."
