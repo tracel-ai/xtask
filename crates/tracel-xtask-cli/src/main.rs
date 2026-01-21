@@ -38,12 +38,12 @@ fn run() -> Result<ExitCode, String> {
         return show_all_help(&git_root);
     }
     // Discover workspaces and dispatch commands
-    let mut is_mono_repo = false;
+    let mut subrepo = None;
     let discovery = discover_workspaces(&git_root)?;
     let target = match first_arg_basename(&args) {
         Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
             // monorepo
-            is_mono_repo = true;
+            subrepo = Some(name.clone());
             args.remove(0);
             discovery
                 .children
@@ -67,7 +67,7 @@ fn run() -> Result<ExitCode, String> {
         }
     };
 
-    exec_cargo_xtask(&target, &args, is_mono_repo)
+    exec_cargo_xtask(&target, &args, subrepo.as_deref())
 }
 
 fn is_help_invocation(args: &[OsString]) -> bool {
@@ -195,18 +195,36 @@ fn run_help_one(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn exec_cargo_xtask(dir: &Path, args: &[OsString], is_mono_repo: bool) -> Result<ExitCode, String> {
+fn exec_cargo_xtask(
+    dir: &Path,
+    args: &[OsString],
+    subrepo: Option<&str>,
+) -> Result<ExitCode, String> {
+    let (target_dir, bin_name) = match subrepo {
+        Some(subrepo) => (OsStr::new("../target/xtask"), format!("xtask-{subrepo}")),
+        None => (OsStr::new("target/xtask"), "xtask".to_string()),
+    };
     let mut cmd = Command::new("cargo");
-    cmd.arg("xtask");
-    cmd.args(args);
-    cmd.current_dir(dir);
-    if is_mono_repo {
+    cmd.arg("run")
+        .arg("--target-dir")
+        .arg(target_dir)
+        .arg("--package")
+        .arg("xtask")
+        .arg("--bin")
+        .arg(bin_name)
+        .arg("--")
+        .args(args)
+        .current_dir(dir);
+    if subrepo.is_some() {
         cmd.env("XTASK_MONOREPO", "1");
     }
-    let status = cmd
-        .status()
-        .map_err(|e| format!("failed to execute cargo xtask in {}: {e}", dir.display()))?;
 
+    let status = cmd.status().map_err(|e| {
+        format!(
+            "failed to execute cargo run (xtask) in {}: {e}",
+            dir.display()
+        )
+    })?;
     Ok(exit_code_from_status(status))
 }
 
