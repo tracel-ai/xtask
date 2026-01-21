@@ -18,6 +18,8 @@ struct Discovery {
     children: Vec<Workspace>,
 }
 
+const MAGIC_ARG_ALL: &'static str = ":all";
+
 fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
@@ -38,36 +40,51 @@ fn run() -> Result<ExitCode, String> {
         return show_all_help(&git_root);
     }
     // Discover workspaces and dispatch commands
-    let mut subrepo = None;
     let discovery = discover_workspaces(&git_root)?;
-    let target = match first_arg_basename(&args) {
-        Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
-            // monorepo
-            subrepo = Some(name.clone());
-            args.remove(0);
-            discovery
-                .children
-                .into_iter()
-                .find(|ws| ws.dir_name == name)
-                .expect("workspace existence already checked")
-                .path
+    if let Some(name) = first_arg_basename(&args)
+        && name == MAGIC_ARG_ALL
+    {
+        // assume monorepo and dispatch to all subrepos
+        args.remove(0);
+        if discovery.children.is_empty() {
+            return Err(format!(
+                "xtask all requires a monorepo with at least one subrepo workspace under git root.\n\
+                 Git root: {}",
+                git_root.display()
+            ));
         }
-        _ => {
-            if let Some(root) = discovery.root {
-                // standard repository
-                root
-            } else {
-                return Err(format!(
-                    "No xtask workspace found at git root, and the first argument does not match any monorepo workspace.\n\
-                     Git root: {}\n\
-                     Try: xtask -h",
-                    git_root.display()
-                ));
+        exec_cargo_xtask_all(&args, &discovery.children)
+    } else {
+        // dispatch to standard repo or specified subrepo in the monorepo
+        let mut subrepo = None;
+        let target = match first_arg_basename(&args) {
+            Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
+                // monorepo
+                subrepo = Some(name.clone());
+                args.remove(0);
+                discovery
+                    .children
+                    .into_iter()
+                    .find(|ws| ws.dir_name == name)
+                    .expect("workspace existence already checked")
+                    .path
             }
-        }
-    };
-
-    exec_cargo_xtask(&target, &args, subrepo.as_deref())
+            _ => {
+                if let Some(root) = discovery.root {
+                    // standard repository
+                    root
+                } else {
+                    return Err(format!(
+                        "No xtask workspace found at git root, and the first argument does not match any monorepo workspace.\n\
+                         Git root: {}\n\
+                         Try: xtask -h",
+                        git_root.display()
+                    ));
+                }
+            }
+        };
+        exec_cargo_xtask(&target, &args, subrepo.as_deref())
+    }
 }
 
 fn is_help_invocation(args: &[OsString]) -> bool {
@@ -193,6 +210,20 @@ fn run_help_one(dir: &Path) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn exec_cargo_xtask_all(args: &[OsString], subrepos: &[Workspace]) -> Result<ExitCode, String> {
+    let mut first_failure: Option<ExitCode> = None;
+    for ws in subrepos {
+        println!("== xtask @ {} ==", ws.path.display());
+
+        let code = exec_cargo_xtask(&ws.path, args, Some(&ws.dir_name))?;
+
+        if code != ExitCode::SUCCESS && first_failure.is_none() {
+            first_failure = Some(code);
+        }
+    }
+    Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
 }
 
 fn exec_cargo_xtask(
