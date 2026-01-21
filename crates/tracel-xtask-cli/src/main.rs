@@ -31,17 +31,19 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode, String> {
     let mut args: Vec<OsString> = env::args_os().skip(1).collect();
     // Snap to git root to make it work from anywhere in the repo
-    let git_root = git_toplevel()
-        .map_err(|e| format!("xtask should run inside a git repository: {e}"))?;
+    let git_root =
+        git_toplevel().map_err(|e| format!("xtask should run inside a git repository: {e}"))?;
     // Help mode
     if is_help_invocation(&args) {
         return show_all_help(&git_root);
     }
     // Discover workspaces and dispatch commands
+    let mut is_mono_repo = false;
     let discovery = discover_workspaces(&git_root)?;
     let target = match first_arg_basename(&args) {
         Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
             // monorepo
+            is_mono_repo = true;
             args.remove(0);
             discovery
                 .children
@@ -65,7 +67,7 @@ fn run() -> Result<ExitCode, String> {
         }
     };
 
-    exec_cargo_xtask(&target, &args)
+    exec_cargo_xtask(&target, &args, is_mono_repo)
 }
 
 fn is_help_invocation(args: &[OsString]) -> bool {
@@ -193,11 +195,14 @@ fn run_help_one(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn exec_cargo_xtask(dir: &Path, args: &[OsString]) -> Result<ExitCode, String> {
+fn exec_cargo_xtask(dir: &Path, args: &[OsString], is_mono_repo: bool) -> Result<ExitCode, String> {
     let mut cmd = Command::new("cargo");
     cmd.arg("xtask");
     cmd.args(args);
     cmd.current_dir(dir);
+    if is_mono_repo {
+        cmd.env("XTASK_MONOREPO", "1");
+    }
     let status = cmd
         .status()
         .map_err(|e| format!("failed to execute cargo xtask in {}: {e}", dir.display()))?;
