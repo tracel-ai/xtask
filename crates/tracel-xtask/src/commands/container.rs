@@ -43,6 +43,12 @@ pub struct ContainerBuildSubCmdArgs {
     /// Build arguments
     #[arg(long)]
     pub build_args: Vec<String>,
+    /// When set, always build the container even if the build tag already exists in ECR.
+    #[arg(long)]
+    pub force: bool,
+    /// Region where the container repository lives
+    #[arg(long)]
+    pub region: String,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -334,8 +340,28 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     } else {
         context_dir.join(&build_args.build_file)
     };
-
     let tag = build_args.build_tag.as_deref().unwrap_or("latest");
+
+    // If the image tag already exists in ECR, skip docker build unless forced.
+    if ecr_get_manifest(&build_args.image, &build_args.region, tag)?.is_some() {
+        if build_args.force {
+            eprintln!(
+                "⚠️ tag already exists in ECR. Forcing build the docker image because '--force' is set."
+            );
+        } else {
+            eprintln!(
+                "✅ Image already present in ECR: {}:{} (manifest {}). Skipping build.",
+                build_args.image,
+                tag,
+                ManifestDigestDisplay(
+                    &ecr_get_manifest(&build_args.image, &build_args.region, tag)?
+                        .unwrap_or_default()
+                ),
+            );
+            return Ok(());
+        }
+    }
+
     let mut args: Vec<String> = vec![
         "build".into(),
         format!("--file={}", build_file_path.to_string_lossy()),
