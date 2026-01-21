@@ -1,6 +1,8 @@
+use std::io::Write as _;
 /// Manage containers.
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use crate::prelude::anyhow::Context as _;
 use crate::prelude::*;
@@ -597,13 +599,17 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
     let promote_tag = promote_tag(promote_args.promote_tag, env);
     eprintln!(
         "Promoting '{}' to '{}'...",
-        &promote_args.repository, &promote_tag
+        &promote_args.build_tag, &promote_tag
     );
-    // Fetch current 'latest' and the target tag's manifest.
-    let prev_latest_manifest =
+
+    // Fetch current 'latest' manifest and the new manifest to promote.
+    let current_latest_manifest =
         ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
             .context("current '{promote_tag}' manifest should be retrievable")?;
-    let n_manifest = ecr_get_manifest(
+    if let Some(ref current) = current_latest_manifest {
+        eprintln!("Found previously promoted image with tag '{promote_tag}': {current}");
+    }
+    let to_promote_manifest = ecr_get_manifest(
         &promote_args.repository,
         &promote_args.region,
         &promote_args.build_tag,
@@ -615,37 +621,62 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
             promote_args.repository
         )
     })?;
+    eprintln!("Found new image to promote with tag '{promote_tag}': {to_promote_manifest}");
+
     // If 'latest' tag is already the target manifest then do nothing
-    if let Some(ref prev) = prev_latest_manifest {
-        if prev == &n_manifest {
+    if let Some(ref current) = current_latest_manifest {
+        if current == &to_promote_manifest {
             eprintln!(
-                "ℹ️  Tag '{}' is already promoted as '{promote_tag}' in '{}', no changes needed.",
+                "ℹ️  Tag '{}' is already promoted as '{promote_tag}' in registry '{}', no changes needed.",
                 promote_args.build_tag, promote_args.repository
             );
             return Ok(());
         }
     }
-    // Update 'latest' to the new manifest.
+
+    // If there was a previous 'latest', move it to 'rollback'.
+    if let Some(current_manifest) = current_latest_manifest {
+        let rollback_tag = rollback_tag(promote_args.rollback_tag, env);
+        // this should never happen, report a warning in case the rollback tag is already
+        // applied to the current manifest and then do nothing
+        let current_rollback_manifest = ecr_get_manifest(
+            &promote_args.repository,
+            &promote_args.region,
+            &rollback_tag,
+        )
+        .context("current '{rollback_tag}' manifest should be retrievable")?;
+        if let Some(rollback_manifest) = current_rollback_manifest
+            && rollback_manifest == current_manifest
+        {
+            eprintln!(
+                "⚠️ Tag '{rollback_tag}' is already assigned to manifest '{current_manifest}', this should not happen and might indicate a bug!",
+            );
+        } else {
+            // Update rollback manifest
+            ecr_put_manifest(
+                &promote_args.repository,
+                &promote_args.region,
+                &rollback_tag,
+                &current_manifest,
+            )
+            .context(format!(
+                "'{rollback_tag}' should be updated to the previous '{promote_tag}'"
+            ))?;
+        }
+    }
+
+    // At last, update 'latest' to the new manifest.
     ecr_put_manifest(
         &promote_args.repository,
         &promote_args.region,
         &promote_tag,
-        &n_manifest,
+        &to_promote_manifest,
     )
-    .context("'{promote_tag}' should be updated to the target manifest")?;
-    // If there was a previous 'latest', move it to 'rollback'.
-    if let Some(prev) = prev_latest_manifest {
-        let rollback_tag = rollback_tag(promote_args.rollback_tag, env);
-        // Only write rollback if it's different from the new 'latest'.
-        ecr_put_manifest(
-            &promote_args.repository,
-            &promote_args.region,
-            &rollback_tag,
-            &prev,
-        )
-        .context("'{rollback_tag}' should be updated to the previous '{promote_tag}'")?;
-    }
+    .context(format!(
+        "'{promote_tag}' should be updated to the target manifest"
+    ))?;
 
+    // Report
     eprintln!(
         "✅ Promoted '{}' to '{promote_tag}'.",
         promote_args.build_tag
@@ -670,7 +701,7 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
 fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let rollback_tag = rollback_tag(rollback_args.rollback_tag, env);
     // Fetch the manifest of the 'rollback' tag
-    let rb = ecr_get_manifest(
+    let current_rb_manifest = ecr_get_manifest(
         &rollback_args.repository,
         &rollback_args.region,
         &rollback_tag,
@@ -681,8 +712,8 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
             rollback_args.repository
         )
     })?;
-    // If promoted container is different, update it.
-    // If it's already the same, skip write.
+    // If currently promoted container is different of the rollback one,
+    // then put the promoted tag on the rollback manifest
     let promote_tag = promote_tag(rollback_args.promote_tag, env);
     if ecr_get_manifest(
         &rollback_args.repository,
@@ -690,16 +721,18 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
         &promote_tag,
     )?
     .as_ref()
-        != Some(&rb)
+        != Some(&current_rb_manifest)
     {
         ecr_put_manifest(
             &rollback_args.repository,
             &rollback_args.region,
             &promote_tag,
-            &rb,
+            &current_rb_manifest,
         )
-        .context("'{promote_tag}' should be updated to the '{rollback_tag}' manifest")?;
-        eprintln!("✅ Promoted '{rollback_tag}' to '{promote_tag}'.");
+        .context(format!(
+            "'{promote_tag}' should be updated to the '{rollback_tag}' manifest"
+        ))?;
+        eprintln!("✅ Promoted '{rollback_tag}' manifest '{current_rb_manifest}' to '{promote_tag}'.");
     } else {
         eprintln!(
             "ℹ️ '{promote_tag}' already points to the '{rollback_tag}' manifest, skipping promotion..."
@@ -743,12 +776,6 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
 
 /// rollout: rollout latest promoted container for current environment
 fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
-    use anyhow::Context;
-    use std::{
-        io::{self, Write},
-        time::{Duration, Instant},
-    };
-
     // Build preferences JSON strictly from flags
     let preferences = serde_json::json!({
         "InstanceWarmup": rollout_args.instance_warmup,
@@ -793,7 +820,6 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
     eprintln!("  Console: {}", console_url);
 
     if rollout_args.wait {
-        use anyhow::Context as _;
         let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let mut frame_index = 0;
 
@@ -836,7 +862,7 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
                 asg = rollout_args.asg,
                 msg = msg,
             );
-            io::stdout().flush().ok();
+            std::io::stdout().flush().ok();
 
             match status_opt.as_deref() {
                 Some("Successful") => {
