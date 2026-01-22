@@ -1,9 +1,11 @@
+mod args;
 mod emojis;
 
 use std::{
     env,
     ffi::{OsStr, OsString},
     fs,
+    io::Write as _,
     path::{Path, PathBuf},
     process::{Command, ExitCode},
 };
@@ -16,80 +18,125 @@ struct Workspace {
     xtask_bin: String,
 }
 
-#[derive(Debug)]
-struct Discovery {
-    root: Option<Workspace>,
-    children: Vec<Workspace>,
-}
-
-const MAGIC_ARG_ALL: &str = ":all";
-
 fn main() -> ExitCode {
-    match run() {
-        Ok(code) => code,
+    let mut args: Vec<OsString> = env::args_os().skip(1).collect();
+    let git_root = match git_repo_root()
+        .map_err(|e| format!("xtask should run inside a git repository: {e}"))
+    {
+        Ok(root) => root,
         Err(err) => {
             eprintln!("{err}");
-            ExitCode::from(1)
+            return ExitCode::from(1);
+        }
+    };
+
+    if is_help_invocation(&args) {
+        match show_all_help(&git_root, &mut args) {
+            Ok(code) => code,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
+        }
+    } else {
+        match run(&git_root, &mut args) {
+            Ok(code) => code,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
         }
     }
 }
 
-fn run() -> Result<ExitCode, String> {
-    let mut args: Vec<OsString> = env::args_os().skip(1).collect();
-    // Snap to git root to make it work from anywhere in the repo
-    let git_root =
-        git_toplevel().map_err(|e| format!("xtask should run inside a git repository: {e}"))?;
-    // Help mode
-    if is_help_invocation(&args) {
-        return show_all_help(&git_root);
-    }
+fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
+    let yes = args::take_yes_flag(args);
+    let selector = args::take_subrepo_selector(args);
+    let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
-    // Discover workspaces and dispatch commands
-    let discovery = discover_workspaces(&git_root)?;
-    if let Some(name) = first_arg_basename(&args)
-        && name == MAGIC_ARG_ALL
-    {
-        // :all mode
-        args.remove(0);
-
-        if discovery.children.is_empty() {
-            Err(format!(
-                "xtask all requires a monorepo with at least one subrepo workspace under git root.\n\
-                 Git root: {}",
-                git_root.display()
-            ))
+    // Selector provided
+    if let Some(sel) = selector {
+        if sel == "all" {
+            // :all magic selector
+            let subrepos = list_subrepo_workspaces(git_root)?;
+            if subrepos.is_empty() {
+                return Err(format!(
+                    "xtask :all requires at least one subrepo workspace under git root.\n\
+                     Git root: {}",
+                    git_root.display()
+                ));
+            }
+            return exec_cargo_xtask_all(args, &subrepos);
         } else {
-            exec_cargo_xtask_all(&args, &discovery.children)
-        }
-    } else {
-        // single target
-        let target: Workspace = match first_arg_basename(&args) {
-            Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
-                // subrepo in monorepo
-                args.remove(0);
-                discovery
-                    .children
-                    .into_iter()
-                    .find(|ws| ws.dir_name == name)
-                    .expect("workspace existence already checked")
-            }
-            _ => {
-                // standard repo with only one workspace at root
-                if let Some(root) = discovery.root {
-                    root
-                } else {
-                    return Err(format!(
-                        "No xtask workspace found at git root, and the first argument does not match any subrepo workspace.\n\
-                         Git root: {}\n\
-                         Try: xtask -h",
-                        git_root.display()
-                    ));
-                }
-            }
-        };
+            // :<subrepo> selector
+            let subrepo_root = git_root.join(&sel);
+            let xtask_crate = is_workspace(&subrepo_root)?.ok_or_else(|| {
+                format!(
+                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo.toml and an xtask* directory).\n\
+                     Path: {}",
+                    sel,
+                    subrepo_root.display()
+                )
+            })?;
 
-        exec_cargo_xtask(&target, &args)
+            let ws = Workspace {
+                path: subrepo_root,
+                dir_name: sel.clone(),
+                xtask_bin: format!("xtask-{sel}"),
+                xtask_crate,
+            };
+            return exec_cargo_xtask(&ws, args);
+        }
     }
+
+    // No selector provided
+    // Behavior depends on standard repo vs monorepo
+    let root_xtask = is_workspace(git_root)?;
+    if let Some(xtask_crate) = root_xtask {
+        // Standard repo -> execute at git root
+        let ws = Workspace {
+            path: git_root.to_path_buf(),
+            dir_name: "root".to_string(),
+            xtask_bin: xtask_crate.clone(),
+            xtask_crate,
+        };
+        exec_cargo_xtask(&ws, args)
+    } else {
+        // Monorepo:
+        if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root)? {
+            // inside a subrepo workspace at any depth then we execute in that subrepo.
+            exec_cargo_xtask(&ws, args)
+        } else {
+            //  At monorepo root we dispatch to all subrepos after confirmation
+            let subrepos = list_subrepo_workspaces(git_root)?;
+            if subrepos.is_empty() {
+                return Err(format!(
+                    "No xtask workspaces found under git root: {}",
+                    git_root.display()
+                ));
+            }
+            if !confirm_dispatch_all(yes)? {
+                return Ok(ExitCode::SUCCESS);
+            }
+            exec_cargo_xtask_all(args, &subrepos)
+        }
+    }
+}
+
+fn confirm_dispatch_all(yes: bool) -> Result<bool, String> {
+    if yes {
+        return Ok(true);
+    }
+
+    eprint!("This will run the command in all subrepos. Continue? [y/N] ");
+
+    std::io::stderr().flush().ok();
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_line(&mut buf)
+        .map_err(|e| format!("failed to read confirmation from stdin: {e}"))?;
+    let answer = buf.trim().to_ascii_lowercase();
+    Ok(answer == "y" || answer == "yes")
 }
 
 fn is_help_invocation(args: &[OsString]) -> bool {
@@ -97,21 +144,7 @@ fn is_help_invocation(args: &[OsString]) -> bool {
         || (args.len() == 1 && (args[0] == OsStr::new("-h") || args[0] == OsStr::new("--help")))
 }
 
-fn first_arg_basename(args: &[OsString]) -> Option<String> {
-    let s = args.first()?.to_string_lossy();
-
-    if s.starts_with('-')
-        || s.contains(std::path::MAIN_SEPARATOR)
-        || s.contains('/')
-        || s.contains('\\')
-    {
-        return None;
-    }
-
-    Some(s.to_string())
-}
-
-fn git_toplevel() -> Result<PathBuf, String> {
+fn git_repo_root() -> Result<PathBuf, String> {
     let out = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
@@ -130,44 +163,6 @@ fn git_toplevel() -> Result<PathBuf, String> {
     }
 
     Ok(PathBuf::from(p))
-}
-
-fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
-    let root = is_workspace(git_root)?.map(|xtask_crate| Workspace {
-        path: git_root.to_path_buf(),
-        dir_name: "root".to_string(),
-        xtask_bin: xtask_crate.clone(),
-        xtask_crate,
-    });
-    let mut children = Vec::new();
-    let entries = fs::read_dir(git_root).map_err(|e| {
-        format!(
-            "failed to read git root directory listing {}: {e}",
-            git_root.display()
-        )
-    })?;
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
-        let path = entry.path();
-
-        if !path.is_dir() {
-            continue;
-        }
-
-        let dir_name = entry.file_name().to_string_lossy().to_string();
-
-        if let Some(xtask_crate) = is_workspace(&path)? {
-            children.push(Workspace {
-                path,
-                dir_name: dir_name.clone(),
-                xtask_crate,
-                xtask_bin: format!("xtask-{dir_name}"),
-            });
-        }
-    }
-    children.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
-
-    Ok(Discovery { root, children })
 }
 
 fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
@@ -206,25 +201,159 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
     Ok(Some(matches[0].clone()))
 }
 
-fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
-    let discovery = discover_workspaces(git_root)?;
-    if discovery.root.is_none() && discovery.children.is_empty() {
-        return Err(format!(
-            "No xtask workspaces found under git root: {}",
-            git_root.display()
-        ));
-    }
+fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<Workspace>, String> {
+    let mut cur = start.to_path_buf();
 
-    let mut first_failure: Option<ExitCode> = None;
-    if let Some(root) = &discovery.root {
-        let code = run_help_one(root)?;
-        if code != ExitCode::SUCCESS && first_failure.is_none() {
-            first_failure = Some(code);
+    loop {
+        // The root of the repository cannot be a subrepo
+        if cur == *git_root {
+            return Ok(None);
         }
-        eprintln!();
+
+        if let Some(xtask_crate) = is_workspace(&cur)? {
+            // subrepo dir name is the first path segment under git_root
+            let rel = cur.strip_prefix(git_root).map_err(|_| {
+                format!(
+                    "internal error: {} is not under git root {}",
+                    cur.display(),
+                    git_root.display()
+                )
+            })?;
+
+            let subrepo = rel
+                .components()
+                .next()
+                .ok_or_else(|| {
+                    "internal error: workspace root has empty relative path".to_string()
+                })?
+                .as_os_str()
+                .to_string_lossy()
+                .to_string();
+
+            return Ok(Some(Workspace {
+                path: cur,
+                dir_name: subrepo.clone(),
+                xtask_bin: format!("xtask-{subrepo}"),
+                xtask_crate,
+            }));
+        }
+
+        if !cur.pop() {
+            return Ok(None);
+        }
+    }
+}
+
+fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
+    let entries = fs::read_dir(git_root).map_err(|e| {
+        format!(
+            "failed to read git root directory listing {}: {e}",
+            git_root.display()
+        )
+    })?;
+    let mut subrepos = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let dir_name = entry.file_name().to_string_lossy().to_string();
+
+        if let Some(xtask_crate) = is_workspace(&path)? {
+            subrepos.push(Workspace {
+                path,
+                dir_name: dir_name.clone(),
+                xtask_crate,
+                xtask_bin: format!("xtask-{dir_name}"),
+            });
+        }
     }
 
-    for ws in &discovery.children {
+    subrepos.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
+    Ok(subrepos)
+}
+
+fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
+    let yes = args::take_yes_flag(args);
+    let selector = args::take_subrepo_selector(args);
+    let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
+
+    // Selector
+    if let Some(sel) = selector {
+        if sel == "all" {
+            // :all magic selector
+            let subrepos = list_subrepo_workspaces(git_root)?;
+            if subrepos.is_empty() {
+                return Err(format!(
+                    "xtask :all requires at least one subrepo workspace under git root.\n\
+                     Git root: {}",
+                    git_root.display()
+                ));
+            }
+            run_help_all(&subrepos)
+        } else {
+            // :<subrepo> selector
+            let subrepo_root = git_root.join(&sel);
+            let xtask_crate = is_workspace(&subrepo_root)?.ok_or_else(|| {
+                format!(
+                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo.toml and an xtask* directory).\n\
+                     Path: {}",
+                    sel,
+                    subrepo_root.display()
+                )
+            })?;
+
+            let ws = Workspace {
+                path: subrepo_root,
+                dir_name: sel.clone(),
+                xtask_bin: format!("xtask-{sel}"),
+                xtask_crate,
+            };
+            run_help_one(&ws)
+        }
+    } else {
+        // No selector, behovior depends on standard repo vs monorepo.
+        let root_xtask = is_workspace(git_root)?;
+        if let Some(xtask_crate) = root_xtask {
+            // Standard repo: help at git root
+            let ws = Workspace {
+                path: git_root.to_path_buf(),
+                dir_name: "root".to_string(),
+                xtask_bin: xtask_crate.clone(),
+                xtask_crate,
+            };
+            run_help_one(&ws)
+        } else {
+            // Monorepo:
+            if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root)? {
+                // if inside a subrepo workspace (any depth), show help for that subrepo.
+                run_help_one(&ws)
+            } else {
+                // At monorepo root we show help for all after confirmation
+                let subrepos = list_subrepo_workspaces(git_root)?;
+                if subrepos.is_empty() {
+                    return Err(format!(
+                        "No xtask workspaces found under git root: {}",
+                        git_root.display()
+                    ));
+                }
+
+                if !confirm_dispatch_all(yes)? {
+                    return Ok(ExitCode::SUCCESS);
+                }
+
+                run_help_all(&subrepos)
+            }
+        }
+    }
+}
+
+fn run_help_all(subrepos: &[Workspace]) -> Result<ExitCode, String> {
+    let mut first_failure: Option<ExitCode> = None;
+
+    for ws in subrepos {
         let code = run_help_one(ws)?;
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
@@ -237,6 +366,7 @@ fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
 
 fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     let is_subrepo = ws.dir_name != "root";
+
     let target_dir: &Path = if is_subrepo {
         Path::new("../target/xtask")
     } else {
@@ -258,9 +388,11 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
         .arg("--")
         .arg("--help")
         .current_dir(&ws.path);
+
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
+
     let status = cmd.status().map_err(|e| {
         format!(
             "failed to execute cargo run ({} --help): {e}",
