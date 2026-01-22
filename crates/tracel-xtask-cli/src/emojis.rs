@@ -38,7 +38,7 @@ pub fn format_repo_label(name: &str) -> String {
 
 pub fn print_run_header(label: &str) {
     let width = 78;
-    let header = format!("{label}");
+    let header = label.to_string();
     let sep = "─".repeat(width);
     eprintln!("{sep}");
     eprintln!(" {header}");

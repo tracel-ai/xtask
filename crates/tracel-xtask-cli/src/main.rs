@@ -22,7 +22,7 @@ struct Discovery {
     children: Vec<Workspace>,
 }
 
-const MAGIC_ARG_ALL: &'static str = ":all";
+const MAGIC_ARG_ALL: &str = ":all";
 
 fn main() -> ExitCode {
     match run() {
@@ -133,15 +133,12 @@ fn git_toplevel() -> Result<PathBuf, String> {
 }
 
 fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
-    let root = match is_workspace(git_root)? {
-        Some(xtask_crate) => Some(Workspace {
-            path: git_root.to_path_buf(),
-            dir_name: "root".to_string(),
-            xtask_bin: xtask_crate.clone(),
-            xtask_crate,
-        }),
-        None => None,
-    };
+    let root = is_workspace(git_root)?.map(|xtask_crate| Workspace {
+        path: git_root.to_path_buf(),
+        dir_name: "root".to_string(),
+        xtask_bin: xtask_crate.clone(),
+        xtask_crate,
+    });
     let mut children = Vec::new();
     let entries = fs::read_dir(git_root).map_err(|e| {
         format!(
@@ -174,6 +171,9 @@ fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
 }
 
 fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
+    if !dir.join("Cargo.toml").is_file() {
+        return Ok(None);
+    }
     let entries = fs::read_dir(dir)
         .map_err(|e| format!("failed to read directory listing {}: {e}", dir.display()))?;
     let mut matches: Vec<String> = Vec::new();
