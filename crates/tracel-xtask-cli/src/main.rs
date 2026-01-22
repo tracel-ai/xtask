@@ -1,3 +1,5 @@
+mod emojis;
+
 use std::{
     env,
     ffi::{OsStr, OsString},
@@ -168,57 +170,85 @@ fn is_workspace_root(dir: &Path) -> Result<bool, String> {
 
 fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
     let discovery = discover_workspaces(git_root)?;
+
     if discovery.root.is_none() && discovery.children.is_empty() {
         return Err(format!(
             "No xtask workspaces found under git root: {}",
             git_root.display()
         ));
     }
+
+    let mut first_failure: Option<ExitCode> = None;
+
+    // Root (standard repo)
     if let Some(root) = discovery.root {
-        println!("== xtask @ {} ==", root.display());
-        run_help_one(&root)?;
-        println!();
+        let code = run_help_one(&root, None)?;
+        if code != ExitCode::SUCCESS && first_failure.is_none() {
+            first_failure = Some(code);
+        }
+        eprintln!();
     }
 
+    // Monorepo subrepos
     for ws in discovery.children {
-        println!("== xtask @ {}/{} ==", git_root.display(), ws.dir_name);
-        run_help_one(&ws.path)?;
-        println!();
+        let code = run_help_one(&ws.path, Some(&ws.dir_name))?;
+        if code != ExitCode::SUCCESS && first_failure.is_none() {
+            first_failure = Some(code);
+        }
+        eprintln!();
     }
 
-    Ok(ExitCode::SUCCESS)
+    Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
 }
 
-fn run_help_one(dir: &Path) -> Result<(), String> {
-    let status = Command::new("cargo")
+fn run_help_one(dir: &Path, subrepo: Option<&str>) -> Result<ExitCode, String> {
+    let (target_dir, bin_name, label, kind) = match subrepo {
+        Some(s) => (
+            Path::new("../target/xtask"),
+            format!("xtask-{s}"),
+            emojis::format_repo_label(s),
+            "subrepo",
+        ),
+        None => (
+            Path::new("target/xtask"),
+            "xtask".to_string(),
+            "📦 root".to_string(),
+            "standard repository",
+        ),
+    };
+
+    emojis::print_run_header(kind, &label);
+
+    let mut cmd = Command::new("cargo");
+    cmd.arg("run")
+        .arg("--target-dir")
+        .arg(target_dir)
+        .arg("--package")
         .arg("xtask")
+        .arg("--bin")
+        .arg(bin_name)
+        .arg("--")
         .arg("--help")
-        .current_dir(dir)
-        .status()
-        .map_err(|e| {
-            format!(
-                "failed to execute cargo xtask --help in {}: {e}",
-                dir.display()
-            )
-        })?;
-    if !status.success() {
-        eprintln!(
-            "warning: cargo xtask --help failed in {} (exit code {:?})",
-            dir.display(),
-            status.code()
-        );
+        .current_dir(dir);
+
+    if subrepo.is_some() {
+        cmd.env("XTASK_MONOREPO", "1");
     }
 
-    Ok(())
+    let status = cmd.status().map_err(|e| {
+        format!(
+            "failed to execute cargo run (xtask --help) in {}: {e}",
+            dir.display()
+        )
+    })?;
+
+    Ok(exit_code_from_status(status))
 }
 
 fn exec_cargo_xtask_all(args: &[OsString], subrepos: &[Workspace]) -> Result<ExitCode, String> {
     let mut first_failure: Option<ExitCode> = None;
     for ws in subrepos {
-        println!("== xtask @ {} ==", ws.path.display());
-
         let code = exec_cargo_xtask(&ws.path, args, Some(&ws.dir_name))?;
-
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
         }
@@ -232,9 +262,17 @@ fn exec_cargo_xtask(
     subrepo: Option<&str>,
 ) -> Result<ExitCode, String> {
     let (target_dir, bin_name) = match subrepo {
-        Some(subrepo) => (OsStr::new("../target/xtask"), format!("xtask-{subrepo}")),
-        None => (OsStr::new("target/xtask"), "xtask".to_string()),
+        Some(subrepo) => (Path::new("../target/xtask"), format!("xtask-{subrepo}")),
+        None => (Path::new("target/xtask"), "xtask".to_string()),
     };
+
+    if let Some(s) = subrepo.as_deref() {
+        let label = emojis::format_repo_label(s);
+        emojis::print_run_header("subrepo", &label);
+    } else {
+        emojis::print_run_header("root", "📦 root");
+    }
+
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
