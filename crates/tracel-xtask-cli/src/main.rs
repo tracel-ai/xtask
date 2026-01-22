@@ -46,7 +46,9 @@ fn run() -> Result<ExitCode, String> {
 
     // Discover workspaces and dispatch commands
     let discovery = discover_workspaces(&git_root)?;
-    if let Some(name) = first_arg_basename(&args) && name == MAGIC_ARG_ALL {
+    if let Some(name) = first_arg_basename(&args)
+        && name == MAGIC_ARG_ALL
+    {
         // :all mode
         args.remove(0);
 
@@ -241,12 +243,9 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
         Path::new("target/xtask")
     };
 
-    let (kind, label) = if is_subrepo {
-        ("subrepo", emojis::format_repo_label(&ws.dir_name))
-    } else {
-        ("root", "📦 root".to_string())
-    };
-    emojis::print_run_header(kind, &label);
+    if is_subrepo {
+        emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
+    }
 
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
@@ -292,12 +291,9 @@ fn exec_cargo_xtask(ws: &Workspace, args: &[OsString]) -> Result<ExitCode, Strin
         Path::new("target/xtask")
     };
 
-    let (kind, label) = if is_subrepo {
-        ("subrepo", emojis::format_repo_label(&ws.dir_name))
-    } else {
-        ("root", "📦 root".to_string())
+    if is_subrepo {
+        emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
-    emojis::print_run_header(kind, &label);
 
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
@@ -313,12 +309,9 @@ fn exec_cargo_xtask(ws: &Workspace, args: &[OsString]) -> Result<ExitCode, Strin
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
-    let status = cmd.status().map_err(|e| {
-        format!(
-            "failed to execute cargo run ({}): {e}",
-            ws.path.display()
-        )
-    })?;
+    let status = cmd
+        .status()
+        .map_err(|e| format!("failed to execute cargo run ({}): {e}", ws.path.display()))?;
 
     Ok(exit_code_from_status(status))
 }
