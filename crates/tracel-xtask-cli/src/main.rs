@@ -12,11 +12,13 @@ use std::{
 struct Workspace {
     path: PathBuf,
     dir_name: String,
+    xtask_crate: String,
+    xtask_bin: String,
 }
 
 #[derive(Debug)]
 struct Discovery {
-    root: Option<PathBuf>,
+    root: Option<Workspace>,
     children: Vec<Workspace>,
 }
 
@@ -41,43 +43,41 @@ fn run() -> Result<ExitCode, String> {
     if is_help_invocation(&args) {
         return show_all_help(&git_root);
     }
+
     // Discover workspaces and dispatch commands
     let discovery = discover_workspaces(&git_root)?;
-    if let Some(name) = first_arg_basename(&args)
-        && name == MAGIC_ARG_ALL
-    {
-        // assume monorepo and dispatch to all subrepos
+    if let Some(name) = first_arg_basename(&args) && name == MAGIC_ARG_ALL {
+        // :all mode
         args.remove(0);
+
         if discovery.children.is_empty() {
-            return Err(format!(
+            Err(format!(
                 "xtask all requires a monorepo with at least one subrepo workspace under git root.\n\
                  Git root: {}",
                 git_root.display()
-            ));
+            ))
+        } else {
+            exec_cargo_xtask_all(&args, &discovery.children)
         }
-        exec_cargo_xtask_all(&args, &discovery.children)
     } else {
-        // dispatch to standard repo or specified subrepo in the monorepo
-        let mut subrepo = None;
-        let target = match first_arg_basename(&args) {
+        // single target
+        let target: Workspace = match first_arg_basename(&args) {
             Some(name) if discovery.children.iter().any(|ws| ws.dir_name == name) => {
-                // monorepo
-                subrepo = Some(name.clone());
+                // subrepo in monorepo
                 args.remove(0);
                 discovery
                     .children
                     .into_iter()
                     .find(|ws| ws.dir_name == name)
                     .expect("workspace existence already checked")
-                    .path
             }
             _ => {
+                // standard repo with only one workspace at root
                 if let Some(root) = discovery.root {
-                    // standard repository
                     root
                 } else {
                     return Err(format!(
-                        "No xtask workspace found at git root, and the first argument does not match any monorepo workspace.\n\
+                        "No xtask workspace found at git root, and the first argument does not match any subrepo workspace.\n\
                          Git root: {}\n\
                          Try: xtask -h",
                         git_root.display()
@@ -85,7 +85,8 @@ fn run() -> Result<ExitCode, String> {
                 }
             }
         };
-        exec_cargo_xtask(&target, &args, subrepo.as_deref())
+
+        exec_cargo_xtask(&target, &args)
     }
 }
 
@@ -130,10 +131,15 @@ fn git_toplevel() -> Result<PathBuf, String> {
 }
 
 fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
-    let mut root = None;
-    if is_workspace_root(git_root)? {
-        root = Some(git_root.to_path_buf());
-    }
+    let root = match is_workspace(git_root)? {
+        Some(xtask_crate) => Some(Workspace {
+            path: git_root.to_path_buf(),
+            dir_name: "root".to_string(),
+            xtask_bin: xtask_crate.clone(),
+            xtask_crate,
+        }),
+        None => None,
+    };
     let mut children = Vec::new();
     let entries = fs::read_dir(git_root).map_err(|e| {
         format!(
@@ -141,7 +147,6 @@ fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
             git_root.display()
         )
     })?;
-
     for entry in entries {
         let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
         let path = entry.path();
@@ -152,8 +157,13 @@ fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
 
         let dir_name = entry.file_name().to_string_lossy().to_string();
 
-        if is_workspace_root(&path)? {
-            children.push(Workspace { path, dir_name });
+        if let Some(xtask_crate) = is_workspace(&path)? {
+            children.push(Workspace {
+                path,
+                dir_name: dir_name.clone(),
+                xtask_crate,
+                xtask_bin: format!("xtask-{dir_name}"),
+            });
         }
     }
     children.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
@@ -161,16 +171,41 @@ fn discover_workspaces(git_root: &Path) -> Result<Discovery, String> {
     Ok(Discovery { root, children })
 }
 
-fn is_workspace_root(dir: &Path) -> Result<bool, String> {
-    let cargo_toml = dir.join("Cargo.toml");
-    let xtask_dir = dir.join("xtask");
+fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
+    let entries = fs::read_dir(dir)
+        .map_err(|e| format!("failed to read directory listing {}: {e}", dir.display()))?;
+    let mut matches: Vec<String> = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
+        let path = entry.path();
 
-    Ok(cargo_toml.is_file() && xtask_dir.is_dir())
+        if !path.is_dir() {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.to_ascii_lowercase().contains("xtask") {
+            matches.push(name);
+        }
+    }
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    matches.sort();
+
+    if let Some(exact) = matches
+        .iter()
+        .find(|n| n.eq_ignore_ascii_case("xtask"))
+        .cloned()
+    {
+        return Ok(Some(exact));
+    }
+
+    Ok(Some(matches[0].clone()))
 }
 
 fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
     let discovery = discover_workspaces(git_root)?;
-
     if discovery.root.is_none() && discovery.children.is_empty() {
         return Err(format!(
             "No xtask workspaces found under git root: {}",
@@ -179,19 +214,16 @@ fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
     }
 
     let mut first_failure: Option<ExitCode> = None;
-
-    // Root (standard repo)
-    if let Some(root) = discovery.root {
-        let code = run_help_one(&root, None)?;
+    if let Some(root) = &discovery.root {
+        let code = run_help_one(root)?;
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
         }
         eprintln!();
     }
 
-    // Monorepo subrepos
-    for ws in discovery.children {
-        let code = run_help_one(&ws.path, Some(&ws.dir_name))?;
+    for ws in &discovery.children {
+        let code = run_help_one(ws)?;
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
         }
@@ -201,22 +233,19 @@ fn show_all_help(git_root: &Path) -> Result<ExitCode, String> {
     Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
 }
 
-fn run_help_one(dir: &Path, subrepo: Option<&str>) -> Result<ExitCode, String> {
-    let (target_dir, bin_name, label, kind) = match subrepo {
-        Some(s) => (
-            Path::new("../target/xtask"),
-            format!("xtask-{s}"),
-            emojis::format_repo_label(s),
-            "subrepo",
-        ),
-        None => (
-            Path::new("target/xtask"),
-            "xtask".to_string(),
-            "📦 root".to_string(),
-            "standard repository",
-        ),
+fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
+    let is_subrepo = ws.dir_name != "root";
+    let target_dir: &Path = if is_subrepo {
+        Path::new("../target/xtask")
+    } else {
+        Path::new("target/xtask")
     };
 
+    let (kind, label) = if is_subrepo {
+        ("subrepo", emojis::format_repo_label(&ws.dir_name))
+    } else {
+        ("root", "📦 root".to_string())
+    };
     emojis::print_run_header(kind, &label);
 
     let mut cmd = Command::new("cargo");
@@ -224,21 +253,19 @@ fn run_help_one(dir: &Path, subrepo: Option<&str>) -> Result<ExitCode, String> {
         .arg("--target-dir")
         .arg(target_dir)
         .arg("--package")
-        .arg("xtask")
+        .arg(&ws.xtask_crate)
         .arg("--bin")
-        .arg(bin_name)
+        .arg(&ws.xtask_bin)
         .arg("--")
         .arg("--help")
-        .current_dir(dir);
-
-    if subrepo.is_some() {
+        .current_dir(&ws.path);
+    if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
-
     let status = cmd.status().map_err(|e| {
         format!(
-            "failed to execute cargo run (xtask --help) in {}: {e}",
-            dir.display()
+            "failed to execute cargo run ({} --help): {e}",
+            ws.path.display()
         )
     })?;
 
@@ -248,52 +275,51 @@ fn run_help_one(dir: &Path, subrepo: Option<&str>) -> Result<ExitCode, String> {
 fn exec_cargo_xtask_all(args: &[OsString], subrepos: &[Workspace]) -> Result<ExitCode, String> {
     let mut first_failure: Option<ExitCode> = None;
     for ws in subrepos {
-        let code = exec_cargo_xtask(&ws.path, args, Some(&ws.dir_name))?;
+        let code = exec_cargo_xtask(ws, args)?;
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
         }
     }
+
     Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
 }
 
-fn exec_cargo_xtask(
-    dir: &Path,
-    args: &[OsString],
-    subrepo: Option<&str>,
-) -> Result<ExitCode, String> {
-    let (target_dir, bin_name) = match subrepo {
-        Some(subrepo) => (Path::new("../target/xtask"), format!("xtask-{subrepo}")),
-        None => (Path::new("target/xtask"), "xtask".to_string()),
+fn exec_cargo_xtask(ws: &Workspace, args: &[OsString]) -> Result<ExitCode, String> {
+    let is_subrepo = ws.dir_name != "root";
+    let target_dir: &Path = if is_subrepo {
+        Path::new("../target/xtask")
+    } else {
+        Path::new("target/xtask")
     };
 
-    if let Some(s) = subrepo.as_deref() {
-        let label = emojis::format_repo_label(s);
-        emojis::print_run_header("subrepo", &label);
+    let (kind, label) = if is_subrepo {
+        ("subrepo", emojis::format_repo_label(&ws.dir_name))
     } else {
-        emojis::print_run_header("root", "📦 root");
-    }
+        ("root", "📦 root".to_string())
+    };
+    emojis::print_run_header(kind, &label);
 
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
         .arg(target_dir)
         .arg("--package")
-        .arg("xtask")
+        .arg(&ws.xtask_crate)
         .arg("--bin")
-        .arg(bin_name)
+        .arg(&ws.xtask_bin)
         .arg("--")
         .args(args)
-        .current_dir(dir);
-    if subrepo.is_some() {
+        .current_dir(&ws.path);
+    if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
-
     let status = cmd.status().map_err(|e| {
         format!(
-            "failed to execute cargo run (xtask) in {}: {e}",
-            dir.display()
+            "failed to execute cargo run ({}): {e}",
+            ws.path.display()
         )
     })?;
+
     Ok(exit_code_from_status(status))
 }
 
