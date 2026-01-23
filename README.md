@@ -268,6 +268,9 @@ The `.secrets` component in `.env.secrets` is called a `dotenv family`. There ex
 
 For each family both `.env.{family}` and `.env.{environment}.{family}` are sourced if they exists.
 
+**Note:** If an environment variable is already defined in the process environment, it takes precedence over the
+value defined in `.env` files.
+
 At last, the display form used in dotenv filenames for the environment is the `medium` one (see table above).
 
 #### Environment Index
