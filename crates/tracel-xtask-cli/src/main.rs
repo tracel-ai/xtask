@@ -1,4 +1,5 @@
 mod args;
+mod deps;
 mod emojis;
 
 use std::{
@@ -66,7 +67,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
                     git_root.display()
                 ));
             }
-            return exec_cargo_xtask_all(args, &subrepos);
+            return exec_cargo_xtask_all(git_root, args, &subrepos);
         } else {
             // :<subrepo> selector
             let subrepo_root = git_root.join(&sel);
@@ -85,7 +86,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
                 xtask_bin: format!("xtask-{sel}"),
                 xtask_crate,
             };
-            return exec_cargo_xtask(&ws, args);
+            return exec_cargo_xtask(git_root, &ws, args);
         }
     }
 
@@ -100,12 +101,12 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             xtask_bin: xtask_crate.clone(),
             xtask_crate,
         };
-        exec_cargo_xtask(&ws, args)
+        exec_cargo_xtask(git_root, &ws, args)
     } else {
         // Monorepo:
         if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root)? {
             // inside a subrepo workspace at any depth then we execute in that subrepo.
-            exec_cargo_xtask(&ws, args)
+            exec_cargo_xtask(git_root, &ws, args)
         } else {
             //  At monorepo root we dispatch to all subrepos after confirmation
             let subrepos = list_subrepo_workspaces(git_root)?;
@@ -118,9 +119,30 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             if !confirm_dispatch_all(yes)? {
                 return Ok(ExitCode::SUCCESS);
             }
-            exec_cargo_xtask_all(args, &subrepos)
+            exec_cargo_xtask_all(git_root, args, &subrepos)
         }
     }
+}
+
+/// Sync dependency versions from the root fake Cargo.toml
+fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result<(), String> {
+    let root_manifest = git_root.join("Cargo.toml");
+
+    let subrepo_roots: Vec<PathBuf> = subrepos.iter().map(|ws| ws.path.clone()).collect();
+
+    let report = deps::sync_subrepos(&root_manifest, &subrepo_roots)
+        .map_err(|e| format!("dependency sync should succeed: {e}"))?;
+
+    for (manifest, table_path, dep) in report.missing_canonical_dependencies {
+        eprintln!(
+            "warning: {} declares dependency '{}' in [{}] but it is missing from root [workspace.dependencies]",
+            manifest.display(),
+            dep,
+            table_path,
+        );
+    }
+
+    Ok(())
 }
 
 fn confirm_dispatch_all(yes: bool) -> Result<bool, String> {
@@ -403,10 +425,15 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     Ok(exit_code_from_status(status))
 }
 
-fn exec_cargo_xtask_all(args: &[OsString], subrepos: &[Workspace]) -> Result<ExitCode, String> {
+fn exec_cargo_xtask_all(
+    git_root: &Path,
+    args: &[OsString],
+    subrepos: &[Workspace],
+) -> Result<ExitCode, String> {
+    sync_monorepo_dependencies(git_root, &subrepos)?;
     let mut first_failure: Option<ExitCode> = None;
     for ws in subrepos {
-        let code = exec_cargo_xtask(ws, args)?;
+        let code = exec_cargo_xtask(git_root, ws, args)?;
         if code != ExitCode::SUCCESS && first_failure.is_none() {
             first_failure = Some(code);
         }
@@ -415,7 +442,12 @@ fn exec_cargo_xtask_all(args: &[OsString], subrepos: &[Workspace]) -> Result<Exi
     Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
 }
 
-fn exec_cargo_xtask(ws: &Workspace, args: &[OsString]) -> Result<ExitCode, String> {
+fn exec_cargo_xtask(
+    git_root: &Path,
+    ws: &Workspace,
+    args: &[OsString],
+) -> Result<ExitCode, String> {
+    sync_monorepo_dependencies(git_root, std::slice::from_ref(&ws))?;
     let is_subrepo = ws.dir_name != "root";
     let target_dir: &Path = if is_subrepo {
         Path::new("../target/xtask")
