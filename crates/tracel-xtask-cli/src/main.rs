@@ -11,6 +11,8 @@ use std::{
     process::{Command, ExitCode},
 };
 
+use toml_edit::DocumentMut;
+
 #[derive(Debug)]
 struct Workspace {
     path: PathBuf,
@@ -187,36 +189,83 @@ fn git_repo_root() -> Result<PathBuf, String> {
     Ok(PathBuf::from(p))
 }
 
+/// Returns the xtask *package name* if this directory is a Cargo workspace that contains
+/// an xtask-like member.
 fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
-    if !dir.join("Cargo.toml").is_file() {
+    let workspace_toml = dir.join("Cargo.toml");
+    if !workspace_toml.is_file() {
         return Ok(None);
     }
-    let entries = fs::read_dir(dir)
-        .map_err(|e| format!("failed to read directory listing {}: {e}", dir.display()))?;
-    let mut matches: Vec<String> = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
-        let path = entry.path();
+    let root_src = fs::read_to_string(&workspace_toml)
+        .map_err(|e| format!("failed to read {}: {e}", workspace_toml.display()))?;
+    let root_doc = root_src
+        .parse::<DocumentMut>()
+        .map_err(|e| format!("failed to parse {}: {e}", workspace_toml.display()))?;
 
-        if !path.is_dir() {
+    let members_item = root_doc
+        .get("workspace")
+        .and_then(|w| w.get("members"))
+        .ok_or_else(|| "workspace.members not found".to_string())?;
+    let members = members_item
+        .as_array()
+        .ok_or_else(|| "workspace.members should be an array".to_string())?;
+    let mut member_dirs: Vec<PathBuf> = Vec::new();
+    for m in members.iter() {
+        let s = m
+            .as_str()
+            .ok_or_else(|| "workspace member should be a string".to_string())?;
+        if let Some((prefix, suffix)) = s.split_once('*') {
+            if suffix.is_empty() {
+                let base = dir.join(prefix);
+                if base.is_dir() {
+                    let entries = fs::read_dir(&base).map_err(|e| {
+                        format!("failed to read directory listing {}: {e}", base.display())
+                    })?;
+                    for entry in entries {
+                        let entry =
+                            entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
+                        let p = entry.path();
+                        if p.is_dir() {
+                            member_dirs.push(p);
+                        }
+                    }
+                }
+                continue;
+            }
+            continue;
+        }
+        member_dirs.push(dir.join(s));
+    }
+
+    let mut matches: Vec<String> = Vec::new();
+    for member_dir in member_dirs {
+        let member_toml = member_dir.join("Cargo.toml");
+        if !member_toml.is_file() {
             continue;
         }
 
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.to_ascii_lowercase().contains("xtask") {
-            matches.push(name);
+        let src = fs::read_to_string(&member_toml)
+            .map_err(|e| format!("failed to read {}: {e}", member_toml.display()))?;
+        let doc = src
+            .parse::<DocumentMut>()
+            .map_err(|e| format!("failed to parse {}: {e}", member_toml.display()))?;
+
+        let package_name = doc
+            .get("package")
+            .and_then(|p| p.get("name"))
+            .and_then(|n| n.as_str());
+
+        if let Some(name) = package_name {
+            if name.to_ascii_lowercase().contains("xtask") {
+                matches.push(name.to_string());
+            }
         }
     }
     if matches.is_empty() {
         return Ok(None);
     }
     matches.sort();
-
-    if let Some(exact) = matches
-        .iter()
-        .find(|n| n.eq_ignore_ascii_case("xtask"))
-        .cloned()
-    {
+    if let Some(exact) = matches.iter().find(|n| n.eq_ignore_ascii_case("xtask")).cloned() {
         return Ok(Some(exact));
     }
 
