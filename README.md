@@ -26,7 +26,19 @@ extended using handy proc macros and by following some patterns described in thi
 
 ## Getting Started
 
+### Install xtask CLI
+
+```bash
+cargo install tracel-xtask-cli
+```
+
 ### Setting Up a Cargo Workspace with an xtask binary crate
+
+#### Using the CLI
+
+**Not available yet**
+
+#### Manually
 
 1. **Create a new Cargo workspace:**
 
@@ -102,87 +114,8 @@ fn main() -> anyhow::Result<()> {
 4. You should now be able to display the main help screen which lists the commands you selected previously:
 
 ```sh
-cargo xtask --help
+xtask --help
 ```
-
-### Setup aliases for easy invocation
-
-#### Cargo Alias
-
-Invoking the xtask binary with cargo is very verbose and not really usable as is. Happily we can create a
-cargo alias to make it really effortless to invoke it.
-
-Create a new file `.cargo/config.toml` in your repository with the following contents:
-
-```toml
-[alias]
-xtask = "run --target-dir target/xtask --package xtask --bin xtask --"
-```
-
-This saves quite a few characters to type as you can now invoke `xtask` directly like this:
-
-```sh
-cargo xtask
-```
-
-Try it with `cargo xtask --help`.
-
-#### Shell Alias
-
-We can save even more typing by creating a shell alias for `cargo xtask`.
-
-For instance we can set the alias to `cx`. Here is how to do it in various shells.
-
-- For bash:
-
-```bash
-nano ~/.bashrc
-
-# add this to the file
-alias cx='cargo xtask'
-
-# save and source the file or restart the shell session
-source ~/.bashrc
-```
-
-- For zsh:
-
-```sh
-nano ~/.zshrc
-
-# add this to the file
-alias cx='cargo xtask'
-
-# save and source the file or restart the shell session
-source ~/.zshrc
-```
-
-- For fish:
-
-```fish
-nano ~/.config/fish/config.fish
-
-# add this to the file
-alias cx='cargo xtask'
-
-# save and source the file or restart the shell session
-source ~/.config/fish/config.fish
-```
-
-- For powershell:
-
-```powershell
-notepad $PROFILE
-
-# add this at the end of file
-function cx {
-    cargo xtask $args
-}
-
-# save and quit then open a new powershell terminal
-```
-
-Try it with `cx --help` at the root of the repository.
 
 ## Conventions
 
@@ -219,13 +152,13 @@ Here are some examples:
 
 ```sh
 # run all the crates tests
-cargo xtask test --target crates all
+xtask test --target crates all
 # check format for examples, binaries and libs
-cargo xtask check --target all-packages unit
+xtask check --target all-packages unit
 # build the workspace
-cargo xtask build --target workspace
+xtask build --target workspace
 # workspace is the default target so this has the same effect
-cargo xtask build
+xtask build
 ```
 
 ### Global options
@@ -237,7 +170,7 @@ The following options are global and precede the actual command on the command l
 `-e`, `--environment`
 
 ```sh
-cargo xtask -e production build
+xtask -e production build
 ```
 
 This `--environment` parameter is passed to all the `handle_command` function as `env`.
@@ -289,7 +222,7 @@ or `staging`, it will print `s1`, `stag1` and `staging1` explicitly.
 `-c`, `--context`
 
 ```sh
-cargo xtask --context no-std build
+xtask --context no-std build
 ```
 
 This argument has no effect in the base commands. Its purpose is to provide additional context to your custom commands
@@ -302,6 +235,72 @@ This parameter is passed to all the `handle_command` function as `context`.
 `--enable-coverage`
 
 It setups the Rust toolchain to generate coverage information.
+
+## Standard repository vs. Monorepo
+
+`xtask` CLI is capable of handling traditional repositories with a single Rust workspase at the root of the repository and
+monorepos which are a collection of Cargo workspaces in their own directories called `subrepos`.
+
+A `subrepo` is basically the same as a standard repository with its own `Cargo.toml` and `xtask` crate. For instance this
+simple monorepo contains the following files and directories at the root:
+
+```
+.git
+.gitignore
+Cargo.toml
+[backend]
+  |__Cargo.toml
+  |__[crates]
+  |__[xtask]
+[frontend]
+  |__Cargo.toml
+  |__[xtask]
+
+```
+
+`backend` and `frontend` are subrepos with separate Cargo workspaces with their own members. They all have an `xtask` member
+to manage them.
+
+The root `Cargo.toml` does not represent a real Cargo workspace, its only purpose is to centralize all the dependency versions
+and features. `xtask` CLI will push the dependency versions in the root `Cargo.toml` to the subrepos `Cargo.toml` files
+whenever a dependency is used in the subrepo.
+
+For instance, say we have this root `Cargo.toml` file:
+
+```toml
+[workspace.dependencies]
+log = "0.4.29"
+rand = "0.9.2"
+tokio = { version = "1.48.0", features = ["full"] }
+```
+
+and `backend` subrepo `Cargo.toml` is:
+
+```toml
+[workspace]
+resolver = "2"
+members = ["crates/*", "xtask"]
+
+[workspace.dependencies]
+rand = "0.8.0"
+tokio = "1.46.0"
+```
+
+Whenever the `xtask` CLI executes a command it will enforce the dependency versions to by in sync with the root `Cargo.toml`,
+which means that the `backendf` subrepo `Cargo.toml` will be modified to be:
+
+```toml
+[workspace]
+resolver = "2"
+members = ["crates/*", "xtask"]
+
+[workspace.dependencies]
+rand = "0.9.2"
+tokio = { version = "1.48.0", features = ["full"] }
+```
+
+Note that it is possible to drop `features = ["full"]` from the root `Cargo.toml` file and make the decision about which
+feature to use at the subrepo or even crate level.
 
 ## Anatomy of a base command
 
@@ -317,7 +316,7 @@ Here is an example with a `foo` command:
 struct FooCmdArgs {}
 
 pub enum FooSubCommand {
-    /// A sub command for foo (usage on the command line: cargo xtask foo print-something)
+    /// A sub command for foo (usage on the command line: xtask foo print-something)
     PrintSomething,
 }
 ```
@@ -394,9 +393,9 @@ fn main() -> anyhow::Result<()> {
 6. You can now test your new command with:
 
 ```sh
-cargo xtask my-command --help
+xtask my-command --help
 
-cargo xtask my-command
+xtask my-command
 ```
 
 ### Extend the default Target enum
@@ -481,9 +480,9 @@ fn main() -> anyhow::Result<()> {
 7. Test the command with:
 
 ```rust
-cargo xtask extended-target --help
+xtask extended-target --help
 
-cargo xtask extended-target --target frontend
+xtask extended-target --target frontend
 ```
 
 ### Target aliases
@@ -577,9 +576,9 @@ fn main() -> anyhow::Result<()> {
 4. Test the command with:
 
 ```rust
-cargo xtask extended-build-args --help
+xtask extended-build-args --help
 
-cargo xtask extended-build-args --debug
+xtask extended-build-args --debug
 ```
 
 #### Extend the subcommands of a base command
@@ -670,9 +669,9 @@ fn main() -> anyhow::Result<()> {
 6. Test the command with:
 
 ```rust
-cargo xtask extended-check-subcommands --help
+xtask extended-check-subcommands --help
 
-cargo xtask extended-check-subcommands my-check
+xtask extended-check-subcommands my-check
 ```
 
 ## Custom builds and tests
@@ -723,17 +722,17 @@ jobs:
         run: |
           curl -L "$GRCOV_LINK/v$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2" |
           tar xj -C $HOME/.cargo/bin
-          cargo xtask coverage install
+          xtask coverage install
       - name: Build
         shell: bash
-        run: cargo xtask build
+        run: xtask build
       - name: Tests
         shell: bash
-        run: cargo xtask --enable-coverage test all
+        run: xtask --enable-coverage test all
       - name: Generate lcov.info
         shell: bash
         # /* is to exclude std library code coverage from analysis
-        run: cargo xtask coverage generate --ignore "/*,xtask/*,examples/*"
+        run: xtask coverage generate --ignore "/*,xtask/*,examples/*"
       - name: Codecov upload lcov.info
         uses: codecov/codecov-action@v4
         with:
@@ -810,11 +809,11 @@ Each check can be executed separately or all of them can be executed sequentiall
 Usage to lint the code base:
 
 ```sh
-cargo xtask check lint
+xtask check lint
 
-cargo xtask fix lint
+xtask fix lint
 
-cargo xtask fix all
+xtask fix all
 ```
 
 ### Running Tests
@@ -828,11 +827,11 @@ the `src` directory.
 Usage:
 ```sh
 # execute workspace unit tests
-cargo xtask test unit
+xtask test unit
 # execute workspace integration tests
-cargo xtask test integration
+xtask test integration
 # execute workspace both unit tests and integration tests
-cargo xtask test all
+xtask test all
 ```
 
 Note that documentation tests are supported by the `doc` command.
@@ -855,7 +854,7 @@ For bug fixes, bump the patch version.
 
 Usage:
 ```sh
-cargo xtask bump <SUBCOMMAND>
+xtask bump <SUBCOMMAND>
 ```
 
 ### Publishing Crates
@@ -867,7 +866,7 @@ By specifying the name of the crate, `xtask` handles the publication process, en
 
 Usage:
 ```sh
-cargo xtask publish <NAME>
+xtask publish <NAME>
 ```
 
 As mentioned, this command is often used in a GitHub workflow.
@@ -932,13 +931,13 @@ The design, however, could later be refactored to support other cloud providers 
 First build the container locally:
 
 ```
-cargo xtask -e stag container build --allow-dirty --context-dir . --build-file Dockerfile --image my_image
+xtask -e stag container build --allow-dirty --context-dir . --build-file Dockerfile --image my_image
 ```
 
 Retrieve the commit `SHA` tag from the output of the build command and push the container to the registry:
 
 ```
-cargo xtask -e stag container push --image my_image --local-tag SHA --repository my_image --auto-remote_tag --region AWS_REGION
+xtask -e stag container push --image my_image --local-tag SHA --repository my_image --auto-remote_tag --region AWS_REGION
 ```
 
 The container image will be pushed with the commit SHA tag and a monotonic number tag.
@@ -946,19 +945,19 @@ The container image will be pushed with the commit SHA tag and a monotonic numbe
 Promote the pushed image to mark it as latest (move the latest tag to it):
 
 ```
-cargo xtask -e stag container promote --repository my_image --tag SHA --region AWS_REGION
+xtask -e stag container promote --repository my_image --tag SHA --region AWS_REGION
 ```
 
 Then to actually deploy to the targeted environment, initiate a rollout:
 
 ```
-cargo xtask -e stag container rollout --region AWS_REGION --asg ASG_NAME --wait
+xtask -e stag container rollout --region AWS_REGION --asg ASG_NAME --wait
 ```
 
 To see the current `latest` and `rollback` images use the `list` subcommand:
 
 ```
-cargo xtask -e stag container list --region AWS_REGION --repository my_image
+xtask -e stag container list --region AWS_REGION --repository my_image
 ```
 
 ### Secrets
@@ -970,7 +969,7 @@ This command handles secrets to view, edit and even write an env file with them.
 View secrets:
 
 ```
-cargo xtask -e stag secrets view --region AWS_REGION my_secret
+xtask -e stag secrets view --region AWS_REGION my_secret
 ```
 
 ### Docker Compose
