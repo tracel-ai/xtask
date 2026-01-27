@@ -260,10 +260,10 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
             .and_then(|p| p.get("name"))
             .and_then(|n| n.as_str());
 
-        if let Some(name) = package_name {
-            if name.to_ascii_lowercase().starts_with("xtask") {
-                matches.push(name.to_string());
-            }
+        if let Some(name) = package_name
+            && name.to_ascii_lowercase().starts_with("xtask")
+        {
+            matches.push(name.to_string());
         }
     }
     if matches.is_empty() {
@@ -489,7 +489,7 @@ fn exec_cargo_xtask_all(
     args: &[OsString],
     subrepos: &[Workspace],
 ) -> Result<ExitCode, String> {
-    sync_monorepo_dependencies(git_root, &subrepos)?;
+    sync_monorepo_dependencies(git_root, subrepos)?;
     let mut first_failure: Option<ExitCode> = None;
     for ws in subrepos {
         let code = exec_cargo_xtask(git_root, ws, args)?;
@@ -506,7 +506,7 @@ fn exec_cargo_xtask(
     ws: &Workspace,
     args: &[OsString],
 ) -> Result<ExitCode, String> {
-    sync_monorepo_dependencies(git_root, std::slice::from_ref(&ws))?;
+    sync_monorepo_dependencies(git_root, std::slice::from_ref(ws))?;
     let is_subrepo = ws.dir_name != "root";
     let target_path = format!("target/{}", ws.xtask_crate);
     let target_dir = Path::new(&target_path);

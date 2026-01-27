@@ -371,10 +371,10 @@ fn sync_dep_table(
     for dep in keys {
         match canonical.get(&dep) {
             Some(canon) => {
-                if let Some(dep_item) = deps_table.get_mut(&dep) {
-                    if update_dep_item_inline_only(dep_item, canon, root_prefix) {
-                        updated += 1;
-                    }
+                if let Some(dep_item) = deps_table.get_mut(&dep)
+                    && update_dep_item_inline_only(dep_item, canon, root_prefix)
+                {
+                    updated += 1;
                 }
             }
             None => {
@@ -545,10 +545,10 @@ fn set_inline_table_features(inline: &mut InlineTable, features: &[String]) -> b
     let desired = features_to_array(features);
 
     let current = inline.get("features").and_then(|v| v.as_array());
-    if let Some(cur) = current {
-        if arrays_equal_str(cur, &desired) {
-            return false;
-        }
+    if let Some(cur) = current
+        && arrays_equal_str(cur, &desired)
+    {
+        return false;
     }
 
     inline.insert("features", Value::Array(desired));
