@@ -4,6 +4,7 @@ use tracel_xtask::prelude::*;
     Build,
     Bump,
     Check,
+    Clean,
     Compile,
     Container,
     Coverage,

@@ -1,6 +1,7 @@
 pub mod build;
 pub mod bump;
 pub mod check;
+pub mod clean;
 pub mod compile;
 pub mod container;
 pub mod coverage;

@@ -209,6 +209,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Clean",
+        quote! {
+            #[doc = r"Clean target directory."]
+            Clean(tracel_xtask::commands::clean::CleanCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Compile",
         quote! {
             #[doc = r"Compile check the code (does not write binaries to disk)."]

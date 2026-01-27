@@ -31,6 +31,7 @@ pub mod prelude {
     pub use crate::commands::bump::BumpSubCommand;
     pub use crate::commands::check::CheckCmdArgs;
     pub use crate::commands::check::CheckSubCommand;
+    pub use crate::commands::clean::CleanCmdArgs;
     pub use crate::commands::compile::CompileCmdArgs;
     pub use crate::commands::container::ContainerCmdArgs;
     pub use crate::commands::container::ContainerSubCommand;
