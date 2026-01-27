@@ -261,7 +261,7 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
             .and_then(|n| n.as_str());
 
         if let Some(name) = package_name {
-            if name.to_ascii_lowercase().contains("xtask") {
+            if name.to_ascii_lowercase().starts_with("xtask") {
                 matches.push(name.to_string());
             }
         }
@@ -314,7 +314,7 @@ fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<W
             return Ok(Some(Workspace {
                 path: cur,
                 dir_name: subrepo.clone(),
-                xtask_bin: format!("xtask-{subrepo}"),
+                xtask_bin: xtask_crate.clone(),
                 xtask_crate,
             }));
         }
@@ -346,8 +346,8 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
             subrepos.push(Workspace {
                 path,
                 dir_name: dir_name.clone(),
+                xtask_bin: xtask_crate.clone(),
                 xtask_crate,
-                xtask_bin: format!("xtask-{dir_name}"),
             });
         }
     }
@@ -389,7 +389,7 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
             let ws = Workspace {
                 path: subrepo_root,
                 dir_name: sel.clone(),
-                xtask_bin: format!("xtask-{sel}"),
+                xtask_bin: xtask_crate.clone(),
                 xtask_crate,
             };
             run_help_one(&ws)
@@ -508,7 +508,8 @@ fn exec_cargo_xtask(
 ) -> Result<ExitCode, String> {
     sync_monorepo_dependencies(git_root, std::slice::from_ref(&ws))?;
     let is_subrepo = ws.dir_name != "root";
-    let target_dir = Path::new("target/xtask");
+    let target_path = format!("target/{}", ws.xtask_crate);
+    let target_dir = Path::new(&target_path);
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
