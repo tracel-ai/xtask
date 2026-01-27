@@ -202,19 +202,23 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
         .parse::<DocumentMut>()
         .map_err(|e| format!("failed to parse {}: {e}", workspace_toml.display()))?;
 
-    let members_item = root_doc
-        .get("workspace")
-        .and_then(|w| w.get("members"))
-        .ok_or_else(|| "workspace.members not found".to_string())?;
+    // Not a workspace if workspace.members is missing.
+    let Some(members_item) = root_doc.get("workspace").and_then(|w| w.get("members")) else {
+        return Ok(None);
+    };
+
     let members = members_item
         .as_array()
         .ok_or_else(|| "workspace.members should be an array".to_string())?;
+    // Resolve members (with minimal support for "dir/*" globs)
     let mut member_dirs: Vec<PathBuf> = Vec::new();
     for m in members.iter() {
         let s = m
             .as_str()
             .ok_or_else(|| "workspace member should be a string".to_string())?;
+
         if let Some((prefix, suffix)) = s.split_once('*') {
+            // Only handle the common "path/*" form
             if suffix.is_empty() {
                 let base = dir.join(prefix);
                 if base.is_dir() {
@@ -230,13 +234,14 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
                         }
                     }
                 }
-                continue;
             }
             continue;
         }
+
         member_dirs.push(dir.join(s));
     }
 
+    // Find xtask-like member(s) by package.name
     let mut matches: Vec<String> = Vec::new();
     for member_dir in member_dirs {
         let member_toml = member_dir.join("Cargo.toml");
@@ -265,7 +270,12 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
         return Ok(None);
     }
     matches.sort();
-    if let Some(exact) = matches.iter().find(|n| n.eq_ignore_ascii_case("xtask")).cloned() {
+    // Prefer exact "xtask"
+    if let Some(exact) = matches
+        .iter()
+        .find(|n| n.eq_ignore_ascii_case("xtask"))
+        .cloned()
+    {
         return Ok(Some(exact));
     }
 
