@@ -449,16 +449,10 @@ fn exec_cargo_xtask(
 ) -> Result<ExitCode, String> {
     sync_monorepo_dependencies(git_root, std::slice::from_ref(&ws))?;
     let is_subrepo = ws.dir_name != "root";
-    let target_dir: &Path = if is_subrepo {
-        Path::new("../target/xtask")
-    } else {
-        Path::new("target/xtask")
-    };
-
+    let target_dir = Path::new("target/xtask");
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
-
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
