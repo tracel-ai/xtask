@@ -126,15 +126,15 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
     }
 }
 
-/// Sync dependency versions from the root fake Cargo.toml
+/// Sync dependency versions from the root fake Dependencies.toml
 fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result<(), String> {
-    let root_manifest = git_root.join("Cargo.toml");
-
+    let deps_toml = git_root.join("Dependencies.toml");
+    if !deps_toml.exists() {
+        return Ok(());
+    }
     let subrepo_roots: Vec<PathBuf> = subrepos.iter().map(|ws| ws.path.clone()).collect();
-
-    let report = deps::sync_subrepos(&root_manifest, &subrepo_roots)
+    let report = deps::sync_subrepos(&deps_toml, &subrepo_roots)
         .map_err(|e| format!("dependency sync should succeed: {e}"))?;
-
     for (manifest, table_path, dep) in report.missing_canonical_dependencies {
         eprintln!(
             "warning: {} declares dependency '{}' in [{}] but it is missing from root [workspace.dependencies]",

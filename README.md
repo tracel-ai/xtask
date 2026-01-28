@@ -247,7 +247,7 @@ simple monorepo contains the following files and directories at the root:
 ```
 .git
 .gitignore
-Cargo.toml
+Dependencies.toml
 [backend]
   |__Cargo.toml
   |__[crates]
@@ -261,11 +261,11 @@ Cargo.toml
 `backend` and `frontend` are subrepos with separate Cargo workspaces with their own members. They all have an `xtask` member
 to manage them.
 
-The root `Cargo.toml` does not represent a real Cargo workspace, its only purpose is to centralize all the dependency versions
-and features. `xtask` CLI will push the dependency versions in the root `Cargo.toml` to the subrepos `Cargo.toml` files
-whenever a dependency is used in the subrepo.
+The root `Dependencies.toml` does not represent a real Cargo workspace, its only purpose is to centralize all the dependency
+versions and features. `xtask` CLI will push the dependency versions in `Dependencies.toml` to the subrepos `Cargo.toml`
+files whenever a dependency is used in the subrepo.
 
-For instance, say we have this root `Cargo.toml` file:
+For instance, say we have this `Dependencies.toml` file:
 
 ```toml
 [workspace.dependencies]
@@ -286,8 +286,8 @@ rand = "0.8.0"
 tokio = "1.46.0"
 ```
 
-Whenever the `xtask` CLI executes a command it will enforce the dependency versions to by in sync with the root `Cargo.toml`,
-which means that the `backendf` subrepo `Cargo.toml` will be modified to be:
+Whenever the `xtask` CLI executes a command it will enforce the dependency versions to by in sync with the `Dependencies.toml`,
+which means that the `backend` subrepo `Cargo.toml` will be modified to be:
 
 ```toml
 [workspace]
@@ -299,7 +299,7 @@ rand = "0.9.2"
 tokio = { version = "1.48.0", features = ["full"] }
 ```
 
-Note that it is possible to drop `features = ["full"]` from the root `Cargo.toml` file and make the decision about which
+Note that it is possible to drop `features = ["full"]` from the `Dependencies.toml` file and make the decision about which
 feature to use at the subrepo or even crate level.
 
 ## Anatomy of a base command
