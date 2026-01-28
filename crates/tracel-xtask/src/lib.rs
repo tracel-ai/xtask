@@ -67,6 +67,7 @@ pub mod prelude {
     pub use crate::handle_cleanup;
     pub use crate::init_xtask;
     pub use crate::parse_args;
+    pub use crate::print_help;
     pub use crate::register_cleanup;
     pub use crate::utils as base_utils;
     pub use crate::utils::aws;
@@ -89,6 +90,10 @@ pub mod prelude {
     // does not re-export strum has it is incompatible with strum macros expansions
 }
 
+use std::fmt::Display;
+use std::process::exit;
+
+use clap::CommandFactory as _;
 use environment::EnvironmentName;
 use prelude::Environment;
 
@@ -98,9 +103,11 @@ use crate::logging::init_logger;
 #[macro_use]
 extern crate log;
 
-#[derive(clap::Parser)]
-#[command(author, version, about, long_about = None)]
-pub struct XtaskArgs<C: clap::Subcommand> {
+const XTASK_MONOREPO_ENVVAR: &str = "XTASK_MONOREPO";
+
+#[derive(clap::Parser, Clone)]
+#[command(author, version, about, long_about = None, disable_help_flag = true)]
+pub struct XtaskArgs<C: clap::Subcommand + Clone + Display> {
     /// Enable code coverage for Rust code if available (see coverage command for more info).
     #[arg(long)]
     pub enable_coverage: bool,
@@ -113,23 +120,33 @@ pub struct XtaskArgs<C: clap::Subcommand> {
     /// Set context.
     #[arg(short = 'c', long, default_value_t = Context::default())]
     pub context: Context,
+    /// Display help.
+    #[arg(short = 'h', long)]
+    pub help: bool,
     #[command(subcommand)]
-    pub command: C,
+    pub command: Option<C>,
 }
 
-pub fn parse_args<C: clap::Subcommand>() -> anyhow::Result<(XtaskArgs<C>, Environment)> {
+pub fn parse_args<C: clap::Subcommand + Clone + Display>() -> anyhow::Result<(XtaskArgs<C>, Environment)> {
     // init logs early
     init_logger().init();
     let args = <XtaskArgs<C> as clap::Parser>::parse();
+    if args.help {
+        print_help::<C>()?;
+        exit(0);
+    }
     let env = Environment::new(args.environment_name.clone(), args.environment_index);
     Ok((args, env))
 }
 
-pub fn init_xtask<C: clap::Subcommand>(
+pub fn init_xtask<C: clap::Subcommand + Clone + Display>(
     config: (XtaskArgs<C>, Environment),
 ) -> anyhow::Result<(XtaskArgs<C>, Environment)> {
     let args = config.0;
     let env = config.1;
+    if std::env::var(XTASK_MONOREPO_ENVVAR).is_ok() {
+        eprintln!("➡️ {}:", args.clone().command.unwrap());
+    }
     group_info!("Environment: {}", env.long());
     env.load(None)?;
     group_info!("Context: {}", args.context);
@@ -139,6 +156,13 @@ pub fn init_xtask<C: clap::Subcommand>(
         setup_coverage()?;
     }
     Ok((args, env))
+}
+
+pub fn print_help<C: clap::Subcommand + Clone + Display>() -> anyhow::Result<()> {
+    let mut cmd = XtaskArgs::<C>::command();
+    eprintln!("💡 Help:");
+    cmd.print_help().expect("should print help");
+    Ok(())
 }
 
 fn setup_coverage() -> anyhow::Result<()> {

@@ -447,17 +447,15 @@ fn run_help_all(subrepos: &[Workspace]) -> Result<ExitCode, String> {
 
 fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     let is_subrepo = ws.dir_name != "root";
-
     let target_dir: &Path = if is_subrepo {
         Path::new("../target/xtask")
     } else {
         Path::new("target/xtask")
     };
-
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     }
-
+    eprintln!("⚡ Compiling xtask:{}...", ws.dir_name);
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
@@ -469,11 +467,9 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
         .arg("--")
         .arg("--help")
         .current_dir(&ws.path);
-
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
-
     let status = cmd.status().map_err(|e| {
         format!(
             "failed to execute cargo run ({} --help): {e}",
@@ -513,6 +509,7 @@ fn exec_cargo_xtask(
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
+    eprintln!("⚡ Compiling xtask:{}...", ws.dir_name);
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
