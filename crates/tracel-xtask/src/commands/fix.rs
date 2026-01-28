@@ -25,11 +25,7 @@ pub fn handle_command(
     _ctx: Context,
     mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
-    answer = if args.yes {
-        Some(true)
-    } else {
-        warning_prompt(answer, &args)
-    };
+    answer = warning_prompt(answer, &args);
     if answer.unwrap() {
         match args.get_command() {
             FixSubCommand::Audit => run_audit(),
@@ -67,6 +63,9 @@ pub fn handle_command(
 }
 
 pub fn warning_prompt(answer: Option<bool>, args: &FixCmdArgs) -> Option<bool> {
+    if args.yes {
+        return Some(true);
+    }
     if answer.is_none() {
         if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
             warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
