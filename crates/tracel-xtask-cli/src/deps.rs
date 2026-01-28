@@ -431,9 +431,17 @@ fn apply_canonical_to_item(
 
     let mut changed = false;
 
-    // version: canonical when present
-    if let Some(version) = canon.version.as_deref() {
-        changed |= set_k_str(inline, "version", version);
+    // version: canonical when present, removed when absent and source-based dep
+    match canon.version.as_deref() {
+        Some(version) => {
+            changed |= set_k_str(inline, "version", version);
+        }
+        None => {
+            // If canonical switches to path/git/etc, version must disappear
+            if canon_requires_inline_for_source(canon) {
+                changed |= remove_key_if_present(inline, "version");
+            }
+        }
     }
 
     // features/default-features: authoritative only if root defines them

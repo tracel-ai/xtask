@@ -455,7 +455,7 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     }
-    eprintln!("⚡ Compiling xtask:{}...", ws.dir_name);
+    eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")
@@ -509,7 +509,7 @@ fn exec_cargo_xtask(
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
-    eprintln!("⚡ Compiling xtask:{}...", ws.dir_name);
+    eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("--target-dir")

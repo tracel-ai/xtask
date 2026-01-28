@@ -170,14 +170,9 @@ fn generate_dispatch_function(
     }).collect();
     let func = quote! {
         fn dispatch_base_commands(args: XtaskArgs<Command>, env: Environment) -> anyhow::Result<()> {
-            if let Some(command) = args.command {
-                match command {
-                    #(#arms)*
-                    _ => Err(anyhow::anyhow!("Unknown command")),
-                }
-            } else {
-                print_help::<Command>()?;
-                std::process::exit(0);
+            match args.command {
+                #(#arms)*
+                _ => Err(anyhow::anyhow!("Unknown command")),
             }
         }
     };
@@ -346,7 +341,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     let enum_name = &item.ident;
     let other_variants = &item.variants;
     let mut output = TokenStream::from(quote! {
-        #[derive(clap::Subcommand, Clone, strum::Display)]
+        #[derive(clap::Subcommand, strum::Display)]
         pub enum #enum_name {
             #(#variants,)*
             #other_variants
