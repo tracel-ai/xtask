@@ -1,4 +1,4 @@
-/// Sync dependency versions from a monorepo “source of truth” Cargo.toml into subrepo Cargo.toml
+/// Sync dependency specs from a monorepo “source of truth” Cargo.toml into subrepo Cargo.toml
 /// files, updating only dependencies that are explicitly declared in each subrepo.
 use std::{
     collections::HashMap,
@@ -12,20 +12,6 @@ use toml_edit::{Array, DocumentMut, InlineTable, Item, Table, Value, value};
 pub type DynError = Box<dyn Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, DynError>;
 
-#[derive(Debug, Clone, Default)]
-struct CanonicalDep {
-    version: Option<String>,
-    features: Option<Vec<String>>,
-    path: Option<String>,
-    default_features: Option<bool>,
-
-    git: Option<String>,
-    tag: Option<String>,
-    rev: Option<String>,
-    branch: Option<String>,
-    package: Option<String>,
-}
-
 #[derive(Debug, Default)]
 pub struct SyncReport {
     pub changed_manifests: Vec<PathBuf>,
@@ -35,10 +21,38 @@ pub struct SyncReport {
     pub missing_canonical_dependencies: Vec<(PathBuf, String, String)>,
 }
 
-/// Sync all subrepo manifests by pushing canonical dependency fields from the root manifest.
-/// Returns a report listing changed/unchanged/missing manifests and any missing canonical deps.
+/// Normalized dependency spec
+#[derive(Debug, Clone, Default)]
+struct DepSpec {
+    branch: Option<String>,
+    default_features: Option<bool>,
+    features: Option<Vec<String>>,
+    git: Option<String>,
+    package: Option<String>,
+    path: Option<String>,
+    rev: Option<String>,
+    tag: Option<String>,
+    version: Option<String>,
+}
+
+impl DepSpec {
+    /// True if the spec requires inline representation
+    fn needs_inline(&self) -> bool {
+        self.features.is_some()
+            || self.default_features.is_some()
+            || self.path.is_some()
+            || self.git.is_some()
+            || self.tag.is_some()
+            || self.rev.is_some()
+            || self.branch.is_some()
+            || self.package.is_some()
+    }
+}
+
+/// Sync canonical fields into all subrepos provided, writing changes to disk.
 pub fn sync_subrepos(root_manifest_path: &Path, subrepo_roots: &[PathBuf]) -> Result<SyncReport> {
     let canonical = read_canonical_deps(root_manifest_path)?;
+
     let root_dir = root_manifest_path
         .parent()
         .ok_or_else(|| "root manifest should have a parent directory".to_string())?;
@@ -59,7 +73,7 @@ pub fn sync_subrepos(root_manifest_path: &Path, subrepo_roots: &[PathBuf]) -> Re
             )
         })?;
 
-        // Prefix needed to rebase root-relative paths into this subrepo.
+        // Prefix used to rebase root-relative `path = "..."`
         let root_prefix = relative_prefix_to_ancestor(manifest_dir, root_dir);
 
         let r = sync_one_manifest(&manifest_path, &canonical, root_prefix.as_deref())?;
@@ -74,11 +88,10 @@ pub fn sync_subrepos(root_manifest_path: &Path, subrepo_roots: &[PathBuf]) -> Re
     Ok(report)
 }
 
-/// Sync one Cargo.toml by updating only explicitly declared dependencies.
-/// Writes the file back if its textual representation changes.
+/// Sync a single Cargo.toml by applying canonical fields to dependency entries.
 fn sync_one_manifest(
     manifest_path: &Path,
-    canonical: &HashMap<String, CanonicalDep>,
+    canonical: &HashMap<String, DepSpec>,
     root_prefix: Option<&Path>,
 ) -> Result<SyncReport> {
     let before = fs::read_to_string(manifest_path)
@@ -91,7 +104,7 @@ fn sync_one_manifest(
     let mut report = SyncReport::default();
     let mut updated = 0usize;
 
-    // Prefer subrepo workspace dependencies if present.
+    // [workspace.dependencies]
     updated += sync_subrepo_workspace_dependencies(
         doc.as_table_mut(),
         canonical,
@@ -100,7 +113,7 @@ fn sync_one_manifest(
         root_prefix,
     );
 
-    // Also sync top-level dependency tables when present.
+    // also support top-level dependencies tables
     updated += sync_dep_table(
         doc.as_table_mut(),
         "dependencies",
@@ -129,7 +142,7 @@ fn sync_one_manifest(
         root_prefix,
     );
 
-    // Sync target-specific dependency tables.
+    // and [target.*.<dep-table>] sections
     updated += sync_target_dep_tables(
         doc.as_table_mut(),
         canonical,
@@ -139,11 +152,9 @@ fn sync_one_manifest(
     );
 
     let after = doc.to_string();
-    let changed = after != before;
-
     report.updated_dependencies = updated;
 
-    if changed {
+    if after != before {
         fs::write(manifest_path, after)
             .map_err(|e| format!("failed to write {}: {e}", manifest_path.display()))?;
         report.changed_manifests.push(manifest_path.to_path_buf());
@@ -154,11 +165,10 @@ fn sync_one_manifest(
     Ok(report)
 }
 
-/// Sync the `[workspace.dependencies]` table of a subrepo (if it exists).
-/// Returns the number of dependency entries updated.
+/// Sync subrepo `[workspace.dependencies]` if present.
 fn sync_subrepo_workspace_dependencies(
     root: &mut Table,
-    canonical: &HashMap<String, CanonicalDep>,
+    canonical: &HashMap<String, DepSpec>,
     manifest_path: &Path,
     report: &mut SyncReport,
     root_prefix: Option<&Path>,
@@ -181,9 +191,8 @@ fn sync_subrepo_workspace_dependencies(
     )
 }
 
-/// Parse the root manifest and extract canonical dependency fields from `[workspace.dependencies]`.
-/// Supports string and inline-table dependency specs but not expanded tables.
-fn read_canonical_deps(root_manifest_path: &Path) -> Result<HashMap<String, CanonicalDep>> {
+/// Read canonical dependencies from root `[workspace.dependencies]`.
+fn read_canonical_deps(root_manifest_path: &Path) -> Result<HashMap<String, DepSpec>> {
     let contents = fs::read_to_string(root_manifest_path)
         .map_err(|e| format!("failed to read {}: {e}", root_manifest_path.display()))?;
 
@@ -204,95 +213,82 @@ fn read_canonical_deps(root_manifest_path: &Path) -> Result<HashMap<String, Cano
             )
         })?;
 
-    let mut out: HashMap<String, CanonicalDep> = HashMap::new();
+    let mut out: HashMap<String, DepSpec> = HashMap::new();
     for (dep_name, item) in ws_deps.iter() {
-        let canon = extract_canonical_dep(item);
-        if canon.version.is_some()
-            || canon.features.is_some()
-            || canon.path.is_some()
-            || canon.default_features.is_some()
-            || canon.git.is_some()
-            || canon.tag.is_some()
-            || canon.rev.is_some()
-            || canon.branch.is_some()
-            || canon.package.is_some()
-        {
-            out.insert(dep_name.to_string(), canon);
+        let spec = parse_dep_item_inline_only(item);
+        if spec.version.is_some() || spec.needs_inline() {
+            out.insert(dep_name.to_string(), spec);
         }
     }
 
     Ok(out)
 }
 
-/// Convert a dependency spec item from the root `[workspace.dependencies]` table into `CanonicalDep`.
-/// Supported forms: `dep = "..."` and `dep = { ... }`
-fn extract_canonical_dep(item: &Item) -> CanonicalDep {
+/// Parse a dependency item with the inline-only policy.
+fn parse_dep_item_inline_only(item: &Item) -> DepSpec {
     // dep = "1.2.3"
     if let Some(v) = item.as_value().and_then(|v| v.as_str()) {
-        return CanonicalDep {
+        return DepSpec {
             version: Some(v.to_string()),
-            ..CanonicalDep::default()
+            ..DepSpec::default()
         };
     }
 
     // dep = { ... } inline table
     if let Some(inline) = item.as_inline_table() {
-        return CanonicalDep {
+        return DepSpec {
             version: inline
                 .get("version")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            features: extract_features_from_value(inline.get("features")),
+                .map(str::to_string),
+
+            features: parse_features(inline.get("features")),
+            default_features: inline.get("default-features").and_then(|v| v.as_bool()),
+
             path: inline
                 .get("path")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            default_features: inline.get("default-features").and_then(|v| v.as_bool()),
-
+                .map(str::to_string),
             git: inline
                 .get("git")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(str::to_string),
             tag: inline
                 .get("tag")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(str::to_string),
             rev: inline
                 .get("rev")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(str::to_string),
             branch: inline
                 .get("branch")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(str::to_string),
             package: inline
                 .get("package")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(str::to_string),
         };
     }
 
-    // Expanded canonical form ignored by design (inline-only policy).
-    CanonicalDep::default()
+    DepSpec::default()
 }
 
-/// Read `features = ["..."]` into a string vector.
-/// Returns None if the value is missing or not an array of strings.
-fn extract_features_from_value(v: Option<&Value>) -> Option<Vec<String>> {
+/// Parse `features = ["..."]` into a Vec<String>.
+fn parse_features(v: Option<&Value>) -> Option<Vec<String>> {
     let arr = v?.as_array()?;
     let mut out = Vec::new();
     for val in arr.iter() {
-        let s = val.as_str()?;
-        out.push(s.to_string());
+        out.push(val.as_str()?.to_string());
     }
     Some(out)
 }
 
-/// Sync all dependency tables under `[target.*]` (dependencies/dev-dependencies/build-dependencies).
-/// Returns the number of dependency entries updated.
+/// Sync dependency tables under `[target.*]` (dependencies/dev-dependencies/build-dependencies)
 fn sync_target_dep_tables(
     root: &mut Table,
-    canonical: &HashMap<String, CanonicalDep>,
+    canonical: &HashMap<String, DepSpec>,
     manifest_path: &Path,
     report: &mut SyncReport,
     root_prefix: Option<&Path>,
@@ -345,13 +341,11 @@ fn sync_target_dep_tables(
     updated
 }
 
-/// Sync a single dependency table (e.g. `dependencies`) within `root`.
-/// Only dependencies already present in the table are considered.
-/// Missing canonical entries are recorded in the report.
+/// Sync one dependency table by updating only dependencies already declared in that table.
 fn sync_dep_table(
     root: &mut Table,
     table_name: &str,
-    canonical: &HashMap<String, CanonicalDep>,
+    canonical: &HashMap<String, DepSpec>,
     manifest_path: &Path,
     report: &mut SyncReport,
     prefix: &str,
@@ -365,56 +359,54 @@ fn sync_dep_table(
         return 0;
     };
 
-    let mut updated = 0usize;
     let keys: Vec<String> = deps_table.iter().map(|(k, _)| k.to_string()).collect();
+    let mut updated = 0usize;
 
     for dep in keys {
-        match canonical.get(&dep) {
-            Some(canon) => {
-                if let Some(dep_item) = deps_table.get_mut(&dep)
-                    && update_dep_item_inline_only(dep_item, canon, root_prefix)
-                {
-                    updated += 1;
-                }
-            }
-            None => {
-                let table_path = if prefix.is_empty() {
-                    table_name.to_string()
-                } else {
-                    format!("{prefix}.{table_name}")
-                };
+        let Some(dep_item) = deps_table.get_mut(&dep) else {
+            continue;
+        };
 
-                report.missing_canonical_dependencies.push((
-                    manifest_path.to_path_buf(),
-                    table_path,
-                    dep,
-                ));
-            }
+        let Some(canon) = canonical.get(&dep) else {
+            let table_path = if prefix.is_empty() {
+                table_name.to_string()
+            } else {
+                format!("{prefix}.{table_name}")
+            };
+
+            report.missing_canonical_dependencies.push((
+                manifest_path.to_path_buf(),
+                table_path,
+                dep,
+            ));
+            continue;
+        };
+
+        if apply_canonical_to_item(dep_item, canon, root_prefix) {
+            updated += 1;
         }
     }
 
     updated
 }
 
-/// Update one dependency entry using inline-only rules:
-/// - string shorthand stays shorthand unless canonical requires inline fields
-/// - inline table is updated in-place
-/// - `workspace = true` entries are left untouched
-fn update_dep_item_inline_only(
+/// Apply canonical rules to a subrepo dependency item.
+/// Returns true if the TOML item was modified.
+fn apply_canonical_to_item(
     dep_item: &mut Item,
-    canon: &CanonicalDep,
+    canon: &DepSpec,
     root_prefix: Option<&Path>,
 ) -> bool {
-    // dep = "..." (string shorthand)
+    // dep = "..." shorthand
     if dep_item.as_value().and_then(|v| v.as_str()).is_some() {
-        let needs_inline = canon_needs_inline(canon);
-
-        if needs_inline {
-            let inline = build_inline_from_canonical(canon, root_prefix);
+        // If canonical requires source keys, we must expand to inline.
+        if canon_requires_inline_for_source(canon) {
+            let inline = to_inline_table(canon, root_prefix);
             *dep_item = Item::Value(Value::InlineTable(inline));
             return true;
         }
 
+        // Otherwise keep shorthand and only apply canonical version if present.
         if let Some(version) = canon.version.as_deref() {
             *dep_item = value(version);
             return true;
@@ -423,59 +415,52 @@ fn update_dep_item_inline_only(
         return false;
     }
 
-    // dep = { ... } (inline table)
-    if let Some(inline) = dep_item.as_inline_table_mut() {
-        if inline
-            .get("workspace")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            return false;
-        }
+    // dep = { ... } inline table
+    let Some(inline) = dep_item.as_inline_table_mut() else {
+        return false;
+    };
 
-        let mut changed = false;
-
-        if let Some(version) = canon.version.as_deref() {
-            changed |= set_inline_table_string(inline, "version", version);
-        }
-        if let Some(features) = canon.features.as_ref() {
-            changed |= set_inline_table_features(inline, features);
-        }
-        if let Some(path) = canon.path.as_deref() {
-            let rebased = rebase_path_for_subrepo(path, root_prefix);
-            changed |= set_inline_table_string(inline, "path", rebased.as_str());
-        }
-        if let Some(df) = canon.default_features {
-            changed |= set_inline_table_bool(inline, "default-features", df);
-        }
-
-        if let Some(git) = canon.git.as_deref() {
-            changed |= set_inline_table_string(inline, "git", git);
-        }
-        if let Some(tag) = canon.tag.as_deref() {
-            changed |= set_inline_table_string(inline, "tag", tag);
-        }
-        if let Some(rev) = canon.rev.as_deref() {
-            changed |= set_inline_table_string(inline, "rev", rev);
-        }
-        if let Some(branch) = canon.branch.as_deref() {
-            changed |= set_inline_table_string(inline, "branch", branch);
-        }
-        if let Some(package) = canon.package.as_deref() {
-            changed |= set_inline_table_string(inline, "package", package);
-        }
-
-        return changed;
+    // dep = { workspace = true } => do not touch
+    if inline
+        .get("workspace")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        return false;
     }
 
-    false
+    let mut changed = false;
+
+    // version: canonical when present
+    if let Some(version) = canon.version.as_deref() {
+        changed |= set_k_str(inline, "version", version);
+    }
+
+    // features/default-features: authoritative only if root defines them
+    if let Some(features) = canon.features.as_ref() {
+        changed |= set_k_features(inline, features);
+    }
+    if let Some(df) = canon.default_features {
+        changed |= set_k_bool(inline, "default-features", df);
+    }
+
+    // Source keys: canonical always (set when present, prune when absent)
+    changed |= sync_source_keys_inline(inline, canon, root_prefix);
+
+    // Collapse if now exactly `{ version = "..." }`
+    if inline_is_version_only(inline)
+        && let Some(v) = inline.get("version").and_then(|v| v.as_str())
+    {
+        *dep_item = value(v);
+        return true;
+    }
+
+    changed
 }
 
-/// Return true if canonical requires an inline table (anything beyond `version`).
-fn canon_needs_inline(canon: &CanonicalDep) -> bool {
-    canon.features.is_some()
-        || canon.path.is_some()
-        || canon.default_features.is_some()
+/// Return true if canonical includes any “source key” that forces inline form.
+fn canon_requires_inline_for_source(canon: &DepSpec) -> bool {
+    canon.path.is_some()
         || canon.git.is_some()
         || canon.tag.is_some()
         || canon.rev.is_some()
@@ -483,22 +468,25 @@ fn canon_needs_inline(canon: &CanonicalDep) -> bool {
         || canon.package.is_some()
 }
 
-/// Build an inline dependency spec from canonical fields, rebasing `path` if needed.
-fn build_inline_from_canonical(canon: &CanonicalDep, root_prefix: Option<&Path>) -> InlineTable {
+/// Convert canonical spec to an inline table, rebasing `path` as needed.
+fn to_inline_table(canon: &DepSpec, root_prefix: Option<&Path>) -> InlineTable {
     let mut inline = InlineTable::default();
 
     if let Some(version) = canon.version.as_deref() {
         inline.insert("version", Value::from(version));
     }
+
+    // Root-defined features/default-features are authoritative (so include if present in root)
     if let Some(features) = canon.features.as_ref() {
         inline.insert("features", Value::Array(features_to_array(features)));
     }
+    if let Some(df) = canon.default_features {
+        inline.insert("default-features", Value::from(df));
+    }
+
     if let Some(path) = canon.path.as_deref() {
         let rebased = rebase_path_for_subrepo(path, root_prefix);
         inline.insert("path", Value::from(rebased.as_str()));
-    }
-    if let Some(df) = canon.default_features {
-        inline.insert("default-features", Value::from(df));
     }
 
     if let Some(git) = canon.git.as_deref() {
@@ -520,28 +508,73 @@ fn build_inline_from_canonical(canon: &CanonicalDep, root_prefix: Option<&Path>)
     inline
 }
 
-/// Set/replace a string value in an inline table, returning true if it changed.
-fn set_inline_table_string(inline: &mut InlineTable, key: &str, val: &str) -> bool {
-    let current = inline.get(key).and_then(|v| v.as_str());
-    if current == Some(val) {
+/// Sync “source keys” on an inline table: set when present in canonical, remove when absent.
+/// Returns true if anything changed.
+fn sync_source_keys_inline(
+    inline: &mut InlineTable,
+    canon: &DepSpec,
+    root_prefix: Option<&Path>,
+) -> bool {
+    let mut changed = false;
+
+    // path property needs rebasing
+    match canon.path.as_deref() {
+        Some(p) => {
+            let rebased = rebase_path_for_subrepo(p, root_prefix);
+            changed |= set_k_str(inline, "path", rebased.as_str());
+        }
+        None => {
+            changed |= remove_key_if_present(inline, "path");
+        }
+    }
+
+    changed |= sync_opt_str(inline, "git", canon.git.as_deref());
+    changed |= sync_opt_str(inline, "tag", canon.tag.as_deref());
+    changed |= sync_opt_str(inline, "rev", canon.rev.as_deref());
+    changed |= sync_opt_str(inline, "branch", canon.branch.as_deref());
+    changed |= sync_opt_str(inline, "package", canon.package.as_deref());
+
+    changed
+}
+
+/// Set string if Some, else remove key. Returns true if changed.
+fn sync_opt_str(inline: &mut InlineTable, key: &str, desired: Option<&str>) -> bool {
+    match desired {
+        Some(v) => set_k_str(inline, key, v),
+        None => remove_key_if_present(inline, key),
+    }
+}
+
+/// Remove `key` if present, returning true if it was removed.
+fn remove_key_if_present(inline: &mut InlineTable, key: &str) -> bool {
+    if inline.get(key).is_some() {
+        inline.remove(key);
+        true
+    } else {
+        false
+    }
+}
+
+/// Set a string key in an inline table, returning true if changed.
+fn set_k_str(inline: &mut InlineTable, key: &str, val: &str) -> bool {
+    if inline.get(key).and_then(|v| v.as_str()) == Some(val) {
         return false;
     }
     inline.insert(key, Value::from(val));
     true
 }
 
-/// Set/replace a bool value in an inline table, returning true if it changed.
-fn set_inline_table_bool(inline: &mut InlineTable, key: &str, val: bool) -> bool {
-    let current = inline.get(key).and_then(|v| v.as_bool());
-    if current == Some(val) {
+/// Set a bool key in an inline table, returning true if changed.
+fn set_k_bool(inline: &mut InlineTable, key: &str, val: bool) -> bool {
+    if inline.get(key).and_then(|v| v.as_bool()) == Some(val) {
         return false;
     }
     inline.insert(key, Value::from(val));
     true
 }
 
-/// Set/replace `features = [...]` in an inline table, returning true if it changed.
-fn set_inline_table_features(inline: &mut InlineTable, features: &[String]) -> bool {
+/// Set `features = [...]` in an inline table, returning true if changed.
+fn set_k_features(inline: &mut InlineTable, features: &[String]) -> bool {
     let desired = features_to_array(features);
 
     let current = inline.get("features").and_then(|v| v.as_array());
@@ -555,7 +588,23 @@ fn set_inline_table_features(inline: &mut InlineTable, features: &[String]) -> b
     true
 }
 
-/// Convert a list of feature strings into a TOML array value.
+/// Return true if the inline table contains exactly one key: `version`.
+fn inline_is_version_only(inline: &InlineTable) -> bool {
+    if inline.get("version").and_then(|v| v.as_str()).is_none() {
+        return false;
+    }
+
+    for (k, _) in inline.iter() {
+        // NOTE: `k` is a String here, so compare directly.
+        if k != "version" {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Convert a list of features into a TOML array.
 fn features_to_array(features: &[String]) -> Array {
     let mut arr = Array::default();
     for f in features {
@@ -564,7 +613,7 @@ fn features_to_array(features: &[String]) -> Array {
     arr
 }
 
-/// Return true if two TOML arrays contain identical string elements in the same order.
+/// Check equality of two TOML arrays containing strings (order-sensitive).
 fn arrays_equal_str(a: &Array, b: &Array) -> bool {
     if a.len() != b.len() {
         return false;
@@ -600,7 +649,6 @@ fn rebase_path_for_subrepo(canonical_path: &str, root_prefix: Option<&Path>) -> 
     };
 
     let p = Path::new(canonical_path);
-
     if p.is_absolute() {
         return canonical_path.to_string();
     }
