@@ -391,6 +391,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 #[doc = r"Define whether to use default features."]
                 #[arg(long, default_value_t = false, required = false)]
                 pub no_default_features: bool,
+                #[doc = r"If set then bypass confirmation prompt."]
+                #[arg(short = 'y', long, global = true)]
+                pub yes: bool,
             },
         ),
         (
@@ -744,7 +747,8 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                         || ident_str == "only"
                         || ident_str == "release"
                         || ident_str == "test"
-                        || ident_str == "threads")
+                        || ident_str == "threads"
+                        || ident_str == "yes")
                 {
                     quote! { #ident: self.#ident, }
                 } else {

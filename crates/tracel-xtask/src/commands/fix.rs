@@ -25,7 +25,11 @@ pub fn handle_command(
     _ctx: Context,
     mut answer: Option<bool>,
 ) -> anyhow::Result<()> {
-    answer = warning_prompt(answer, &args);
+    answer = if args.yes {
+        Some(true)
+    } else {
+        warning_prompt(answer, &args)
+    };
     if answer.unwrap() {
         match args.get_command() {
             FixSubCommand::Audit => run_audit(),
@@ -49,6 +53,7 @@ pub fn handle_command(
                             only: args.only.clone(),
                             features: args.features.clone(),
                             no_default_features: args.no_default_features,
+                            yes: args.yes,
                         },
                         _env.clone(),
                         _ctx.clone(),
