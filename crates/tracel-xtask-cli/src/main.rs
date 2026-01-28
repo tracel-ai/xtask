@@ -53,7 +53,6 @@ fn main() -> ExitCode {
 }
 
 fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
-    let yes = args::take_yes_flag(args);
     let selector = args::take_subrepo_selector(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
@@ -118,7 +117,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
                     git_root.display()
                 ));
             }
-            if !confirm_dispatch_all(yes)? {
+            if !confirm_dispatch_all()? {
                 return Ok(ExitCode::SUCCESS);
             }
             exec_cargo_xtask_all(git_root, args, &subrepos)
@@ -147,12 +146,11 @@ fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result
     Ok(())
 }
 
-fn confirm_dispatch_all(yes: bool) -> Result<bool, String> {
-    if yes {
-        return Ok(true);
-    }
-
-    eprint!("This will run the command in all subrepos. Continue? [y/N] ");
+fn confirm_dispatch_all() -> Result<bool, String> {
+    eprintln!(
+        "⚠️ This will run the command in all subrepos (to suppress this prompt use the ':all' selector)"
+    );
+    eprint!("Continue? [y/N] ");
 
     std::io::stderr().flush().ok();
     let mut buf = String::new();
@@ -357,7 +355,6 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
 }
 
 fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
-    let yes = args::take_yes_flag(args);
     let selector = args::take_subrepo_selector(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
@@ -421,7 +418,7 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
                     ));
                 }
 
-                if !confirm_dispatch_all(yes)? {
+                if !confirm_dispatch_all()? {
                     return Ok(ExitCode::SUCCESS);
                 }
 
