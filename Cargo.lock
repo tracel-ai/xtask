@@ -1600,7 +1600,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "toml_edit 0.24.0+spec-1.1.0",
 ]
