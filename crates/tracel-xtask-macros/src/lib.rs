@@ -209,7 +209,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Check",
         quote! {
-            #[doc = r"Run checks like formatting, linting etc... This command only reports issues, use the 'fix' command to auto-fix issues."]
+            #[doc = r"Run checks without fixing the issues (use the 'fix' command to auto-fix issues)."]
             Check(tracel_xtask::commands::check::CheckCmdArgs)
         },
     );
@@ -307,7 +307,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     variant_map.insert(
         "Validate",
         quote! {
-            #[doc = r"Validate the code base by running all the relevant checks and tests. Use this command before creating a new pull-request."]
+            #[doc = r"Validate the code base by running all the relevant checks and tests."]
             Validate(tracel_xtask::commands::validate::ValidateCmdArgs)
         },
     );
