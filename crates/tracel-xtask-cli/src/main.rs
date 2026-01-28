@@ -466,6 +466,7 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
         .arg(&ws.xtask_bin)
         .arg("--")
         .arg("--help")
+        .env("XTASK_CLI", "1")
         .current_dir(&ws.path);
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
@@ -520,6 +521,7 @@ fn exec_cargo_xtask(
         .arg(&ws.xtask_bin)
         .arg("--")
         .args(args)
+        .env("XTASK_CLI", "1")
         .current_dir(&ws.path);
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");

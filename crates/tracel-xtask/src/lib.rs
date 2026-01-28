@@ -91,6 +91,7 @@ pub mod prelude {
 
 use std::fmt::Display;
 
+use clap::{CommandFactory as _, FromArgMatches as _};
 use environment::EnvironmentName;
 use prelude::Environment;
 
@@ -100,16 +101,11 @@ use crate::logging::init_logger;
 #[macro_use]
 extern crate log;
 
-const XTASK_MONOREPO_ENVVAR: &str = "XTASK_MONOREPO";
+const HELP_PREFIX: &str = "💡 Help";
+const XTASK_CLI_ENVVAR: &str = "XTASK_CLI";
 
 #[derive(clap::Parser)]
-#[command(
-    author,
-    version,
-    about,
-    long_about = None,
-    before_help = "💡 Help:",
-    before_long_help = "💡 Help:",)]
+#[command(author, version, about, long_about = None)]
 pub struct XtaskArgs<C: clap::Subcommand + Display> {
     /// Enable code coverage for Rust code if available (see coverage command for more info).
     #[arg(long)]
@@ -127,10 +123,19 @@ pub struct XtaskArgs<C: clap::Subcommand + Display> {
     pub command: C,
 }
 
-pub fn parse_args<C: clap::Subcommand + Display>() -> anyhow::Result<(XtaskArgs<C>, Environment)> {
+pub fn parse_args<C>() -> anyhow::Result<(XtaskArgs<C>, Environment)>
+where
+    C: clap::Subcommand + std::fmt::Display,
+{
     // init logs early
     init_logger().init();
-    let args = <XtaskArgs<C> as clap::Parser>::parse();
+    // Let clap do its normal parsing/help/version handling but with our help screen prefix
+    let mut cmd = XtaskArgs::<C>::command();
+    if std::env::var(XTASK_CLI_ENVVAR).is_ok() {
+        add_help_prefix(&mut cmd);
+    }
+    let matches = cmd.get_matches();
+    let args = XtaskArgs::<C>::from_arg_matches(&matches)?;
     let env = Environment::new(args.environment_name.clone(), args.environment_index);
     Ok((args, env))
 }
@@ -140,8 +145,8 @@ pub fn init_xtask<C: clap::Subcommand + Display>(
 ) -> anyhow::Result<(XtaskArgs<C>, Environment)> {
     let args = config.0;
     let env = config.1;
-    if std::env::var(XTASK_MONOREPO_ENVVAR).is_ok() {
-        eprintln!("⚡️ {}:", args.command);
+    if std::env::var(XTASK_CLI_ENVVAR).is_ok() {
+        eprintln!("⚡️ {}", args.command);
     }
     group_info!("Environment: {}", env.long());
     env.load(None)?;
@@ -160,4 +165,14 @@ fn setup_coverage() -> anyhow::Result<()> {
         std::env::set_var("LLVM_PROFILE_FILE", "burn-%p-%m.profraw");
     }
     Ok(())
+}
+
+fn add_help_prefix(cmd: &mut clap::Command) {
+    let mut owned = std::mem::take(cmd);
+    owned = owned.before_help(HELP_PREFIX).before_long_help(HELP_PREFIX);
+    // Recurse into subcommands to append the help prefix
+    for sub in owned.get_subcommands_mut() {
+        add_help_prefix(sub);
+    }
+    *cmd = owned;
 }
