@@ -22,7 +22,7 @@ pub struct SyncReport {
 }
 
 /// Normalized dependency spec
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 struct DepSpec {
     branch: Option<String>,
     default_features: Option<bool>,
@@ -275,7 +275,7 @@ fn parse_dep_item_inline_only(item: &Item) -> DepSpec {
     DepSpec::default()
 }
 
-/// Parse `features = ["..."]` into a Vec<String>.
+/// Parse features from an Item::Value holding an array.
 fn parse_features(v: Option<&Value>) -> Option<Vec<String>> {
     let arr = v?.as_array()?;
     let mut out = Vec::new();
@@ -382,8 +382,14 @@ fn sync_dep_table(
             continue;
         };
 
-        if apply_canonical_to_item(dep_item, canon, root_prefix) {
+        if let Some((from, to)) = apply_canonical_to_item(dep_item, canon, root_prefix) {
             updated += 1;
+            eprintln!(
+                "  - {}: {} → {}",
+                dep,
+                fmt_dep_spec(&from),
+                fmt_dep_spec(&to),
+            );
         }
     }
 
@@ -391,34 +397,37 @@ fn sync_dep_table(
 }
 
 /// Apply canonical rules to a subrepo dependency item.
-/// Returns true if the TOML item was modified.
+/// Returns Some((from, to)) when the semantic spec changed, otherwise None.
 fn apply_canonical_to_item(
     dep_item: &mut Item,
     canon: &DepSpec,
     root_prefix: Option<&Path>,
-) -> bool {
+) -> Option<(DepSpec, DepSpec)> {
+    let before_spec = dep_spec_from_item(dep_item)?;
+
     // dep = "..." shorthand
     if dep_item.as_value().and_then(|v| v.as_str()).is_some() {
         // If canonical requires source keys, we must expand to inline.
         if canon_requires_inline_for_source(canon) {
             let inline = to_inline_table(canon, root_prefix);
             *dep_item = Item::Value(Value::InlineTable(inline));
-            return true;
-        }
-
-        // Otherwise keep shorthand and only apply canonical version if present.
-        if let Some(version) = canon.version.as_deref() {
+        } else if let Some(version) = canon.version.as_deref() {
+            // Otherwise keep shorthand and only apply canonical version if present.
             *dep_item = value(version);
-            return true;
+        } else {
+            // No canonical version and no canonical source keys: keep as-is.
         }
 
-        return false;
+        let after_spec = dep_spec_from_item(dep_item)?;
+        return if after_spec != before_spec {
+            Some((before_spec, after_spec))
+        } else {
+            None
+        };
     }
 
     // dep = { ... } inline table
-    let Some(inline) = dep_item.as_inline_table_mut() else {
-        return false;
-    };
+    let inline = dep_item.as_inline_table_mut()?;
 
     // dep = { workspace = true } => do not touch
     if inline
@@ -426,44 +435,99 @@ fn apply_canonical_to_item(
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
     {
-        return false;
+        return None;
     }
 
-    let mut changed = false;
-
-    // version: canonical when present, removed when absent and source-based dep
+    // version:
+    // - set when canonical has one
+    // - remove when canonical has no version AND canonical is source-based (path/git/...)
     match canon.version.as_deref() {
-        Some(version) => {
-            changed |= set_k_str(inline, "version", version);
+        Some(v) => {
+            let _ = set_k_str(inline, "version", v);
         }
         None => {
-            // If canonical switches to path/git/etc, version must disappear
             if canon_requires_inline_for_source(canon) {
-                changed |= remove_key_if_present(inline, "version");
+                let _ = remove_key_if_present(inline, "version");
             }
         }
     }
 
-    // features/default-features: authoritative only if root defines them
+    // features/default-features are authoritative only if root defines them
     if let Some(features) = canon.features.as_ref() {
-        changed |= set_k_features(inline, features);
+        let _ = set_k_features(inline, features);
     }
     if let Some(df) = canon.default_features {
-        changed |= set_k_bool(inline, "default-features", df);
+        let _ = set_k_bool(inline, "default-features", df);
     }
 
-    // Source keys: canonical always (set when present, prune when absent)
-    changed |= sync_source_keys_inline(inline, canon, root_prefix);
+    // Source keys are authoritative: set when present in canonical, remove when absent
+    let _ = sync_source_keys_inline(inline, canon, root_prefix);
 
-    // Collapse if now exactly `{ version = "..." }`
-    if inline_is_version_only(inline)
-        && let Some(v) = inline.get("version").and_then(|v| v.as_str())
+    let after_spec = dep_spec_from_item(dep_item)?;
+    if after_spec != before_spec {
+        Some((before_spec, after_spec))
+    } else {
+        None
+    }
+}
+
+/// Build a normalized DepSpec from a dependency TOML item.
+/// Returns None when the item is not a supported dependency form.
+fn dep_spec_from_item(item: &Item) -> Option<DepSpec> {
+    // dep = "1.2.3"
+    if let Some(v) = item.as_value().and_then(|v| v.as_str()) {
+        return Some(DepSpec {
+            version: Some(v.to_string()),
+            ..DepSpec::default()
+        });
+    }
+
+    // dep = { ... } inline table
+    let inline = item.as_inline_table()?;
+
+    // treat workspace deps as "unsupported for sync"
+    if inline
+        .get("workspace")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
     {
-        *dep_item = value(v);
-        return true;
+        return None;
     }
 
-    changed
+    Some(DepSpec {
+        version: inline
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+
+        features: parse_features(inline.get("features")),
+        default_features: inline.get("default-features").and_then(|v| v.as_bool()),
+
+        path: inline
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        git: inline
+            .get("git")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        tag: inline
+            .get("tag")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        rev: inline
+            .get("rev")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        branch: inline
+            .get("branch")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        package: inline
+            .get("package")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+    })
 }
 
 /// Return true if canonical includes any “source key” that forces inline form.
@@ -596,22 +660,6 @@ fn set_k_features(inline: &mut InlineTable, features: &[String]) -> bool {
     true
 }
 
-/// Return true if the inline table contains exactly one key: `version`.
-fn inline_is_version_only(inline: &InlineTable) -> bool {
-    if inline.get("version").and_then(|v| v.as_str()).is_none() {
-        return false;
-    }
-
-    for (k, _) in inline.iter() {
-        // NOTE: `k` is a String here, so compare directly.
-        if k != "version" {
-            return false;
-        }
-    }
-
-    true
-}
-
 /// Convert a list of features into a TOML array.
 fn features_to_array(features: &[String]) -> Array {
     let mut arr = Array::default();
@@ -663,4 +711,53 @@ fn rebase_path_for_subrepo(canonical_path: &str, root_prefix: Option<&Path>) -> 
 
     let rebased = prefix.join(p);
     rebased.to_string_lossy().replace('\\', "/")
+}
+
+/// Format dependencies spec for logging
+fn fmt_dep_spec(spec: &DepSpec) -> String {
+    // version-only
+    if spec.version.is_some()
+        && spec.features.is_none()
+        && spec.default_features.is_none()
+        && spec.path.is_none()
+        && spec.git.is_none()
+        && spec.tag.is_none()
+        && spec.rev.is_none()
+        && spec.branch.is_none()
+        && spec.package.is_none()
+    {
+        return spec.version.clone().unwrap();
+    }
+
+    let mut parts = Vec::new();
+
+    if let Some(v) = &spec.version {
+        parts.push(format!("version={v}"));
+    }
+    if let Some(p) = &spec.path {
+        parts.push(format!("path={p}"));
+    }
+    if let Some(g) = &spec.git {
+        parts.push(format!("git={g}"));
+    }
+    if let Some(t) = &spec.tag {
+        parts.push(format!("tag={t}"));
+    }
+    if let Some(r) = &spec.rev {
+        parts.push(format!("rev={r}"));
+    }
+    if let Some(b) = &spec.branch {
+        parts.push(format!("branch={b}"));
+    }
+    if let Some(pkg) = &spec.package {
+        parts.push(format!("package={pkg}"));
+    }
+    if let Some(df) = spec.default_features {
+        parts.push(format!("default-features={df}"));
+    }
+    if let Some(f) = &spec.features {
+        parts.push(format!("features={:?}", f));
+    }
+
+    format!("{{ {} }}", parts.join(", "))
 }

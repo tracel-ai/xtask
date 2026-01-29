@@ -131,6 +131,10 @@ fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result
     if !deps_toml.exists() {
         return Ok(());
     }
+    eprintln!(
+        "🔗 Syncing dependencies from {}...",
+        deps_toml.file_name().unwrap().to_string_lossy()
+    );
     let subrepo_roots: Vec<PathBuf> = subrepos.iter().map(|ws| ws.path.clone()).collect();
     let report = deps::sync_subrepos(&deps_toml, &subrepo_roots)
         .map_err(|e| format!("dependency sync should succeed: {e}"))?;
@@ -483,7 +487,6 @@ fn exec_cargo_xtask_all(
     args: &[OsString],
     subrepos: &[Workspace],
 ) -> Result<ExitCode, String> {
-    sync_monorepo_dependencies(git_root, subrepos)?;
     let mut first_failure: Option<ExitCode> = None;
     for ws in subrepos {
         let code = exec_cargo_xtask(git_root, ws, args)?;
@@ -500,13 +503,13 @@ fn exec_cargo_xtask(
     ws: &Workspace,
     args: &[OsString],
 ) -> Result<ExitCode, String> {
-    sync_monorepo_dependencies(git_root, std::slice::from_ref(ws))?;
     let is_subrepo = ws.dir_name != "root";
     let target_path = format!("target/{}", ws.xtask_crate);
     let target_dir = Path::new(&target_path);
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
+    sync_monorepo_dependencies(git_root, std::slice::from_ref(ws))?;
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
