@@ -83,6 +83,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             let xtask_crate = is_workspace(&subrepo_root)?.ok_or_else(|| {
                 format!(
                     "Subrepo '{}' is not a valid xtask workspace (expected Cargo.toml and an xtask* directory).\n\
+                     You are likely inside a standard repository and not a monorepo, call `xtask` to verify.\n\
                      Path: {}",
                     sel,
                     subrepo_root.display()
