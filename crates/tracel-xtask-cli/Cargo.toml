@@ -8,7 +8,7 @@ license.workspace = true
 name = "tracel-xtask-cli"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask-cli"
-version = "0.4.0"
+version = "1.0.0"
 
 [[bin]]
 name = "xtask"
