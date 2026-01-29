@@ -33,7 +33,15 @@ fn main() -> ExitCode {
         }
     };
 
-    if is_help_invocation(&args) {
+    if is_cli_help_invocation(&args) {
+        match show_xtask_cli_help(&git_root) {
+            Ok(code) => code,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
+        }
+    } else if is_transparent_help_invocation(&args) {
         match show_all_help(&git_root, &mut args) {
             Ok(code) => code,
             Err(err) => {
@@ -165,7 +173,11 @@ fn confirm_dispatch_all() -> Result<bool, String> {
     Ok(answer == "y" || answer == "yes")
 }
 
-fn is_help_invocation(args: &[OsString]) -> bool {
+fn is_cli_help_invocation(args: &[OsString]) -> bool {
+    args.is_empty()
+}
+
+fn is_transparent_help_invocation(args: &[OsString]) -> bool {
     args.is_empty()
         || (args.len() == 1 && (args[0] == OsStr::new("-h") || args[0] == OsStr::new("--help")))
 }
@@ -538,4 +550,133 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
         Some(code) if (0..=255).contains(&code) => ExitCode::from(code as u8),
         _ => ExitCode::from(1),
     }
+}
+
+/// Try to retrieve xtask CLI binary name, otherwise fallback to xtask
+fn cli_name() -> String {
+    std::env::args_os()
+        .next()
+        .and_then(|p| {
+            std::path::Path::new(&p)
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| "xtask".to_string())
+}
+
+fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
+    let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
+
+    let cli_name = cli_name();
+    let cli_version = env!("CARGO_PKG_VERSION");
+
+    // Determine repo mode
+    let root_xtask = is_workspace(git_root)?;
+    let is_monorepo = root_xtask.is_none();
+
+    println!("{cli_name} v{cli_version}");
+    println!();
+    println!("A transparent wrapper around `cargo xtask` alias for standard repos and monorepos.");
+    println!("It discovers xtask workspaces and dispatches your command to the right place.");
+    println!();
+
+    println!("USAGE");
+    println!("-----");
+    println!("  {cli_name} [:<subrepo>|:all] [<xtask args...>]");
+    println!();
+    println!("BEHAVIOR");
+    println!("--------");
+    println!("  - With a selector:");
+    println!("      :<subrepo>  Runs xtask in that subrepo workspace.");
+    println!("      :all        Runs xtask in all subrepos.");
+    println!("  - Without a selector:");
+    println!("      Standard repo: runs xtask at the git root.");
+    println!("      Monorepo: if you're inside a subrepo, runs in that subrepo context,");
+    println!("                otherwise prompts then run the command in all the subrepos.");
+    println!();
+    println!("HELP");
+    println!("----");
+    println!("  - `{cli_name}`           Shows this screen.");
+    println!("  - `{cli_name} --help`    Shows underlying xtask help (transparent mode).");
+    println!("  - `{cli_name} :all --help` / `{cli_name} :backend --help` also works.");
+    println!();
+
+    if !is_monorepo {
+        let xtask_pkg = root_xtask.unwrap_or_else(|| "xtask".to_string());
+        println!("CONTEXT");
+        println!("-------");
+        println!("  Current Repository mode: standard repository");
+        println!("  Git root: {}", git_root.display());
+        println!("  Xtask package: {xtask_pkg}");
+        println!();
+        println!("EXAMPLES");
+        println!("--------");
+        println!("  {cli_name} build");
+        println!("  {cli_name} check -- --help");
+        println!("  {cli_name} --help");
+        println!();
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    // Monorepo context
+    let subrepos = list_subrepo_workspaces(git_root)?;
+    let located = find_subrepo_workspace_root(&cwd, git_root)?;
+
+    println!("CONTEXT");
+    println!("-------");
+    println!("  Current Repository mode: monorepo");
+    println!("  Git root: {}", git_root.display());
+    match located {
+        Some(ws) => {
+            println!("  Current location: inside subrepo `{}`", ws.dir_name);
+            println!("  Current xtask package: {}", ws.xtask_crate);
+        }
+        None => {
+            // if cwd is git_root, say so; else just outside recognized workspace
+            if cwd == git_root {
+                println!("  Current location: monorepo root");
+            } else {
+                println!("  Current location: outside a recognized subrepo workspace");
+            }
+        }
+    }
+    println!();
+
+    println!("SUBREPOS");
+    println!("--------");
+    if subrepos.is_empty() {
+        println!("  (none found)");
+    } else {
+        for ws in &subrepos {
+            println!(
+                "  - {:<16}  xtask package: {:<12}  path: {}",
+                ws.dir_name,
+                ws.xtask_crate,
+                ws.path.display()
+            );
+        }
+    }
+    println!();
+
+    println!("EXAMPLES");
+    println!("--------");
+    println!("  {cli_name} :backend build");
+    println!("  {cli_name} :all build");
+    println!("  {cli_name} :all check");
+    println!("  {cli_name} :frontend test -- --nocapture");
+    println!();
+
+    println!("NOTES");
+    println!("-----");
+    println!(
+        "  - If `Dependencies.toml` exists at the monorepo root, xtask will sync dependency specs"
+    );
+    println!("    before running subrepo commands.");
+    println!(
+        "  - This wrapper is designed to remain transparent: it forwards your arguments to the"
+    );
+    println!("    underlying xtask binary in the selected workspace(s).");
+    println!();
+
+    Ok(ExitCode::SUCCESS)
 }
