@@ -179,7 +179,6 @@ fn run_lint(
                 group!("Lint: {}", member.name);
                 let mut cmd_args = vec![
                     "clippy",
-                    "clippy",
                     "--no-deps",
                     "--color=always",
                     "-p",
