@@ -565,17 +565,32 @@ fn cli_name() -> String {
         .unwrap_or_else(|| "xtask".to_string())
 }
 
+fn cli_help_header() {
+    let name = cli_name();
+    let version = env!("CARGO_PKG_VERSION");
+    let authors = env!("CARGO_PKG_AUTHORS");
+    let author = authors.split(',').next().unwrap_or(authors);
+    eprintln!("{name} v{version} by {author}");
+}
+
+fn cli_help_fooder() {
+    println!("LICENSE");
+    println!("-------");
+    println!("  This project is dual-licensed under the Apache 2.0 and MIT licenses.");
+    println!("  You may choose either license when using, modifying, or distributing it.");
+    println!();
+    println!("  Repository: https://github.com/tracel-ai/xtask");
+    println!("  See LICENSE-APACHE and LICENSE-MIT for full license texts.");
+    println!();
+}
+
 fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
-
     let cli_name = cli_name();
-    let cli_version = env!("CARGO_PKG_VERSION");
-
-    // Determine repo mode
     let root_xtask = is_workspace(git_root)?;
     let is_monorepo = root_xtask.is_none();
 
-    println!("{cli_name} v{cli_version}");
+    cli_help_header();
     println!();
     println!("A transparent wrapper around `cargo xtask` alias for standard repos and monorepos.");
     println!("It discovers xtask workspaces and dispatches your command to the right place.");
@@ -597,9 +612,9 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     println!();
     println!("HELP");
     println!("----");
-    println!("  - `{cli_name}`           Shows this screen.");
-    println!("  - `{cli_name} --help`    Shows underlying xtask help (transparent mode).");
-    println!("  - `{cli_name} :all --help` / `{cli_name} :backend --help` also works.");
+    println!("  - `{cli_name}`                   Shows this screen.");
+    println!("  - `{cli_name} --help`            Shows underlying xtask help (transparent mode).");
+    println!("  - `{cli_name} <command> --help`  Shows help of <command>.");
     println!();
 
     if !is_monorepo {
@@ -613,9 +628,18 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
         println!("EXAMPLES");
         println!("--------");
         println!("  {cli_name} build");
-        println!("  {cli_name} check -- --help");
-        println!("  {cli_name} --help");
+        println!("      Run the `build` xtask command at the repository root.");
+        println!("      Equivalent to `cargo xtask build`.");
         println!();
+        println!("  {cli_name} test all");
+        println!("      Run the `test` xtask command with argument `all`.");
+        println!("      Arguments are forwarded transparently to xtask.");
+        println!();
+        println!("  {cli_name} fix -y all");
+        println!("      Run the `fix` xtask command, auto-confirming prompts (`-y`),");
+        println!("      and applying fixes to all supported targets.");
+        println!();
+        cli_help_fooder();
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -625,8 +649,8 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
 
     println!("CONTEXT");
     println!("-------");
-    println!("  Current Repository mode: monorepo");
     println!("  Git root: {}", git_root.display());
+    println!("  Current Repository mode: monorepo");
     match located {
         Some(ws) => {
             println!("  Current location: inside subrepo `{}`", ws.dir_name);
@@ -661,10 +685,21 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
 
     println!("EXAMPLES");
     println!("--------");
-    println!("  {cli_name} :backend build");
     println!("  {cli_name} :all build");
-    println!("  {cli_name} :all check");
-    println!("  {cli_name} :frontend test -- --nocapture");
+    println!("      Run the `build` xtask command in every subrepo workspace.");
+    println!("      Useful to sync dependencies in all subrepos and ensure they still build.");
+    println!();
+    println!("  {cli_name} :all fix -y all");
+    println!("      Run all available fixes (lint, format, audit, ...) across all subrepos,");
+    println!("      auto-confirming prompts and applying fixes everywhere.");
+    println!();
+    println!("  {cli_name} :backend build");
+    println!(
+        "      Run `build` xtask command in the `backend` subrepo, regardless of current directory."
+    );
+    println!();
+    println!("  {cli_name} :frontend test all");
+    println!("      Run both unit and integration tests scoped to the `frontend` subrepo only.");
     println!();
 
     println!("NOTES");
@@ -679,5 +714,6 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     println!("    underlying xtask binary in the selected workspace(s).");
     println!();
 
+    cli_help_fooder();
     Ok(ExitCode::SUCCESS)
 }
