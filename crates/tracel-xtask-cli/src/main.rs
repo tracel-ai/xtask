@@ -646,6 +646,17 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     // Monorepo context
     let subrepos = list_subrepo_workspaces(git_root)?;
     let located = find_subrepo_workspace_root(&cwd, git_root)?;
+    // Pick real example subrepos found in this context.
+    // Fallback to backend and frontend as default examples if we don't have enough subrepos discovered.
+    let ex1 = subrepos
+        .get(0)
+        .map(|ws| ws.dir_name.as_str())
+        .unwrap_or("backend");
+
+    let ex2 = subrepos
+        .get(1)
+        .map(|ws| ws.dir_name.as_str())
+        .unwrap_or("frontend");
 
     println!("CONTEXT");
     println!("-------");
@@ -685,21 +696,22 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
 
     println!("EXAMPLES");
     println!("--------");
-    println!("  {cli_name} :all build");
-    println!("      Run the `build` xtask command in every subrepo workspace.");
-    println!("      Useful to sync dependencies in all subrepos and ensure they still build.");
+    println!("  {cli_name} :{ex1} build");
+    println!("      Run `build` in the `{ex1}` subrepo, regardless of current directory within");
+    println!("      the monorepo.");
+    println!();
+    println!("  {cli_name} :{ex2} test all");
+    println!("      Run both unit and integration tests scoped to the `{ex2}` subrepo only.");
     println!();
     println!("  {cli_name} :all fix -y all");
     println!("      Run all available fixes (lint, format, audit, ...) across all subrepos,");
     println!("      auto-confirming prompts and applying fixes everywhere.");
     println!();
-    println!("  {cli_name} :backend build");
-    println!(
-        "      Run `build` xtask command in the `backend` subrepo, regardless of current directory."
-    );
-    println!();
-    println!("  {cli_name} :frontend test all");
-    println!("      Run both unit and integration tests scoped to the `frontend` subrepo only.");
+    println!("  {cli_name} :all build");
+    println!("      Run `build` xtask command in every subrepo, regardless of current");
+    println!("      directory within the monorepo. Useful to easily sync the dependencies");
+    println!("      of `Dependencies.toml` with all the subrepos and verify that they all");
+    println!("      still build without errors.");
     println!();
 
     println!("NOTES");
