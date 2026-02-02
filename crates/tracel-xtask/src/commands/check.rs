@@ -177,14 +177,8 @@ fn run_lint(
 
             for member in members {
                 group!("Lint: {}", member.name);
-                let mut cmd_args = vec![
-                    "clippy",
-                    "clippy",
-                    "--no-deps",
-                    "--color=always",
-                    "-p",
-                    &member.name,
-                ];
+                let mut cmd_args =
+                    vec!["clippy", "--no-deps", "--color=always", "-p", &member.name];
 
                 if no_default_features {
                     cmd_args.push("--no-default-features");
