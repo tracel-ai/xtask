@@ -14,7 +14,7 @@ on:
 
 jobs:
   tracel-xtask-macros:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v7
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
       crate: tracel-xtask-macros
       tag-validation: true
@@ -24,7 +24,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v7
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
       crate: tracel-xtask
       tag-validation: true
@@ -36,7 +36,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask-cli:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v7
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
       crate: tracel-xtask-cli
       tag-validation: false
@@ -54,7 +54,7 @@ jobs:
       - tracel-xtask
     steps:
       - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v7
+        uses: tracel-ai/github-actions/setup-rust@v8
         with:
           rust-toolchain: stable
           cache-key: stable-linux

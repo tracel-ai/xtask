@@ -10,8 +10,11 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      # --------------------------------------------------------------------------------
       - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v7
+        uses: tracel-ai/github-actions/setup-rust@v8
         with:
           rust-toolchain: stable
           cache-key: stable-linux
@@ -31,7 +34,7 @@ jobs:
         run: xtask check lint
       # --------------------------------------------------------------------------------
       - name: Typos
-        uses: tracel-ai/github-actions/check-typos@v7
+        uses: tracel-ai/github-actions/check-typos@v8
       # --------------------------------------------------------------------------------
       - name: Unit Tests
         run: xtask test unit
