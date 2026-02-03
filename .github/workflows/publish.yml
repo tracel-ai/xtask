@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      dry-run-only:
+        description: "Run xtask publish in dry-run mode (no publish)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   tracel-xtask-macros:
@@ -12,6 +18,7 @@ jobs:
     with:
       crate: tracel-xtask-macros
       tag-validation: true
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
@@ -21,6 +28,7 @@ jobs:
     with:
       crate: tracel-xtask
       tag-validation: true
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     needs:
       - tracel-xtask-macros
     secrets:
@@ -32,6 +40,7 @@ jobs:
     with:
       crate: tracel-xtask-cli
       tag-validation: false
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     needs:
       - tracel-xtask
     secrets:
@@ -62,7 +71,9 @@ jobs:
       # --------------------------------------------------------------------------------
       - name: Upload binary to GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: >
+          startsWith(github.ref, 'refs/tags/')
+          && !(github.event_name == 'workflow_dispatch' && inputs.dry-run-only)
         with:
           files: dist/xtask-core-linux-x86_64.tar.gz
         env:
