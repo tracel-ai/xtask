@@ -1673,7 +1673,7 @@ checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
 
 [[package]]
 name = "tracel-xtask"
-version = "4.13.0"
+version = "4.13.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1710,7 +1710,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-macros"
-version = "4.13.0"
+version = "4.13.1"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -1979,7 +1979,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "xtask-core"
-version = "4.13.0"
+version = "4.13.1"
 dependencies = [
  "log",
  "strum",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "xtask-tests"
-version = "4.13.0"
+version = "4.13.1"
 dependencies = [
  "dotenvy",
  "log",
