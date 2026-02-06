@@ -13,8 +13,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       # --------------------------------------------------------------------------------
-      - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v8
+      - name: Install Rust
+        uses: tracel-ai/github-actions/install-rust@v9
         with:
           rust-toolchain: stable
           cache-key: stable-linux

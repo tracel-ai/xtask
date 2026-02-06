@@ -53,8 +53,11 @@ jobs:
     needs:
       - tracel-xtask
     steps:
-      - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v8
+      - name: Checkout
+        uses: actions/checkout@v6
+      # --------------------------------------------------------------------------------
+      - name: Install Rust
+        uses: tracel-ai/github-actions/install-rust@v9
         with:
           rust-toolchain: stable
           cache-key: stable-linux
