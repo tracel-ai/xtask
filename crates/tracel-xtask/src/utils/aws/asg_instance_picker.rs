@@ -126,7 +126,7 @@ impl fmt::Display for InstanceChoice {
 
         write!(
             f,
-            "{}{gap}🌐 {}{gap}🌍 {}{gap}{h_emoji} {h_text}{gap}⏱️ {}",
+            "{}{gap}🌐 {}{gap}🖥️️ {}{gap}{h_emoji} {h_text}{gap}⏱️ {}",
             x.instance_id.yellow(),
             x.az,
             ip,
@@ -182,6 +182,7 @@ fn parse_rfc3339_to_system_time(s: &str) -> anyhow::Result<SystemTime> {
 
 /// Pick an instance from an ASG with a interactive prompt.
 pub fn pick_asg_instance(region: &str, asg: &str) -> anyhow::Result<SelectedAsgInstance> {
+    eprintln!("🔍 Fetching instances info...");
     // retrieve JSON info about the ASG
     let asg_json = aws_cli_capture_stdout(
         vec![
@@ -290,7 +291,7 @@ pub fn pick_asg_instance(region: &str, asg: &str) -> anyhow::Result<SelectedAsgI
     choices.sort_by_key(|c| c.instance.age);
 
     // prompt user to select an instance and return it
-    let selected = Select::new("Select an instance:", choices)
+    let selected = Select::new("Select Instance:", choices)
         .with_page_size(12)
         .with_vim_mode(true)
         .with_help_message("↑/↓ (or j/k), type to filter, Enter to connect, Esc to cancel")
