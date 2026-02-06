@@ -13,6 +13,7 @@ use crate::utils::aws::cli::{
     ecr_ensure_repo_exists, ecr_get_commit_sha_tag_from_alias_tag,
     ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest, ecr_put_manifest,
 };
+use crate::utils::aws::instance_system_log::stream_system_log;
 use crate::utils::git::git_repo_root_or_cwd;
 use crate::utils::process::{run_process, run_process_capture_stdout};
 
@@ -64,6 +65,10 @@ pub struct ContainerHostSubCmdArgs {
     /// Login user for the SSM interactive shell
     #[arg(long, default_value = "ubuntu")]
     pub user: String,
+
+    /// Show instance system log instead of opening an SSM shell
+    #[arg(long)]
+    pub system_log: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -386,33 +391,40 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
 fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
     let selected =
         crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, &args.asg)?;
+    if args.system_log {
+        eprintln!(
+            "📜 Streaming system log for {} ({}, {}) — Ctrl-C to stop",
+            selected.instance_id,
+            selected.private_ip.as_deref().unwrap_or("no-ip"),
+            selected.az
+        );
+        stream_system_log(&args.region, &selected.instance_id)
+    } else {
+        aws::cli::ensure_ssm_document(SSM_SESSION_DOC, &args.region, &args.user)?;
+        eprintln!(
+            "🔌 Connecting to {} ({}, {})",
+            selected.instance_id,
+            selected.private_ip.as_deref().unwrap_or("no-ip"),
+            selected.az
+        );
 
-    aws::cli::ensure_ssm_document(SSM_SESSION_DOC, &args.region, &args.user)?;
-    eprintln!(
-        "🔌 Connecting to {} ({}, {})",
-        selected.instance_id,
-        selected.private_ip.as_deref().unwrap_or("no-ip"),
-        selected.az
-    );
-
-    run_process(
-        "aws",
-        &[
-            "ssm",
-            "start-session",
-            "--target",
-            &selected.instance_id,
-            "--region",
-            &args.region,
-            "--document-name",
-            SSM_SESSION_DOC,
-        ],
-        None,
-        None,
-        "SSM session to container host should start successfully",
-    )?;
-
-    Ok(())
+        run_process(
+            "aws",
+            &[
+                "ssm",
+                "start-session",
+                "--target",
+                &selected.instance_id,
+                "--region",
+                &args.region,
+                "--document-name",
+                SSM_SESSION_DOC,
+            ],
+            None,
+            None,
+            "SSM session to container host should start successfully",
+        )
+    }
 }
 
 fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
