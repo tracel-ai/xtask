@@ -649,7 +649,7 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     // Pick real example subrepos found in this context.
     // Fallback to backend and frontend as default examples if we don't have enough subrepos discovered.
     let ex1 = subrepos
-        .get(0)
+        .first()
         .map(|ws| ws.dir_name.as_str())
         .unwrap_or("backend");
 

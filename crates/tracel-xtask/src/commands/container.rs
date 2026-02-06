@@ -384,66 +384,29 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
 }
 
 fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
-    // 1) Get a valid instance ID from the ASG (the first one returned in the list)
-    let describe_output = std::process::Command::new("aws")
-        .args([
-            "autoscaling",
-            "describe-auto-scaling-groups",
-            "--auto-scaling-group-names",
-            &args.asg,
-            "--region",
-            &args.region,
-            "--query",
-            "AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId | [0]",
-            "--output",
-            "text",
-        ])
-        .output()
-        .with_context(|| {
-            format!(
-                "Describing Auto Scaling Group '{}' in region '{}' should succeed",
-                args.asg, args.region
-            )
-        })?;
-    if !describe_output.status.success() {
-        let stderr = String::from_utf8_lossy(&describe_output.stderr);
-        anyhow::bail!(
-            "Describing Auto Scaling Group '{}' in region '{}' should succeed, but AWS CLI exited with:\n{}",
-            args.asg,
-            args.region,
-            stderr
-        );
-    }
-    let instance_id = String::from_utf8(describe_output.stdout)
-        .context("Parsing instance ID from AWS CLI output should succeed")?
-        .trim()
-        .to_string();
-    if instance_id.is_empty() || instance_id == "None" {
-        anyhow::bail!(
-            "Finding an InService instance in Auto Scaling Group '{}' should succeed, but none were found",
-            args.asg
-        );
-    }
+    let selected =
+        crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, &args.asg)?;
 
-    // 2) Open session
     aws::cli::ensure_ssm_document(SSM_SESSION_DOC, &args.region, &args.user)?;
     eprintln!(
-        "🔌 Opening SSM session to instance '{}' in region '{}' (ASG '{}', user '{}')...",
-        instance_id, args.region, args.asg, args.user
+        "🔌 Connecting to {} ({}, {})",
+        selected.instance_id,
+        selected.private_ip.as_deref().unwrap_or("no-ip"),
+        selected.az
     );
-    let args_vec: Vec<&str> = vec![
-        "ssm",
-        "start-session",
-        "--target",
-        instance_id.as_str(),
-        "--region",
-        args.region.as_str(),
-        "--document-name",
-        SSM_SESSION_DOC,
-    ];
+
     run_process(
         "aws",
-        &args_vec,
+        &[
+            "ssm",
+            "start-session",
+            "--target",
+            &selected.instance_id,
+            "--region",
+            &args.region,
+            "--document-name",
+            SSM_SESSION_DOC,
+        ],
         None,
         None,
         "SSM session to container host should start successfully",
