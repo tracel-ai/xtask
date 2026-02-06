@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::time::{Duration, SystemTime};
 
-use crate::utils::aws::cli::aws_cli_capture_stdout;
+use crate::utils::aws;
 
 #[derive(Debug, Deserialize)]
 struct AsgDescribe {
@@ -184,21 +184,7 @@ fn parse_rfc3339_to_system_time(s: &str) -> anyhow::Result<SystemTime> {
 pub fn pick_asg_instance(region: &str, asg: &str) -> anyhow::Result<SelectedAsgInstance> {
     eprintln!("🔍 Fetching instances info...");
     // retrieve JSON info about the ASG
-    let asg_json = aws_cli_capture_stdout(
-        vec![
-            "autoscaling".into(),
-            "describe-auto-scaling-groups".into(),
-            "--auto-scaling-group-names".into(),
-            asg.into(),
-            "--region".into(),
-            region.into(),
-            "--output".into(),
-            "json".into(),
-        ],
-        "aws autoscaling describe-auto-scaling-groups",
-        None,
-        None,
-    )?;
+    let asg_json = aws::cli::ec2_autoscaling_describe_groups_json(region, asg)?;
     let asg_desc: AsgDescribe =
         serde_json::from_str(&asg_json).context("Parsing ASG describe JSON should succeed")?;
     let group = asg_desc
@@ -226,21 +212,7 @@ pub fn pick_asg_instance(region: &str, asg: &str) -> anyhow::Result<SelectedAsgI
         })?;
 
     // retrieve instances health
-    let tg_json = aws_cli_capture_stdout(
-        vec![
-            "elbv2".into(),
-            "describe-target-health".into(),
-            "--target-group-arn".into(),
-            tg_arn,
-            "--region".into(),
-            region.into(),
-            "--output".into(),
-            "json".into(),
-        ],
-        "aws elbv2 describe-target-health",
-        None,
-        None,
-    )?;
+    let tg_json = aws::cli::ec2_elbv2_describe_target_health_json(region, &tg_arn)?;
     let tg_desc: TgHealthDescribe =
         serde_json::from_str(&tg_json).context("Parsing target health JSON should succeed")?;
     let mut health_by_id: HashMap<String, String> = HashMap::new();
@@ -249,17 +221,7 @@ pub fn pick_asg_instance(region: &str, asg: &str) -> anyhow::Result<SelectedAsgI
     }
 
     // retrieve launch time and AZ for each instance
-    let mut ec2_args: Vec<String> = vec![
-        "ec2".into(),
-        "describe-instances".into(),
-        "--region".into(),
-        region.into(),
-        "--output".into(),
-        "json".into(),
-        "--instance-ids".into(),
-    ];
-    ec2_args.extend(instance_ids.iter().cloned());
-    let ec2_json = aws_cli_capture_stdout(ec2_args, "aws ec2 describe-instances", None, None)?;
+    let ec2_json = aws::cli::ec2_describe_instances_json(region, &instance_ids)?;
     let ec2_desc: Ec2Describe =
         serde_json::from_str(&ec2_json).context("Parsing EC2 describe JSON should succeed")?;
     let now = SystemTime::now();

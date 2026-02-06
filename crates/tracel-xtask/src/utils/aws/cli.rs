@@ -144,6 +144,53 @@ pub fn aws_account_id() -> anyhow::Result<String> {
 
 // EC2 -----------------------------------------------------------------------
 
+pub fn ec2_describe_instances_json(
+    region: &str,
+    instance_ids: &[String],
+) -> anyhow::Result<String> {
+    anyhow::ensure!(
+        !instance_ids.is_empty(),
+        "ec2 describe-instances should be called with at least one instance id"
+    );
+
+    let mut args: Vec<String> = vec![
+        "ec2".into(),
+        "describe-instances".into(),
+        "--region".into(),
+        region.into(),
+        "--output".into(),
+        "json".into(),
+        "--instance-ids".into(),
+    ];
+    args.extend(instance_ids.iter().cloned());
+
+    aws_cli_capture_stdout(args, "aws ec2 describe-instances", None, None)
+        .map(|s| s.trim_end().to_string())
+}
+
+pub fn ec2_instance_get_console_output_json(
+    region: &str,
+    instance_id: &str,
+) -> anyhow::Result<String> {
+    aws_cli_capture_stdout(
+        vec![
+            "ec2".into(),
+            "get-console-output".into(),
+            "--instance-id".into(),
+            instance_id.into(),
+            "--region".into(),
+            region.into(),
+            "--latest".into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws ec2 get-console-output should succeed",
+        None,
+        None,
+    )
+    .map(|s| s.trim_end().to_string())
+}
+
 /// Start an Auto Scaling Group instance refresh and return its refresh ID.
 /// If you pass `None` for `preferences_json`, AWS will use the ASG defaults.
 /// Example preferences (as JSON string):
@@ -241,6 +288,50 @@ pub fn ec2_autoscaling_rollback_instance_refresh(asg: &str, region: &str) -> any
     }
 
     Ok(())
+}
+
+pub fn ec2_autoscaling_describe_groups_json(
+    region: &str,
+    asg_name: &str,
+) -> anyhow::Result<String> {
+    aws_cli_capture_stdout(
+        vec![
+            "autoscaling".into(),
+            "describe-auto-scaling-groups".into(),
+            "--auto-scaling-group-names".into(),
+            asg_name.into(),
+            "--region".into(),
+            region.into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws autoscaling describe-auto-scaling-groups",
+        None,
+        None,
+    )
+    .map(|s| s.trim_end().to_string())
+}
+
+pub fn ec2_elbv2_describe_target_health_json(
+    region: &str,
+    target_group_arn: &str,
+) -> anyhow::Result<String> {
+    aws_cli_capture_stdout(
+        vec![
+            "elbv2".into(),
+            "describe-target-health".into(),
+            "--target-group-arn".into(),
+            target_group_arn.into(),
+            "--region".into(),
+            region.into(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws elbv2 describe-target-health",
+        None,
+        None,
+    )
+    .map(|s| s.trim_end().to_string())
 }
 
 // ECR -----------------------------------------------------------------------
