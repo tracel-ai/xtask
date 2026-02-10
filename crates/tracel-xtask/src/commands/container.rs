@@ -96,7 +96,7 @@ pub struct ContainerLogsSubCmdArgs {
     #[arg(long, value_name = "LOG_GROUP")]
     pub log_group: String,
     /// Follow stream logs (like 'tail -f')
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = false)]
     pub follow: bool,
     /// Only show logs newer than this duration (AWS CLI syntax like: 10m, 2h, 1d)
     #[arg(long, default_value = "10m")]
