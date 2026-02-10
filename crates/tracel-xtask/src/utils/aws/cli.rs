@@ -960,3 +960,34 @@ pub fn ensure_ssm_document(doc_name: &str, region: &str, login_user: &str) -> an
 
     Ok(())
 }
+
+// Cloudwatch ----------------------------------------------------------------
+
+pub fn cloudwatch_describe_log_streams_json(
+    region: &str,
+    log_group_name: &str,
+    limit: u32,
+) -> anyhow::Result<String> {
+    // we take the most-recent streams first to pick the best match quickly
+    aws_cli_capture_stdout(
+        vec![
+            "logs".into(),
+            "describe-log-streams".into(),
+            "--log-group-name".into(),
+            log_group_name.into(),
+            "--region".into(),
+            region.into(),
+            "--order-by".into(),
+            "LastEventTime".into(),
+            "--descending".into(),
+            "--max-items".into(),
+            limit.to_string(),
+            "--output".into(),
+            "json".into(),
+        ],
+        "aws logs describe-log-streams",
+        None,
+        None,
+    )
+    .map(|s| s.trim_end().to_string())
+}

@@ -504,21 +504,29 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     Ok(())
 }
 
-fn logs(args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
-    // If requested, pick an instance and tail the stream named after its instance id.
-    let mut stream_names = args.log_stream_name.clone();
+fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
+    let mut format = "detailed";
     if let Some(asg) = args.asg.as_deref() {
         let selected =
             crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, asg)?;
         eprintln!(
-            "🪵 Tailing CloudWatch logs for ASG instance {}\n  IP: {}\n  AZ: {}\n  Log group: {}\n  Stream: {}",
+            "🪵 Tailing CloudWatch logs for ASG instance {}\n  IP: {}\n  AZ: {}\n  Log group: {}",
             selected.instance_id,
             selected.private_ip.as_deref().unwrap_or("no-ip"),
             selected.az,
             args.log_group,
-            selected.instance_id,
         );
-        stream_names.push(selected.instance_id);
+
+        let stream =
+            crate::utils::aws::instance_logs::resolve_log_stream_name_containing_instance_id(
+                &args.region,
+                &args.log_group,
+                &selected.instance_id,
+            )?;
+        eprintln!("  Stream: {stream}");
+        args.log_stream_name.push(stream);
+        // no need to show the instance ID
+        format = "short";
     } else {
         eprintln!(
             "🪵 Tailing CloudWatch logs\n  Log group: {}\n  Region: {}\n  Since: {}\n  Follow: {}",
@@ -535,19 +543,18 @@ fn logs(args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
         "--since".into(),
         args.since.clone(),
         "--format".into(),
-        "detailed".into(),
+        format.into(),
     ];
 
     if args.follow {
         cli_args.push("--follow".into());
     }
 
-    if !stream_names.is_empty() {
+    if !args.log_stream_name.is_empty() {
         cli_args.push("--log-stream-names".into());
-        cli_args.extend(stream_names);
+        cli_args.extend(args.log_stream_name.clone());
     }
 
-    // Stream to stdout/stderr (no capture) so the user sees logs live.
     crate::utils::aws::cli::aws_cli(cli_args, None, None, "aws logs tail should succeed")
 }
 
