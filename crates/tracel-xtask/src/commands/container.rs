@@ -88,6 +88,28 @@ pub struct ContainerListSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ContainerLogsSubCmdArgs {
+    /// AWS region to read logs from
+    #[arg(long)]
+    pub region: String,
+    /// CloudWatch Logs log group name
+    #[arg(long, value_name = "LOG_GROUP")]
+    pub log_group: String,
+    /// Follow stream logs (like 'tail -f')
+    #[arg(long, default_value_t = true)]
+    pub follow: bool,
+    /// Only show logs newer than this duration (AWS CLI syntax like: 10m, 2h, 1d)
+    #[arg(long, default_value = "10m")]
+    pub since: String,
+    /// Optional specific log stream names. Repeatable.
+    #[arg(long, value_name = "LOG_STREAM", action = clap::ArgAction::Append)]
+    pub log_stream_name: Vec<String>,
+    /// If set, pick an instance from the specified ASG and tail a stream named after the instance id.
+    #[arg(long, value_name = "ASG_NAME")]
+    pub asg: Option<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
 pub struct ContainerPullSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
@@ -321,6 +343,7 @@ pub fn handle_command(
         ContainerSubCommand::Build(build_args) => build(build_args),
         ContainerSubCommand::Host(host_args) => host(host_args),
         ContainerSubCommand::List(list_args) => list(list_args, &env),
+        ContainerSubCommand::Logs(logs_args) => logs(logs_args),
         ContainerSubCommand::Pull(pull_args) => pull(pull_args),
         ContainerSubCommand::Push(push_args) => push(push_args),
         ContainerSubCommand::Promote(promote_args) => promote(promote_args, &env),
@@ -479,6 +502,53 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     }
 
     Ok(())
+}
+
+fn logs(args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
+    // If requested, pick an instance and tail the stream named after its instance id.
+    let mut stream_names = args.log_stream_name.clone();
+    if let Some(asg) = args.asg.as_deref() {
+        let selected =
+            crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, asg)?;
+        eprintln!(
+            "🪵 Tailing CloudWatch logs for ASG instance {}\n  IP: {}\n  AZ: {}\n  Log group: {}\n  Stream: {}",
+            selected.instance_id,
+            selected.private_ip.as_deref().unwrap_or("no-ip"),
+            selected.az,
+            args.log_group,
+            selected.instance_id,
+        );
+        stream_names.push(selected.instance_id);
+    } else {
+        eprintln!(
+            "🪵 Tailing CloudWatch logs\n  Log group: {}\n  Region: {}\n  Since: {}\n  Follow: {}",
+            args.log_group, args.region, args.since, args.follow,
+        );
+    }
+
+    let mut cli_args: Vec<String> = vec![
+        "logs".into(),
+        "tail".into(),
+        args.log_group.clone(),
+        "--region".into(),
+        args.region.clone(),
+        "--since".into(),
+        args.since.clone(),
+        "--format".into(),
+        "detailed".into(),
+    ];
+
+    if args.follow {
+        cli_args.push("--follow".into());
+    }
+
+    if !stream_names.is_empty() {
+        cli_args.push("--log-stream-names".into());
+        cli_args.extend(stream_names);
+    }
+
+    // Stream to stdout/stderr (no capture) so the user sees logs live.
+    crate::utils::aws::cli::aws_cli(cli_args, None, None, "aws logs tail should succeed")
 }
 
 fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {

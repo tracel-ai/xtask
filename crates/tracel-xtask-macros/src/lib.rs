@@ -856,6 +856,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Host(ContainerHostSubCmdArgs),
                 #[doc = r"Show current latest and rollback images in registry."]
                 List(ContainerListSubCmdArgs),
+                #[doc = r"Show Cloudwatch logs of the container."]
+                Logs(ContainerLogsSubCmdArgs),
                 #[doc = r"Pull a container from a registry."]
                 Pull(ContainerPullSubCmdArgs),
                 #[doc = r"Push a container to a registry."]
