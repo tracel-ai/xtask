@@ -997,6 +997,12 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
             match status_opt.as_deref() {
                 Some("Successful") => {
                     println!("\r✅ Rollout completed successfully in {min:02}:{sec:02}!{CLR_EOL}");
+
+                    if rollback_triggered {
+                        anyhow::bail!(
+                            "rollout completed successfully but a container rollback was triggered during the wait window"
+                        );
+                    }
                     return Ok(());
                 }
                 Some("Failed") => {
