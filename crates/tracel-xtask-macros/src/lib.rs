@@ -279,6 +279,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Object",
+        quote! {
+            #[doc = r"Manage S3-stored objects lifecycle bound to a container."]
+            Object(tracel_xtask::commands::object::ObjectCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Publish",
         quote! {
             #[doc = r"Publish a crate to crates.io."]
@@ -966,6 +973,23 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
+            "ObjectSubCommand",
+            quote! {
+                #[doc = r"Build a Rust binary (crate) to be uploaded as an object."]
+                Build(ObjectBuildSubCmdArgs),
+                #[doc = r"Show current `.latest` and `.rollback` objects."]
+                List(ObjectListSubCmdArgs),
+                #[doc = r"Promote an immutable build object by tagging a container to reference it"]
+                Promote(ObjectPromoteSubCmdArgs),
+                #[doc = r"Push an object build artifact to S3"]
+                Push(ObjectPushSubCmdArgs),
+                #[doc = r"Rollback the live permalink `.latest` to `.rollback`."]
+                Rollback(ObjectRollbackSubCmdArgs),
+                #[doc = r"Rollout a build by updating the `.latest` permalink and saving previous `.latest` to `.rollback`."]
+                Rollout(ObjectRolloutSubCmdArgs),
+            },
+        ),
+        (
             "SecretsSubCommand",
             quote! {
                 #[doc = r"Create an empty secret (metadata only, no version)."]
@@ -1088,7 +1112,7 @@ fn generate_subcomand_tryinto(
             fn try_into(self) -> Result<#base_subcommand, Self::Error> {
                 match self {
                     #(#arms)*
-                    _ => Err(anyhow::anyhow!("{} target is not supported.", self))
+                    _ => Err(anyhow::anyhow!("{} subcommand is not supported.", self))
                 }
             }
         }

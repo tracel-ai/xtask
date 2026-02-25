@@ -11,6 +11,7 @@ pub mod docker_compose;
 pub mod fix;
 pub mod host;
 pub mod infra;
+pub mod object;
 pub mod publish;
 pub mod secrets;
 pub mod test;

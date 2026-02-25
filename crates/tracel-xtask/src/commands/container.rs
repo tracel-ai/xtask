@@ -1,7 +1,8 @@
-use serde::Deserialize;
-use std::io::Write as _;
 /// Manage containers.
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
+
+use serde::Deserialize;
+use std::io::Write as _;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 

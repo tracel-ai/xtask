@@ -991,3 +991,118 @@ pub fn cloudwatch_describe_log_streams_json(
     )
     .map(|s| s.trim_end().to_string())
 }
+
+// S3 ------------------------------------------------------------------------
+
+pub fn s3_url(bucket: &str, key: &str) -> String {
+    format!("s3://{bucket}/{key}")
+}
+
+pub fn s3_console_url(region: &str, bucket: &str, key: &str) -> String {
+    // works well enough for copy/paste and ops use
+    format!(
+        "https://{region}.console.aws.amazon.com/s3/object/{bucket}?region={region}&prefix={key}"
+    )
+}
+
+pub fn s3_cp_file_to_s3(file: &Path, bucket: &str, key: &str, region: &str) -> anyhow::Result<()> {
+    aws_cli_quiet(
+        vec![
+            "s3".into(),
+            "cp".into(),
+            file.to_string_lossy().into_owned(),
+            s3_url(bucket, key),
+            "--region".into(),
+            region.into(),
+        ],
+        None,
+        None,
+        "aws s3 cp should succeed",
+    )
+}
+
+pub fn s3_head_object(bucket: &str, key: &str, region: &str) -> anyhow::Result<Option<String>> {
+    // Return ETag if present, None if not found
+    let out = crate::utils::aws::cli::aws_cli_try_capture_stdout(
+        vec![
+            "s3api".into(),
+            "head-object".into(),
+            "--bucket".into(),
+            bucket.into(),
+            "--key".into(),
+            key.into(),
+            "--region".into(),
+            region.into(),
+            "--query".into(),
+            "ETag".into(),
+            "--output".into(),
+            "text".into(),
+        ],
+        "aws s3api head-object",
+    )?;
+
+    Ok(out
+        .map(|s| s.trim().trim_matches('"').to_string())
+        .filter(|s| !s.is_empty() && s != "None"))
+}
+
+pub fn s3_copy_object(
+    src_bucket: &str,
+    src_key: &str,
+    dst_bucket: &str,
+    dst_key: &str,
+    region: &str,
+) -> anyhow::Result<()> {
+    let copy_source = format!("{src_bucket}/{src_key}");
+
+    aws_cli_quiet(
+        vec![
+            "s3api".into(),
+            "copy-object".into(),
+            "--copy-source".into(),
+            copy_source,
+            "--bucket".into(),
+            dst_bucket.into(),
+            "--key".into(),
+            dst_key.into(),
+            "--region".into(),
+            region.into(),
+        ],
+        None,
+        None,
+        "aws s3api copy-object should succeed",
+    )
+}
+
+pub fn s3_put_object_tags(
+    bucket: &str,
+    key: &str,
+    region: &str,
+    tags: &[(&str, &str)],
+) -> anyhow::Result<()> {
+    // pass JSON to avoid shell-escaping pain
+    let tagset: Vec<serde_json::Value> = tags
+        .iter()
+        .map(|(k, v)| serde_json::json!({ "Key": k, "Value": v }))
+        .collect();
+
+    let payload = serde_json::json!({ "TagSet": tagset }).to_string();
+
+    aws_cli_quiet(
+        vec![
+            "s3api".into(),
+            "put-object-tagging".into(),
+            "--bucket".into(),
+            bucket.into(),
+            "--key".into(),
+            key.into(),
+            "--tagging".into(),
+            payload,
+            "--region".into(),
+            region.into(),
+        ],
+        None,
+        None,
+        "aws s3api put-object-tagging should succeed",
+    )
+}
