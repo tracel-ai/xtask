@@ -3,6 +3,7 @@ mod deps;
 mod emojis;
 
 use std::{
+    collections::BTreeMap,
     env,
     ffi::{OsStr, OsString},
     fs,
@@ -13,12 +14,35 @@ use std::{
 
 use toml_edit::DocumentMut;
 
+#[derive(Debug, Clone)]
+enum XtaskInvocation {
+    /// The xtask crate is a real workspace member, so we can invoke it via:
+    /// `cargo run --package <package> --bin <bin> -- ...`
+    WorkspaceMember { package: String },
+    /// The xtask crate is not a workspace member (commonly because it's under `[workspace].exclude`),
+    /// so we must invoke it via:
+    /// `cargo run --manifest-path <path/to/Cargo.toml> --bin <bin> -- ...`
+    ManifestPath {
+        manifest_path: PathBuf,
+        package: String,
+    },
+}
+
+impl XtaskInvocation {
+    fn package_name(&self) -> &str {
+        match self {
+            XtaskInvocation::WorkspaceMember { package } => package,
+            XtaskInvocation::ManifestPath { package, .. } => package,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Workspace {
     path: PathBuf,
     dir_name: String,
-    xtask_crate: String,
     xtask_bin: String,
+    xtask: XtaskInvocation,
 }
 
 fn main() -> ExitCode {
@@ -80,10 +104,9 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
         } else {
             // :<subrepo> selector
             let subrepo_root = git_root.join(&sel);
-            let xtask_crate = is_workspace(&subrepo_root)?.ok_or_else(|| {
+            let xtask = is_workspace(&subrepo_root)?.ok_or_else(|| {
                 format!(
-                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo.toml and an xtask* directory).\n\
-                     You are likely inside a standard repository and not a monorepo, call `xtask` to verify.\n\
+                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo workspace with an xtask* crate).\n\
                      Path: {}",
                     sel,
                     subrepo_root.display()
@@ -94,7 +117,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
                 path: subrepo_root,
                 dir_name: sel.clone(),
                 xtask_bin: format!("xtask-{sel}"),
-                xtask_crate,
+                xtask,
             };
             return exec_cargo_xtask(git_root, &ws, args);
         }
@@ -103,13 +126,14 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
     // No selector provided
     // Behavior depends on standard repo vs monorepo
     let root_xtask = is_workspace(git_root)?;
-    if let Some(xtask_crate) = root_xtask {
+    if let Some(xtask) = root_xtask {
         // Standard repo -> execute at git root
+        let xtask_bin = xtask.package_name().to_string();
         let ws = Workspace {
             path: git_root.to_path_buf(),
             dir_name: "root".to_string(),
-            xtask_bin: xtask_crate.clone(),
-            xtask_crate,
+            xtask_bin,
+            xtask,
         };
         exec_cargo_xtask(git_root, &ws, args)
     } else {
@@ -118,7 +142,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             // inside a subrepo workspace at any depth then we execute in that subrepo.
             exec_cargo_xtask(git_root, &ws, args)
         } else {
-            //  At monorepo root we dispatch to all subrepos after confirmation
+            // At monorepo root we dispatch to all subrepos after confirmation
             let subrepos = list_subrepo_workspaces(git_root)?;
             if subrepos.is_empty() {
                 return Err(format!(
@@ -204,38 +228,32 @@ fn git_repo_root() -> Result<PathBuf, String> {
     Ok(PathBuf::from(p))
 }
 
-/// Returns the xtask *package name* if this directory is a Cargo workspace that contains
-/// an xtask-like member.
-fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
-    let workspace_toml = dir.join("Cargo.toml");
-    if !workspace_toml.is_file() {
-        return Ok(None);
-    }
-    let root_src = fs::read_to_string(&workspace_toml)
-        .map_err(|e| format!("failed to read {}: {e}", workspace_toml.display()))?;
-    let root_doc = root_src
-        .parse::<DocumentMut>()
-        .map_err(|e| format!("failed to parse {}: {e}", workspace_toml.display()))?;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkspaceEntryOrigin {
+    Members,
+    Exclude,
+}
 
-    // Not a workspace if workspace.members is missing.
-    let Some(members_item) = root_doc.get("workspace").and_then(|w| w.get("members")) else {
-        return Ok(None);
-    };
-
-    let members = members_item
+/// Resolve workspace entries (strings), supporting the common "path/*" glob.
+fn collect_workspace_dirs(
+    workspace_root: &Path,
+    items: &toml_edit::Item,
+) -> Result<Vec<PathBuf>, String> {
+    let arr = items
         .as_array()
-        .ok_or_else(|| "workspace.members should be an array".to_string())?;
-    // Resolve members (with minimal support for "dir/*" globs)
-    let mut member_dirs: Vec<PathBuf> = Vec::new();
-    for m in members.iter() {
-        let s = m
+        .ok_or_else(|| "workspace members/exclude should be an array".to_string())?;
+
+    let mut out: Vec<PathBuf> = Vec::new();
+
+    for it in arr.iter() {
+        let s = it
             .as_str()
-            .ok_or_else(|| "workspace member should be a string".to_string())?;
+            .ok_or_else(|| "workspace entry should be a string".to_string())?;
 
         if let Some((prefix, suffix)) = s.split_once('*') {
             // Only handle the common "path/*" form
             if suffix.is_empty() {
-                let base = dir.join(prefix);
+                let base = workspace_root.join(prefix);
                 if base.is_dir() {
                     let entries = fs::read_dir(&base).map_err(|e| {
                         format!("failed to read directory listing {}: {e}", base.display())
@@ -245,7 +263,7 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
                             entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
                         let p = entry.path();
                         if p.is_dir() {
-                            member_dirs.push(p);
+                            out.push(p);
                         }
                     }
                 }
@@ -253,22 +271,81 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
             continue;
         }
 
-        member_dirs.push(dir.join(s));
+        out.push(workspace_root.join(s));
     }
 
-    // Find xtask-like member(s) by package.name
-    let mut matches: Vec<String> = Vec::new();
-    for member_dir in member_dirs {
-        let member_toml = member_dir.join("Cargo.toml");
-        if !member_toml.is_file() {
+    Ok(out)
+}
+
+/// Returns how to invoke an xtask-like crate if `dir` is a Cargo workspace root that contains one.
+///
+/// Detection:
+/// - Reads `Cargo.toml` and requires `[workspace].members` to exist (same behavior as before).
+/// - Scans candidate directories from:
+///   - `[workspace].members`
+///   - `[workspace].exclude` (important for repos that do `members = ["crates/*"]` and `exclude = ["xtask"]`)
+/// - For each candidate directory, if it has a `Cargo.toml` with `package.name` starting with `"xtask"`
+///   (case-insensitive), it is considered a match.
+///
+/// Selection (deterministic):
+/// - Prefer an exact `package.name == "xtask"` (case-insensitive).
+/// - Otherwise choose the lexicographically smallest xtask-like package name.
+///
+/// Invocation mode:
+/// - If the selected xtask-like crate came from `workspace.members`, returns:
+///   `Some(XtaskInvocation::WorkspaceMember { package })`
+///   (we can safely run via `cargo run --package <package> ...`)
+/// - If it came only from `workspace.exclude`, returns:
+///   `Some(XtaskInvocation::ManifestPath { manifest_path: <crate_dir>/Cargo.toml, package })`
+fn is_workspace(dir: &Path) -> Result<Option<XtaskInvocation>, String> {
+    let workspace_toml = dir.join("Cargo.toml");
+    if !workspace_toml.is_file() {
+        return Ok(None);
+    }
+
+    let root_src = fs::read_to_string(&workspace_toml)
+        .map_err(|e| format!("failed to read {}: {e}", workspace_toml.display()))?;
+    let root_doc = root_src
+        .parse::<DocumentMut>()
+        .map_err(|e| format!("failed to parse {}: {e}", workspace_toml.display()))?;
+
+    let Some(ws) = root_doc.get("workspace") else {
+        return Ok(None);
+    };
+
+    // Keep current behavior: not a workspace if workspace.members is missing.
+    let Some(members_item) = ws.get("members") else {
+        return Ok(None);
+    };
+
+    // Track candidate dirs with origin; dedupe by path.
+    // If a path appears in both, prefer Members.
+    let mut candidates: BTreeMap<PathBuf, WorkspaceEntryOrigin> = BTreeMap::new();
+
+    for p in collect_workspace_dirs(dir, members_item)? {
+        candidates.insert(p, WorkspaceEntryOrigin::Members);
+    }
+
+    if let Some(exclude_item) = ws.get("exclude") {
+        for p in collect_workspace_dirs(dir, exclude_item)? {
+            candidates.entry(p).or_insert(WorkspaceEntryOrigin::Exclude);
+        }
+    }
+
+    // Scan for xtask-like crates; store (package_name, origin, manifest_path)
+    let mut matches: Vec<(String, WorkspaceEntryOrigin, PathBuf)> = Vec::new();
+
+    for (candidate_dir, origin) in candidates {
+        let candidate_manifest = candidate_dir.join("Cargo.toml");
+        if !candidate_manifest.is_file() {
             continue;
         }
 
-        let src = fs::read_to_string(&member_toml)
-            .map_err(|e| format!("failed to read {}: {e}", member_toml.display()))?;
+        let src = fs::read_to_string(&candidate_manifest)
+            .map_err(|e| format!("failed to read {}: {e}", candidate_manifest.display()))?;
         let doc = src
             .parse::<DocumentMut>()
-            .map_err(|e| format!("failed to parse {}: {e}", member_toml.display()))?;
+            .map_err(|e| format!("failed to parse {}: {e}", candidate_manifest.display()))?;
 
         let package_name = doc
             .get("package")
@@ -278,23 +355,35 @@ fn is_workspace(dir: &Path) -> Result<Option<String>, String> {
         if let Some(name) = package_name
             && name.to_ascii_lowercase().starts_with("xtask")
         {
-            matches.push(name.to_string());
+            matches.push((name.to_string(), origin, candidate_manifest));
         }
     }
+
     if matches.is_empty() {
         return Ok(None);
     }
-    matches.sort();
-    // Prefer exact "xtask"
-    if let Some(exact) = matches
-        .iter()
-        .find(|n| n.eq_ignore_ascii_case("xtask"))
-        .cloned()
-    {
-        return Ok(Some(exact));
-    }
 
-    Ok(Some(matches[0].clone()))
+    matches.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Prefer exact "xtask"
+    let chosen = if let Some(idx) = matches
+        .iter()
+        .position(|(n, _, _)| n.eq_ignore_ascii_case("xtask"))
+    {
+        matches.remove(idx)
+    } else {
+        matches.remove(0)
+    };
+
+    let (package, origin, manifest_path) = chosen;
+
+    Ok(Some(match origin {
+        WorkspaceEntryOrigin::Members => XtaskInvocation::WorkspaceMember { package },
+        WorkspaceEntryOrigin::Exclude => XtaskInvocation::ManifestPath {
+            manifest_path,
+            package,
+        },
+    }))
 }
 
 fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<Workspace>, String> {
@@ -306,7 +395,7 @@ fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<W
             return Ok(None);
         }
 
-        if let Some(xtask_crate) = is_workspace(&cur)? {
+        if let Some(xtask) = is_workspace(&cur)? {
             // subrepo dir name is the first path segment under git_root
             let rel = cur.strip_prefix(git_root).map_err(|_| {
                 format!(
@@ -326,11 +415,15 @@ fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<W
                 .to_string_lossy()
                 .to_string();
 
+            // Keep your convention for subrepo bin names.
+            // If you want package-driven bin names, swap this to `xtask.package_name().to_string()`.
+            let xtask_bin = format!("xtask-{subrepo}");
+
             return Ok(Some(Workspace {
                 path: cur,
-                dir_name: subrepo.clone(),
-                xtask_bin: xtask_crate.clone(),
-                xtask_crate,
+                dir_name: subrepo,
+                xtask_bin,
+                xtask,
             }));
         }
 
@@ -347,6 +440,7 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
             git_root.display()
         )
     })?;
+
     let mut subrepos = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
@@ -357,12 +451,15 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
 
         let dir_name = entry.file_name().to_string_lossy().to_string();
 
-        if let Some(xtask_crate) = is_workspace(&path)? {
+        if let Some(xtask) = is_workspace(&path)? {
+            // Keep your convention: xtask-<subrepo>
+            let xtask_bin = format!("xtask-{dir_name}");
+
             subrepos.push(Workspace {
                 path,
                 dir_name: dir_name.clone(),
-                xtask_bin: xtask_crate.clone(),
-                xtask_crate,
+                xtask_bin,
+                xtask,
             });
         }
     }
@@ -391,9 +488,9 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
         } else {
             // :<subrepo> selector
             let subrepo_root = git_root.join(&sel);
-            let xtask_crate = is_workspace(&subrepo_root)?.ok_or_else(|| {
+            let xtask = is_workspace(&subrepo_root)?.ok_or_else(|| {
                 format!(
-                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo.toml and an xtask* directory).\n\
+                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo workspace with an xtask* crate).\n\
                      Path: {}",
                     sel,
                     subrepo_root.display()
@@ -403,21 +500,21 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
             let ws = Workspace {
                 path: subrepo_root,
                 dir_name: sel.clone(),
-                xtask_bin: xtask_crate.clone(),
-                xtask_crate,
+                xtask_bin: format!("xtask-{sel}"),
+                xtask,
             };
             run_help_one(&ws)
         }
     } else {
-        // No selector, behovior depends on standard repo vs monorepo.
+        // No selector, behavior depends on standard repo vs monorepo.
         let root_xtask = is_workspace(git_root)?;
-        if let Some(xtask_crate) = root_xtask {
+        if let Some(xtask) = root_xtask {
             // Standard repo: help at git root
             let ws = Workspace {
                 path: git_root.to_path_buf(),
                 dir_name: "root".to_string(),
-                xtask_bin: xtask_crate.clone(),
-                xtask_crate,
+                xtask_bin: xtask.package_name().to_string(),
+                xtask,
             };
             run_help_one(&ws)
         } else {
@@ -466,25 +563,36 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     } else {
         Path::new("target/xtask")
     };
+
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     }
+
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
+
     let mut cmd = Command::new("cargo");
-    cmd.arg("run")
-        .arg("--target-dir")
-        .arg(target_dir)
-        .arg("--package")
-        .arg(&ws.xtask_crate)
-        .arg("--bin")
+    cmd.arg("run").arg("--target-dir").arg(target_dir);
+
+    match &ws.xtask {
+        XtaskInvocation::WorkspaceMember { package } => {
+            cmd.arg("--package").arg(package);
+        }
+        XtaskInvocation::ManifestPath { manifest_path, .. } => {
+            cmd.arg("--manifest-path").arg(manifest_path);
+        }
+    }
+
+    cmd.arg("--bin")
         .arg(&ws.xtask_bin)
         .arg("--")
         .arg("--help")
         .env("XTASK_CLI", "1")
         .current_dir(&ws.path);
+
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
+
     let status = cmd.status().map_err(|e| {
         format!(
             "failed to execute cargo run ({} --help): {e}",
@@ -517,28 +625,41 @@ fn exec_cargo_xtask(
     args: &[OsString],
 ) -> Result<ExitCode, String> {
     let is_subrepo = ws.dir_name != "root";
-    let target_path = format!("target/{}", ws.xtask_crate);
+
+    let target_path = format!("target/{}", ws.xtask.package_name());
     let target_dir = Path::new(&target_path);
+
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
+
     sync_monorepo_dependencies(git_root, std::slice::from_ref(ws))?;
+
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
+
     let mut cmd = Command::new("cargo");
-    cmd.arg("run")
-        .arg("--target-dir")
-        .arg(target_dir)
-        .arg("--package")
-        .arg(&ws.xtask_crate)
-        .arg("--bin")
+    cmd.arg("run").arg("--target-dir").arg(target_dir);
+
+    match &ws.xtask {
+        XtaskInvocation::WorkspaceMember { package } => {
+            cmd.arg("--package").arg(package);
+        }
+        XtaskInvocation::ManifestPath { manifest_path, .. } => {
+            cmd.arg("--manifest-path").arg(manifest_path);
+        }
+    }
+
+    cmd.arg("--bin")
         .arg(&ws.xtask_bin)
         .arg("--")
         .args(args)
         .env("XTASK_CLI", "1")
         .current_dir(&ws.path);
+
     if is_subrepo {
         cmd.env("XTASK_MONOREPO", "1");
     }
+
     let status = cmd
         .status()
         .map_err(|e| format!("failed to execute cargo run ({}): {e}", ws.path.display()))?;
@@ -618,13 +739,18 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     println!();
 
     if !is_monorepo {
-        let xtask_pkg = root_xtask.unwrap_or_else(|| "xtask".to_string());
+        let xtask_pkg = root_xtask
+            .as_ref()
+            .map(|x| x.package_name().to_string())
+            .unwrap_or_else(|| "xtask".to_string());
+
         println!("CONTEXT");
         println!("-------");
         println!("  Current Repository mode: standard repository");
         println!("  Git root: {}", git_root.display());
         println!("  Xtask package: {xtask_pkg}");
         println!();
+
         println!("EXAMPLES");
         println!("--------");
         println!("  {cli_name} build");
@@ -639,6 +765,7 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
         println!("      Run the `fix` xtask command, auto-confirming prompts (`-y`),");
         println!("      and applying fixes to all supported targets.");
         println!();
+
         cli_help_fooder();
         return Ok(ExitCode::SUCCESS);
     }
@@ -646,13 +773,12 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     // Monorepo context
     let subrepos = list_subrepo_workspaces(git_root)?;
     let located = find_subrepo_workspace_root(&cwd, git_root)?;
+
     // Pick real example subrepos found in this context.
-    // Fallback to backend and frontend as default examples if we don't have enough subrepos discovered.
     let ex1 = subrepos
         .first()
         .map(|ws| ws.dir_name.as_str())
         .unwrap_or("backend");
-
     let ex2 = subrepos
         .get(1)
         .map(|ws| ws.dir_name.as_str())
@@ -665,10 +791,9 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     match located {
         Some(ws) => {
             println!("  Current location: inside subrepo `{}`", ws.dir_name);
-            println!("  Current xtask package: {}", ws.xtask_crate);
+            println!("  Current xtask package: {}", ws.xtask.package_name());
         }
         None => {
-            // if cwd is git_root, say so; else just outside recognized workspace
             if cwd == git_root {
                 println!("  Current location: monorepo root");
             } else {
@@ -687,7 +812,7 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
             println!(
                 "  - {:<16}  xtask package: {:<12}  path: {}",
                 ws.dir_name,
-                ws.xtask_crate,
+                ws.xtask.package_name(),
                 ws.path.display()
             );
         }
