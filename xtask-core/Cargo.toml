@@ -1,6 +1,6 @@
 [package]
 name = "xtask-core"
-version = "4.13.4"
+version = "0.0.0"
 edition = "2024"
 
 [dependencies]

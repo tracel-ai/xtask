@@ -1,5 +1,6 @@
 use std::process::Command;
 
+use crate::utils::aws::instance_system_log::stream_system_log;
 use crate::{
     context::Context,
     prelude::{Environment, EnvironmentName, anyhow::Context as _},
@@ -30,6 +31,10 @@ pub struct HostConnectSubCmdArgs {
     /// Login user for the SSM interactive shell
     #[arg(long, default_value = "ubuntu")]
     pub user: String,
+
+    /// Show instance system log instead of opening an SSM shell
+    #[arg(long)]
+    pub system_log: bool,
 }
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
@@ -78,7 +83,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
         .output()
         .with_context(|| {
             format!(
-                "Describing database instance '{}' in region '{}' should succeed",
+                "Describing host instance '{}' in region '{}' should succeed",
                 args.name, args.region
             )
         })?;
@@ -86,7 +91,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
     if !describe_output.status.success() {
         let stderr = String::from_utf8_lossy(&describe_output.stderr);
         anyhow::bail!(
-            "Describing database instance '{}' in region '{}' should succeed, but AWS CLI exited with:\n{}",
+            "Describing host instance '{}' in region '{}' should succeed, but AWS CLI exited with:\n{}",
             args.name,
             args.region,
             stderr
@@ -94,23 +99,31 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
     }
 
     let instance_id = String::from_utf8(describe_output.stdout)
-        .context("Parsing database instance ID from AWS CLI output should succeed")?
+        .context("Parsing host instance ID from AWS CLI output should succeed")?
         .trim()
         .to_string();
 
     if instance_id.is_empty() || instance_id == "None" {
         anyhow::bail!(
-            "Finding a running database instance named '{}' in region '{}' should succeed, but none were found",
+            "Finding a running host instance named '{}' in region '{}' should succeed, but none were found",
             args.name,
             args.region
         );
+    }
+
+    if args.system_log {
+        eprintln!(
+            "📜 Streaming system log for host '{}' (id '{}') in region '{}' — Ctrl-C to stop",
+            args.name, instance_id, args.region
+        );
+        return stream_system_log(&args.region, &instance_id);
     }
 
     // 2) Ensure the SSM session document is present / up to date for this user
     aws::cli::ensure_ssm_document(SSM_SESSION_DOC, &args.region, &args.user)?;
 
     eprintln!(
-        "🔌 Opening SSM session to database instance '{}' (id '{}') in region '{}' as user '{}'...",
+        "🔌 Opening SSM session to host '{}' (id '{}') in region '{}' as user '{}'...",
         args.name, instance_id, args.region, args.user
     );
 
@@ -130,7 +143,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
         &args_vec,
         None,
         None,
-        "SSM session to database host should start successfully",
+        "SSM session to host should start successfully",
     )?;
 
     Ok(())
