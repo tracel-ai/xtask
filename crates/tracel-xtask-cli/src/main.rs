@@ -37,7 +37,7 @@ impl XtaskInvocation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Workspace {
     path: PathBuf,
     dir_name: String,
@@ -103,22 +103,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             return exec_cargo_xtask_all(git_root, args, &subrepos);
         } else {
             // :<subrepo> selector
-            let subrepo_root = git_root.join(&sel);
-            let xtask = is_workspace(&subrepo_root)?.ok_or_else(|| {
-                format!(
-                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo workspace with an xtask* crate).\n\
-                     Path: {}",
-                    sel,
-                    subrepo_root.display()
-                )
-            })?;
-
-            let ws = Workspace {
-                path: subrepo_root,
-                dir_name: sel.clone(),
-                xtask_bin: format!("xtask-{sel}"),
-                xtask,
-            };
+            let ws = select_subrepo_workspace(git_root, &sel)?;
             return exec_cargo_xtask(git_root, &ws, args);
         }
     }
@@ -468,6 +453,43 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
     Ok(subrepos)
 }
 
+fn select_subrepo_workspace(git_root: &Path, selector: &str) -> Result<Workspace, String> {
+    let subrepos = list_subrepo_workspaces(git_root)?;
+
+    if subrepos.is_empty() {
+        return Err(format!(
+            "No xtask workspaces found under git root: {}",
+            git_root.display()
+        ));
+    }
+
+    if let Some(ws) = subrepos.iter().find(|ws| ws.dir_name == selector) {
+        return Ok(ws.clone());
+    }
+
+    let mut matches: Vec<Workspace> = subrepos
+        .into_iter()
+        .filter(|ws| ws.dir_name.starts_with(selector))
+        .collect();
+
+    match matches.len() {
+        0 => Err(format!("No subrepo matches selector '{}'.", selector)),
+        1 => Ok(matches.remove(0)),
+        _ => {
+            let candidates = matches
+                .iter()
+                .map(|ws| ws.dir_name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Err(format!(
+                "Ambiguous subrepo selector '{}'. Matching candidates: {}",
+                selector, candidates
+            ))
+        }
+    }
+}
+
 fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
     let selector = args::take_subrepo_selector(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
@@ -487,22 +509,7 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
             run_help_all(&subrepos)
         } else {
             // :<subrepo> selector
-            let subrepo_root = git_root.join(&sel);
-            let xtask = is_workspace(&subrepo_root)?.ok_or_else(|| {
-                format!(
-                    "Subrepo '{}' is not a valid xtask workspace (expected Cargo workspace with an xtask* crate).\n\
-                     Path: {}",
-                    sel,
-                    subrepo_root.display()
-                )
-            })?;
-
-            let ws = Workspace {
-                path: subrepo_root,
-                dir_name: sel.clone(),
-                xtask_bin: format!("xtask-{sel}"),
-                xtask,
-            };
+            let ws = select_subrepo_workspace(git_root, &sel)?;
             run_help_one(&ws)
         }
     } else {
