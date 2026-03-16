@@ -1,20 +1,22 @@
 const SUBREPO_EMOJIS: &[(&str, &str)] = &[
-    ("admin", "⚙️️️"),
+    ("admin", "⚙️"),
     ("api", "🔌"),
+    ("app", "📱"),
     ("backend", "🧠"),
     ("cd", "🚀"),
     ("ci", "🤖"),
-    ("console", "🖥 "),
+    ("console", "🖥️"),
     ("data", "🗄️"),
     ("db", "🗄️"),
-    ("dev", "👨‍💻‍"),
-    ("frontend", "🖥 "),
-    ("infra", "🏗 "),
-    ("ops", "🧰️"),
+    ("dev", "👨‍💻"),
+    ("frontend", "🖥️"),
+    ("infra", "🏗️"),
+    ("ops", "🧰"),
     ("monitor", "🚨"),
-    ("platform", "🏗"),
+    ("platform", "🏗️"),
+    ("plugin", "🧩"),
     ("server", "🛰️"),
-    ("tool", "🛠"),
+    ("tool", "🛠️"),
     ("ui", "🎨"),
     ("web", "🌐"),
 ];
@@ -22,10 +24,11 @@ const SUBREPO_EMOJIS: &[(&str, &str)] = &[
 pub fn emoji_for_subrepo(name: &str) -> Option<&'static str> {
     let n = name.to_ascii_lowercase();
     for (needle, emoji) in SUBREPO_EMOJIS {
-        if n.contains(needle) {
+        if n.starts_with(needle) {
             return Some(*emoji);
         }
     }
+
     None
 }
 
