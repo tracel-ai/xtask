@@ -40,19 +40,26 @@ pub fn rustup_get_installed_targets() -> String {
     String::from_utf8(output.stdout).expect("Output should be valid UTF-8")
 }
 
-/// Returns true if the current toolchain is the nightly
+/// Returns true if the current toolchain is nightly.
 pub fn is_current_toolchain_nightly() -> bool {
-    let output = Command::new("rustup")
-        .arg("show")
-        .output()
-        .expect("Should get the list of installed Rust toolchains");
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    for line in output_str.lines() {
-        // look for the "rustc.*-nightly" line
-        if line.contains("rustc") && line.contains("-nightly") {
+    if let Ok(toolchain) = std::env::var("RUSTUP_TOOLCHAIN") {
+        let toolchain = toolchain.trim();
+        if toolchain == "nightly" || toolchain.starts_with("nightly-") {
             return true;
         }
     }
-    // assume we are using a stable toolchain if we did not find the nightly compiler
-    false
+
+    let output = Command::new("rustup")
+        .args(["show", "active-toolchain"])
+        .output()
+        .expect("should get the active Rust toolchain");
+
+    if !output.status.success() {
+        return false;
+    }
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let active_toolchain = output_str.trim();
+
+    active_toolchain == "nightly" || active_toolchain.starts_with("nightly-")
 }
