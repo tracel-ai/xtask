@@ -92,8 +92,8 @@ pub mod prelude {
 use std::fmt::Display;
 
 use clap::{CommandFactory as _, FromArgMatches as _};
-use environment::EnvironmentName;
-use prelude::Environment;
+use environment::{Environment, EnvironmentName};
+use utils::rustup::is_current_toolchain_nightly;
 
 use crate::context::Context;
 use crate::logging::init_logger;
@@ -146,7 +146,7 @@ pub fn init_xtask<C: clap::Subcommand + Display>(
     let args = config.0;
     let env = config.1;
     if std::env::var(XTASK_CLI_ENVVAR).is_ok() {
-        eprintln!("⚡️ {}", args.command);
+        eprintln!("{} {}", add_command_prefix(), args.command);
     }
     group_info!("Environment: {}", env.long());
     env.load(None)?;
@@ -165,6 +165,14 @@ fn setup_coverage() -> anyhow::Result<()> {
         std::env::set_var("LLVM_PROFILE_FILE", "burn-%p-%m.profraw");
     }
     Ok(())
+}
+
+fn add_command_prefix() -> &'static str {
+    if is_current_toolchain_nightly() {
+        "⚡️🌙"
+    } else {
+        "⚡️"
+    }
 }
 
 fn add_help_prefix(cmd: &mut clap::Command) {
