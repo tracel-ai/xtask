@@ -14,6 +14,46 @@ use std::{
 
 use toml_edit::DocumentMut;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ToolchainOverride {
+    Nightly,
+}
+
+impl ToolchainOverride {
+    fn as_rustup_arg(self) -> &'static str {
+        match self {
+            Self::Nightly => "+nightly",
+        }
+    }
+
+    fn display_name(self) -> &'static str {
+        match self {
+            Self::Nightly => "nightly",
+        }
+    }
+}
+
+fn take_toolchain_override(args: &mut Vec<OsString>) -> Option<ToolchainOverride> {
+    let first = args.first()?;
+    match first.to_str() {
+        Some("+nightly") | Some("+n") => {
+            args.remove(0);
+            Some(ToolchainOverride::Nightly)
+        }
+        _ => None,
+    }
+}
+
+fn apply_toolchain_env(cmd: &mut Command, toolchain: Option<ToolchainOverride>) {
+    if let Some(toolchain) = toolchain {
+        match toolchain {
+            ToolchainOverride::Nightly => {
+                cmd.env("RUSTUP_TOOLCHAIN", "nightly");
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum XtaskInvocation {
     /// The xtask crate is a real workspace member, so we can invoke it via:
@@ -43,10 +83,20 @@ struct Workspace {
     dir_name: String,
     xtask_bin: String,
     xtask: XtaskInvocation,
+    toolchain: Option<ToolchainOverride>,
+}
+
+impl Workspace {
+    fn with_toolchain(mut self, toolchain: Option<ToolchainOverride>) -> Self {
+        self.toolchain = toolchain;
+        self
+    }
 }
 
 fn main() -> ExitCode {
     let mut args: Vec<OsString> = env::args_os().skip(1).collect();
+    let toolchain = take_toolchain_override(&mut args);
+
     let git_root = match git_repo_root()
         .map_err(|e| format!("xtask should run inside a git repository: {e}"))
     {
@@ -58,7 +108,7 @@ fn main() -> ExitCode {
     };
 
     if is_cli_help_invocation(&args) {
-        match show_xtask_cli_help(&git_root) {
+        match show_xtask_cli_help(&git_root, toolchain) {
             Ok(code) => code,
             Err(err) => {
                 eprintln!("{err}");
@@ -66,7 +116,7 @@ fn main() -> ExitCode {
             }
         }
     } else if is_transparent_help_invocation(&args) {
-        match show_all_help(&git_root, &mut args) {
+        match show_all_help(&git_root, &mut args, toolchain) {
             Ok(code) => code,
             Err(err) => {
                 eprintln!("{err}");
@@ -74,7 +124,7 @@ fn main() -> ExitCode {
             }
         }
     } else {
-        match run(&git_root, &mut args) {
+        match run(&git_root, &mut args, toolchain) {
             Ok(code) => code,
             Err(err) => {
                 eprintln!("{err}");
@@ -84,7 +134,11 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
+fn run(
+    git_root: &Path,
+    args: &mut Vec<OsString>,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<ExitCode, String> {
     let selector = args::take_subrepo_selector(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
@@ -92,7 +146,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
     if let Some(sel) = selector {
         if sel == "all" {
             // :all magic selector
-            let subrepos = list_subrepo_workspaces(git_root)?;
+            let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
             if subrepos.is_empty() {
                 return Err(format!(
                     "xtask :all requires at least one subrepo workspace under git root.\n\
@@ -103,7 +157,7 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             return exec_cargo_xtask_all(git_root, args, &subrepos);
         } else {
             // :<subrepo> selector
-            let ws = select_subrepo_workspace(git_root, &sel)?;
+            let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
             return exec_cargo_xtask(git_root, &ws, args);
         }
     }
@@ -119,16 +173,17 @@ fn run(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
             dir_name: "root".to_string(),
             xtask_bin,
             xtask,
+            toolchain,
         };
         exec_cargo_xtask(git_root, &ws, args)
     } else {
         // Monorepo:
-        if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root)? {
+        if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root, toolchain)? {
             // inside a subrepo workspace at any depth then we execute in that subrepo.
             exec_cargo_xtask(git_root, &ws, args)
         } else {
             // At monorepo root we dispatch to all subrepos after confirmation
-            let subrepos = list_subrepo_workspaces(git_root)?;
+            let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
             if subrepos.is_empty() {
                 return Err(format!(
                     "No xtask workspaces found under git root: {}",
@@ -371,7 +426,11 @@ fn is_workspace(dir: &Path) -> Result<Option<XtaskInvocation>, String> {
     }))
 }
 
-fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<Workspace>, String> {
+fn find_subrepo_workspace_root(
+    start: &Path,
+    git_root: &Path,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<Option<Workspace>, String> {
     let mut cur = start.to_path_buf();
 
     loop {
@@ -404,12 +463,16 @@ fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<W
             // If you want package-driven bin names, swap this to `xtask.package_name().to_string()`.
             let xtask_bin = format!("xtask-{subrepo}");
 
-            return Ok(Some(Workspace {
-                path: cur,
-                dir_name: subrepo,
-                xtask_bin,
-                xtask,
-            }));
+            return Ok(Some(
+                Workspace {
+                    path: cur,
+                    dir_name: subrepo,
+                    xtask_bin,
+                    xtask,
+                    toolchain: None,
+                }
+                .with_toolchain(toolchain),
+            ));
         }
 
         if !cur.pop() {
@@ -418,7 +481,10 @@ fn find_subrepo_workspace_root(start: &Path, git_root: &Path) -> Result<Option<W
     }
 }
 
-fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
+fn list_subrepo_workspaces(
+    git_root: &Path,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<Vec<Workspace>, String> {
     let entries = fs::read_dir(git_root).map_err(|e| {
         format!(
             "failed to read git root directory listing {}: {e}",
@@ -440,12 +506,16 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
             // Keep your convention: xtask-<subrepo>
             let xtask_bin = format!("xtask-{dir_name}");
 
-            subrepos.push(Workspace {
-                path,
-                dir_name: dir_name.clone(),
-                xtask_bin,
-                xtask,
-            });
+            subrepos.push(
+                Workspace {
+                    path,
+                    dir_name: dir_name.clone(),
+                    xtask_bin,
+                    xtask,
+                    toolchain: None,
+                }
+                .with_toolchain(toolchain),
+            );
         }
     }
 
@@ -453,8 +523,12 @@ fn list_subrepo_workspaces(git_root: &Path) -> Result<Vec<Workspace>, String> {
     Ok(subrepos)
 }
 
-fn select_subrepo_workspace(git_root: &Path, selector: &str) -> Result<Workspace, String> {
-    let subrepos = list_subrepo_workspaces(git_root)?;
+fn select_subrepo_workspace(
+    git_root: &Path,
+    selector: &str,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<Workspace, String> {
+    let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
 
     if subrepos.is_empty() {
         return Err(format!(
@@ -490,7 +564,11 @@ fn select_subrepo_workspace(git_root: &Path, selector: &str) -> Result<Workspace
     }
 }
 
-fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, String> {
+fn show_all_help(
+    git_root: &Path,
+    args: &mut Vec<OsString>,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<ExitCode, String> {
     let selector = args::take_subrepo_selector(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
@@ -498,7 +576,7 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
     if let Some(sel) = selector {
         if sel == "all" {
             // :all magic selector
-            let subrepos = list_subrepo_workspaces(git_root)?;
+            let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
             if subrepos.is_empty() {
                 return Err(format!(
                     "xtask :all requires at least one subrepo workspace under git root.\n\
@@ -509,7 +587,7 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
             run_help_all(&subrepos)
         } else {
             // :<subrepo> selector
-            let ws = select_subrepo_workspace(git_root, &sel)?;
+            let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
             run_help_one(&ws)
         }
     } else {
@@ -522,16 +600,17 @@ fn show_all_help(git_root: &Path, args: &mut Vec<OsString>) -> Result<ExitCode, 
                 dir_name: "root".to_string(),
                 xtask_bin: xtask.package_name().to_string(),
                 xtask,
+                toolchain,
             };
             run_help_one(&ws)
         } else {
             // Monorepo:
-            if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root)? {
+            if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root, toolchain)? {
                 // if inside a subrepo workspace (any depth), show help for that subrepo.
                 run_help_one(&ws)
             } else {
                 // At monorepo root we show help for all after confirmation
-                let subrepos = list_subrepo_workspaces(git_root)?;
+                let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
                 if subrepos.is_empty() {
                     return Err(format!(
                         "No xtask workspaces found under git root: {}",
@@ -578,6 +657,10 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
 
     let mut cmd = Command::new("cargo");
+    if let Some(toolchain) = ws.toolchain {
+        cmd.arg(toolchain.as_rustup_arg());
+    }
+    apply_toolchain_env(&mut cmd, ws.toolchain);
     cmd.arg("run").arg("--target-dir").arg(target_dir);
 
     match &ws.xtask {
@@ -645,6 +728,10 @@ fn exec_cargo_xtask(
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
 
     let mut cmd = Command::new("cargo");
+    if let Some(toolchain) = ws.toolchain {
+        cmd.arg(toolchain.as_rustup_arg());
+    }
+    apply_toolchain_env(&mut cmd, ws.toolchain);
     cmd.arg("run").arg("--target-dir").arg(target_dir);
 
     match &ws.xtask {
@@ -712,7 +799,10 @@ fn cli_help_fooder() {
     println!();
 }
 
-fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
+fn show_xtask_cli_help(
+    git_root: &Path,
+    toolchain: Option<ToolchainOverride>,
+) -> Result<ExitCode, String> {
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
     let cli_name = cli_name();
     let root_xtask = is_workspace(git_root)?;
@@ -726,8 +816,9 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
 
     println!("USAGE");
     println!("-----");
-    println!("  {cli_name} [:<subrepo>|:all] [<xtask args...>]");
+    println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
     println!();
+
     println!("BEHAVIOR");
     println!("--------");
     println!("  - With a selector:");
@@ -738,6 +829,21 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     println!("      Monorepo: if you're inside a subrepo, runs in that subrepo context,");
     println!("                otherwise prompts then run the command in all the subrepos.");
     println!();
+
+    println!("TOOLCHAIN");
+    println!("---------");
+    println!("  - `+nightly`  Runs the underlying xtask with `cargo +nightly run ...`.");
+    println!("  - `+n`        Short alias for `+nightly`.");
+    match toolchain {
+        Some(toolchain) => {
+            println!("  - Current override: {}", toolchain.display_name());
+        }
+        None => {
+            println!("  - Current override: none");
+        }
+    }
+    println!();
+
     println!("HELP");
     println!("----");
     println!("  - `{cli_name}`                   Shows this screen.");
@@ -772,14 +878,17 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
         println!("      Run the `fix` xtask command, auto-confirming prompts (`-y`),");
         println!("      and applying fixes to all supported targets.");
         println!();
+        println!("  {cli_name} +nightly test --miri");
+        println!("      Run the `test` xtask command through the nightly toolchain.");
+        println!();
 
         cli_help_fooder();
         return Ok(ExitCode::SUCCESS);
     }
 
     // Monorepo context
-    let subrepos = list_subrepo_workspaces(git_root)?;
-    let located = find_subrepo_workspace_root(&cwd, git_root)?;
+    let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
+    let located = find_subrepo_workspace_root(&cwd, git_root, toolchain)?;
 
     // Pick real example subrepos found in this context.
     let ex1 = subrepos
@@ -834,6 +943,9 @@ fn show_xtask_cli_help(git_root: &Path) -> Result<ExitCode, String> {
     println!();
     println!("  {cli_name} :{ex2} test all");
     println!("      Run both unit and integration tests scoped to the `{ex2}` subrepo only.");
+    println!();
+    println!("  {cli_name} +n :{ex1} test --miri");
+    println!("      Run xtask in `{ex1}` through the nightly toolchain.");
     println!();
     println!("  {cli_name} :all fix -y all");
     println!("      Run all available fixes (lint, format, audit, ...) across all subrepos,");
