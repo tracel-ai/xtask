@@ -2,11 +2,11 @@ use anyhow::Result;
 use strum::IntoEnumIterator;
 
 use crate::{
-    commands::WARN_IGNORED_ONLY_ARGS,
+    commands::{CARGO_NIGHTLY_MSG, WARN_IGNORED_ONLY_ARGS},
     endgroup,
     environment::EnvironmentName,
     group,
-    prelude::{Context, Environment},
+    prelude::{Context, Environment, is_current_toolchain_nightly, rustup_add_component},
     utils::{
         process::{run_process_for_package, run_process_for_workspace},
         workspace::{WorkspaceMember, WorkspaceMemberType, get_workspace_members},
@@ -44,6 +44,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
                         features: args.features.clone(),
                         no_default_features: args.no_default_features,
                         no_capture: args.no_capture,
+                        miri: args.miri,
                         release: args.release,
                     },
                     env.clone(),
@@ -95,23 +96,25 @@ fn push_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
 }
 
 pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
+    if args.miri {
+        ensure_miri_ready()?;
+    }
+
     match target {
         Target::Workspace => {
             info!("Workspace Unit Tests");
             let test = args.test.as_deref().unwrap_or("");
-            let mut cmd_args = vec![
-                "test",
-                "--workspace",
-                "--lib",
-                "--bins",
-                "--examples",
-                test,
-                "--color",
-                "always",
-            ]
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
+            let mut cmd_args = Vec::new();
+            push_test_command_prefix(&mut cmd_args, args);
+            cmd_args.extend([
+                "--workspace".to_string(),
+                "--lib".to_string(),
+                "--bins".to_string(),
+                "--examples".to_string(),
+                test.to_string(),
+                "--color".to_string(),
+                "always".to_string(),
+            ]);
             push_optional_args(&mut cmd_args, args);
             run_process_for_workspace(
                 "cargo",
@@ -147,20 +150,21 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
 pub fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(), anyhow::Error> {
     group!("Unit Tests: {}", member.name);
     let test = args.test.as_deref().unwrap_or("");
-    let mut cmd_args = vec![
-        "test",
-        test,
-        "--lib",
-        "--bins",
-        "--examples",
-        "-p",
-        &member.name,
-        "--color=always",
-    ]
-    .into_iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<String>>();
+
+    let mut cmd_args = Vec::new();
+    push_test_command_prefix(&mut cmd_args, args);
+    cmd_args.extend([
+        test.to_string(),
+        "--lib".to_string(),
+        "--bins".to_string(),
+        "--examples".to_string(),
+        "-p".to_string(),
+        member.name.clone(),
+        "--color=always".to_string(),
+    ]);
+
     push_optional_args(&mut cmd_args, args);
+
     run_process_for_package(
         "cargo",
         &member.name,
@@ -179,15 +183,27 @@ pub fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<(),
 }
 
 pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()> {
+    if args.miri {
+        ensure_miri_ready()?;
+    }
+
     match target {
         Target::Workspace => {
             info!("Workspace Integration Tests");
             let test = args.test.as_deref().unwrap_or("*");
-            let mut cmd_args = vec!["test", "--workspace", "--test", test, "--color", "always"]
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
+
+            let mut cmd_args = Vec::new();
+            push_test_command_prefix(&mut cmd_args, args);
+            cmd_args.extend([
+                "--workspace".to_string(),
+                "--test".to_string(),
+                test.to_string(),
+                "--color".to_string(),
+                "always".to_string(),
+            ]);
+
             push_optional_args(&mut cmd_args, args);
+
             run_process_for_workspace(
                 "cargo",
                 &cmd_args.iter().map(String::as_str).collect::<Vec<&str>>(),
@@ -221,19 +237,20 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> anyhow::Result<()
 
 fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<()> {
     group!("Integration Tests: {}", &member.name);
-    let mut cmd_args = vec![
-        "test",
-        "--test",
-        "*",
-        "-p",
-        &member.name,
-        "--color",
-        "always",
-    ]
-    .into_iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<String>>();
+
+    let mut cmd_args = Vec::new();
+    push_test_command_prefix(&mut cmd_args, args);
+    cmd_args.extend([
+        "--test".to_string(),
+        "*".to_string(),
+        "-p".to_string(),
+        member.name.clone(),
+        "--color".to_string(),
+        "always".to_string(),
+    ]);
+
     push_optional_args(&mut cmd_args, args);
+
     run_process_for_package(
         "cargo",
         &member.name,
@@ -249,4 +266,19 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
     )?;
     endgroup!();
     anyhow::Ok(())
+}
+
+fn ensure_miri_ready() -> Result<()> {
+    if !is_current_toolchain_nightly() {
+        anyhow::bail!("{CARGO_NIGHTLY_MSG}");
+    }
+    rustup_add_component("miri")?;
+    Ok(())
+}
+
+fn push_test_command_prefix(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
+    if args.miri {
+        cmd_args.push("miri".to_string());
+    }
+    cmd_args.push("test".to_string());
 }

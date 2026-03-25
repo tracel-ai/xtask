@@ -488,6 +488,9 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub no_default_features: bool,
+                #[doc = r"Run tests through Miri. Requires a nightly toolchain."]
+                #[arg(long = "miri", required = false)]
+                pub miri: bool,
                 #[doc = r"Force execution of tests no matter the environment (i.e. authorize to execute tests in prod)."]
                 #[arg(
                     short = 'f',
@@ -742,6 +745,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
                         || ident_str == "ignore_audit"
                         || ident_str == "ignore_typos"
                         || ident_str == "jobs"
+                        || ident_str == "miri"
                         || ident_str == "no_default_features"
                         || ident_str == "no_capture"
                         || ident_str == "only"
