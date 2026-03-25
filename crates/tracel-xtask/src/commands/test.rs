@@ -273,6 +273,7 @@ fn ensure_miri_ready() -> Result<()> {
         anyhow::bail!("{CARGO_NIGHTLY_MSG}");
     }
     rustup_add_component("miri")?;
+    rustup_add_component("rust-src")?;
     Ok(())
 }
 
