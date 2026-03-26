@@ -8,6 +8,14 @@ use syn::{
     token::Comma,
 };
 
+struct CollectedCommandFields {
+    fields: Vec<syn::Field>,
+    target_type: Option<Meta>,
+    subcommand_type: Option<Meta>,
+}
+
+type CollectFieldsResult = Result<CollectedCommandFields, TokenStream>;
+
 // Targets
 // =======
 
@@ -359,9 +367,11 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
         (
             "BuildCmdArgs",
             quote! {
+                #[inherit]
                 #[doc = r"Build artifacts in release mode."]
                 #[arg(short, long, required = false)]
                 pub release: bool,
+                #[inherit]
                 #[doc = r"Comma-separated list of features to enable."]
                 #[arg(
                     short = 'f',
@@ -371,43 +381,7 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub features: Vec<String>,
-                #[doc = r"Define whether to use default features."]
-                #[arg(long, default_value_t = false, required = false)]
-                pub no_default_features: bool,
-            },
-        ),
-        (
-            "FixCmdArgs",
-            quote! {
-                #[doc = r"Comma-separated list of features to enable."]
-                #[arg(
-                    short = 'f',
-                    long,
-                    value_name = "FEATURES,FEATURES,...",
-                    value_delimiter = ',',
-                    required = false
-                )]
-                pub features: Vec<String>,
-                #[doc = r"Define whether to use default features."]
-                #[arg(long, default_value_t = false, required = false)]
-                pub no_default_features: bool,
-                #[doc = r"If set then bypass confirmation prompt."]
-                #[arg(short = 'y', long, global = true)]
-                pub yes: bool,
-            },
-        ),
-        (
-            "DocCmdArgs",
-            quote! {
-                #[doc = r"Comma-separated list of features to enable."]
-                #[arg(
-                    short = 'f',
-                    long,
-                    value_name = "FEATURES,FEATURES,...",
-                    value_delimiter = ',',
-                    required = false
-                )]
-                pub features: Vec<String>,
+                #[inherit]
                 #[doc = r"Define whether to use default features."]
                 #[arg(long, default_value_t = false, required = false)]
                 pub no_default_features: bool,
@@ -416,12 +390,15 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
         (
             "CheckCmdArgs",
             quote! {
+                #[inherit]
                 #[doc = r"Ignore audit errors."]
                 #[arg(long = "ignore-audit", required = false)]
                 pub ignore_audit: bool,
+                #[inherit]
                 #[doc = r"Ignore typos errors."]
                 #[arg(long = "ignore-typos", required = false)]
                 pub ignore_typos: bool,
+                #[inherit]
                 #[doc = r"Comma-separated list of features to enable."]
                 #[arg(
                     short = 'f',
@@ -431,6 +408,27 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub features: Vec<String>,
+                #[inherit]
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
+            },
+        ),
+        (
+            "DocCmdArgs",
+            quote! {
+                #[inherit]
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                #[inherit]
+                pub features: Vec<String>,
+                #[inherit]
                 #[doc = r"Define whether to use default features."]
                 #[arg(long, default_value_t = false, required = false)]
                 pub no_default_features: bool,
@@ -439,85 +437,24 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
         (
             "DockerComposeCmdArgs",
             quote! {
+                #[inherit]
                 #[doc = r"Build images before starting containers."]
                 #[arg(short, long, required = false)]
                 pub build: bool,
+                #[inherit]
                 #[doc = r"Project name."]
                 #[arg(short, long, default_value = "xtask")]
                 pub project: String,
+                #[inherit]
                 #[doc = r"Space separated list of service subset to start. If empty then launch all the services in the stack."]
                 #[arg(short, long, num_args(1..), required = false)]
                 pub services: Vec<String>,
             },
         ),
         (
-            "TestCmdArgs",
+            "FixCmdArgs",
             quote! {
-                #[doc = r"Execute only the test whose name matches the passed string."]
-                #[arg(
-                    long = "test",
-                    value_name = "TEST",
-                    required = false
-                )]
-                pub test: Option<String>,
-                #[doc = r"Maximum number of parallel test crate compilations."]
-                #[arg(
-                    long = "compilation-jobs",
-                    value_name = "NUMBER OF THREADS",
-                    required = false
-                )]
-                pub jobs: Option<u16>,
-                #[doc = r"Maximum number of parallel test within a test crate execution."]
-                #[arg(
-                    long = "test-threads",
-                    value_name = "NUMBER OF THREADS",
-                    required = false
-                )]
-                pub threads: Option<u16>,
-                #[doc = r"Comma-separated list of features to enable during tests."]
-                #[arg(
-                    long,
-                    value_name = "FEATURE,FEATURE,...",
-                    value_delimiter = ',',
-                    required = false
-                )]
-                pub features: Option<Vec<String>>,
-                #[doc = r"If set, ignore default features."]
-                #[arg(
-                    long = "no-default-features",
-                    required = false
-                )]
-                pub no_default_features: bool,
-                #[doc = r"Run tests through Miri. Requires a nightly toolchain."]
-                #[arg(long = "miri", required = false)]
-                pub miri: bool,
-                #[doc = r"Force execution of tests no matter the environment (i.e. authorize to execute tests in prod)."]
-                #[arg(
-                    short = 'f',
-                    long = "force",
-                    required = false
-                )]
-                pub force: bool,
-                #[doc = r"If set, test logs are sent to output."]
-                #[arg(long = "nocapture", required = false)]
-                pub no_capture: bool,
-                #[doc = r"Build test in release mode."]
-                #[arg(short = 'r', long = "release", required = false)]
-                pub release: bool,
-            },
-        ),
-        (
-            "ValidateCmdArgs",
-            quote! {
-                #[doc = r"Ignore audit errors."]
-                #[arg(long = "ignore-audit", required = false)]
-                pub ignore_audit: bool,
-                #[doc = r"Ignore typos errors."]
-                #[arg(long = "ignore-typos", required = false)]
-                pub ignore_typos: bool,
-                #[doc = r"Build in release mode."]
-                #[arg(short = 'r', long = "release", required = false)]
-                pub release: bool,
+                #[inherit]
                 #[doc = r"Comma-separated list of features to enable."]
                 #[arg(
                     short = 'f',
@@ -527,12 +464,239 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                     required = false
                 )]
                 pub features: Vec<String>,
+                #[inherit]
+                #[doc = r"Define whether to use default features."]
+                #[arg(long, default_value_t = false, required = false)]
+                pub no_default_features: bool,
+                #[inherit]
+                #[doc = r"If set then bypass confirmation prompt."]
+                #[arg(short = 'y', long, global = true)]
+                pub yes: bool,
+            },
+        ),
+        (
+            "InfraCmdArgs",
+            quote! {
+                #[inherit]
+                #[doc = r"Path where to generate or read the infra configuration."]
+                #[arg(long, default_value = "./.tfstates")]
+                pub path: PathBuf,
+                #[inherit]
+                #[doc = r"Path to the Terraform plan file used by `plan` and `apply`."]
+                #[arg(long, default_value = "tfplan")]
+                pub out: PathBuf,
+            },
+        ),
+        (
+            "TestCmdArgs",
+            quote! {
+                #[inherit]
+                #[doc = r"Execute only the test whose name matches the passed string."]
+                #[arg(
+                    long = "test",
+                    value_name = "TEST",
+                    required = false
+                )]
+                pub test: Option<String>,
+                #[inherit]
+                #[doc = r"Maximum number of parallel test crate compilations."]
+                #[arg(
+                    long = "compilation-jobs",
+                    value_name = "NUMBER OF THREADS",
+                    required = false
+                )]
+                pub jobs: Option<u16>,
+                #[inherit]
+                #[doc = r"Maximum number of parallel test within a test crate execution."]
+                #[arg(
+                    long = "test-threads",
+                    value_name = "NUMBER OF THREADS",
+                    required = false
+                )]
+                pub threads: Option<u16>,
+                #[inherit]
+                #[doc = r"Comma-separated list of features to enable during tests."]
+                #[arg(
+                    long,
+                    value_name = "FEATURE,FEATURE,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Option<Vec<String>>,
+                #[inherit]
+                #[doc = r"If set, ignore default features."]
+                #[arg(
+                    long = "no-default-features",
+                    required = false
+                )]
+                pub no_default_features: bool,
+                #[inherit]
+                #[doc = r"Run tests through Miri. Requires a nightly toolchain."]
+                #[arg(long = "miri", required = false)]
+                pub miri: bool,
+                #[inherit]
+                #[doc = r"Force execution of tests no matter the environment (i.e. authorize to execute tests in prod)."]
+                #[arg(
+                    short = 'f',
+                    long = "force",
+                    required = false
+                )]
+                pub force: bool,
+                #[inherit]
+                #[doc = r"If set, test logs are sent to output."]
+                #[arg(long = "nocapture", required = false)]
+                pub no_capture: bool,
+                #[inherit]
+                #[doc = r"Build test in release mode."]
+                #[arg(short = 'r', long = "release", required = false)]
+                pub release: bool,
+            },
+        ),
+        (
+            "ValidateCmdArgs",
+            quote! {
+                #[inherit]
+                #[doc = r"Ignore audit errors."]
+                #[arg(long = "ignore-audit", required = false)]
+                pub ignore_audit: bool,
+                #[inherit]
+                #[doc = r"Ignore typos errors."]
+                #[arg(long = "ignore-typos", required = false)]
+                pub ignore_typos: bool,
+                #[inherit]
+                #[doc = r"Build in release mode."]
+                #[arg(short = 'r', long = "release", required = false)]
+                pub release: bool,
+                #[inherit]
+                #[doc = r"Comma-separated list of features to enable."]
+                #[arg(
+                    short = 'f',
+                    long,
+                    value_name = "FEATURES,FEATURES,...",
+                    value_delimiter = ',',
+                    required = false
+                )]
+                pub features: Vec<String>,
+                #[inherit]
                 #[doc = r"Define whether to use default features."]
                 #[arg(long, default_value_t = false, required = false)]
                 pub no_default_features: bool,
             },
         ),
     ])
+}
+
+fn collect_generated_command_fields(
+    args: &Punctuated<Meta, Comma>,
+    item: &ItemStruct,
+) -> CollectFieldsResult {
+    let struct_name = &item.ident;
+
+    let mut target_type: Option<Meta> = None;
+    let mut subcommand_type: Option<Meta> = None;
+
+    if args.len() == 2 {
+        // from declare_command_args
+        let ty = args.get(0).unwrap();
+        if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
+            target_type = Some(ty.clone());
+        }
+        let ty = args.get(1).unwrap();
+        if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
+            subcommand_type = Some(ty.clone());
+        }
+    } else if args.len() == 3 {
+        // from extend_command_args
+        let ty = args.get(1).unwrap();
+        if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
+            target_type = Some(ty.clone());
+        }
+        let ty = args.get(2).unwrap();
+        if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
+            subcommand_type = Some(ty.clone());
+        }
+    } else {
+        return Err(TokenStream::from(quote! {
+            compile_error!("Error expanding macro.");
+        }));
+    }
+
+    let target_fields_tokens = if let Some(target) = target_type.clone() {
+        quote! {
+            #[doc = r"The target on which executing the command."]
+            #[arg(short, long, value_enum, default_value_t = #target::default())]
+            pub target: #target,
+
+            #[inherit]
+            #[doc = r"Comma-separated list of excluded crates."]
+            #[arg(
+                short = 'x',
+                long,
+                value_name = "CRATE,CRATE,...",
+                value_delimiter = ',',
+                required = false
+            )]
+            pub exclude: Vec<String>,
+
+            #[inherit]
+            #[doc = r"Comma-separated list of crates to include exclusively."]
+            #[arg(
+                short = 'n',
+                long,
+                value_name = "CRATE,CRATE,...",
+                value_delimiter = ',',
+                required = false
+            )]
+            pub only: Vec<String>,
+        }
+    } else {
+        quote! {}
+    };
+
+    let additional_cmd_args_map = get_additional_cmd_args_map();
+    let mut base_command_type = struct_name.to_string();
+    if args.len() == 3 {
+        base_command_type = args.get(0).unwrap().path().get_ident().unwrap().to_string();
+    }
+
+    let additional_fields_tokens = match additional_cmd_args_map.get(base_command_type.as_str()) {
+        Some(fields) => fields.clone(),
+        None => quote! {},
+    };
+
+    let subcommand_field_tokens = if let Some(subcommand) = subcommand_type.clone() {
+        quote! {
+            #[command(subcommand)]
+            pub command: Option<#subcommand>,
+        }
+    } else {
+        quote! {}
+    };
+
+    let mut fields = Vec::new();
+
+    match parse_named_fields(target_fields_tokens) {
+        Ok(parsed) => fields.extend(parsed),
+        Err(e) => return Err(TokenStream::from(e.to_compile_error())),
+    }
+
+    match parse_named_fields(additional_fields_tokens) {
+        Ok(parsed) => fields.extend(parsed),
+        Err(e) => return Err(TokenStream::from(e.to_compile_error())),
+    }
+
+    match parse_named_fields(subcommand_field_tokens) {
+        Ok(parsed) => fields.extend(parsed),
+        Err(e) => return Err(TokenStream::from(e.to_compile_error())),
+    }
+
+    fields.extend(item.fields.iter().cloned());
+
+    Ok(CollectedCommandFields {
+        fields,
+        target_type,
+        subcommand_type,
+    })
 }
 
 // Returns a tuple where 0 is the actual struct and 1 is additional implementations
@@ -549,7 +713,18 @@ fn generate_command_args_struct(
         Err(e) => return (TokenStream::from(e.to_compile_error()), TokenStream::new()),
     };
     let struct_name = &item.ident;
-    let original_fields = item.fields.iter().map(|f| {
+
+    let CollectedCommandFields {
+        fields,
+        target_type: _target_type,
+        subcommand_type,
+    } = match collect_generated_command_fields(&args, &item) {
+        Ok(v) => v,
+        Err(e) => return (e, TokenStream::new()),
+    };
+
+    let emitted_fields = fields.iter().map(|f| {
+        let f = strip_internal_field_attrs(f);
         let attrs = &f.attrs;
         let vis = &f.vis;
         let ident = &f.ident;
@@ -560,158 +735,89 @@ fn generate_command_args_struct(
         }
     });
 
-    if args.is_empty() {
-        let struct_output = TokenStream::from(quote! {
-            #[derive(clap::Args, Clone)]
-            pub struct #struct_name {
-                #(#original_fields,)*
+    let struct_output = TokenStream::from(quote! {
+        #[derive(clap::Args, Clone)]
+        pub struct #struct_name {
+            #(#emitted_fields,)*
+        }
+    });
+
+    let (subcommand_impl, maybe_subcommand_enum) = if let Some(subcommand) = subcommand_type {
+        let subcommand_impl = quote! {
+            impl #struct_name {
+                pub fn get_command(&self) -> #subcommand {
+                    self.command.clone().unwrap_or_default()
+                }
             }
-        });
-        (struct_output, TokenStream::new())
+        };
+
+        let maybe_subcommand_enum = if args.len() == 2 {
+            let subcommand_ident = subcommand.path().get_ident().unwrap();
+            let subcommand_string = subcommand_ident.to_string();
+            let original_variants = Punctuated::<Variant, Comma>::new();
+            generate_subcommand_enum(subcommand_string, subcommand_ident, &original_variants)
+        } else {
+            TokenStream::new()
+        };
+
+        (TokenStream::from(subcommand_impl), maybe_subcommand_enum)
     } else {
-        let mut target_type: Option<Meta> = None;
-        let mut subcommand_type: Option<Meta> = None;
-        if args.len() == 2 {
-            // from declare_command_args
-            let ty = args.get(0).unwrap();
-            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
-                target_type = Some(ty.clone());
-            }
-            let ty = args.get(1).unwrap();
-            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
-                subcommand_type = Some(ty.clone());
-            }
-        } else if args.len() == 3 {
-            // from extend_command_args
-            let ty = args.get(1).unwrap();
-            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
-                target_type = Some(ty.clone());
-            }
-            let ty = args.get(2).unwrap();
-            if ty.path().get_ident().unwrap().to_string().as_str() != "None" {
-                subcommand_type = Some(ty.clone());
-            }
-        } else {
-            return (
-                TokenStream::from(quote! {
-                    compile_error!("Error expanding macro.");
-                }),
-                TokenStream::new(),
-            );
-        };
+        (TokenStream::new(), TokenStream::new())
+    };
 
-        let target_fields = if let Some(target) = target_type {
-            quote! {
-                #[doc = r"The target on which executing the command."]
-                #[arg(short, long, value_enum, default_value_t = #target::default())]
-                pub target: #target,
-                #[doc = r"Comma-separated list of excluded crates."]
-                #[arg(
-                    short = 'x',
-                    long,
-                    value_name = "CRATE,CRATE,...",
-                    value_delimiter = ',',
-                    required = false
-                )]
-                pub exclude: Vec<String>,
-                #[doc = r"Comma-separated list of crates to include exclusively."]
-                #[arg(
-                    short = 'n',
-                    long,
-                    value_name = "CRATE,CRATE,...",
-                    value_delimiter = ',',
-                    required = false
-                )]
-                pub only: Vec<String>,
-            }
-        } else {
-            quote! {}
-        };
+    let mut additional_output = TokenStream::new();
+    additional_output.extend(subcommand_impl);
+    additional_output.extend(maybe_subcommand_enum);
 
-        let additional_cmd_args_map = get_additional_cmd_args_map();
-        let mut base_command_type = struct_name.to_string();
-        if args.len() == 3 {
-            base_command_type = args.get(0).unwrap().path().get_ident().unwrap().to_string();
-        }
-        let additional_fields = match additional_cmd_args_map.get(base_command_type.as_str()) {
-            Some(fields) => fields.clone(),
-            None => quote! {},
-        };
-
-        let (subcommand_field, subcommand_impl) = if let Some(subcommand) = subcommand_type.clone()
-        {
-            (
-                quote! {
-                    #[command(subcommand)]
-                    pub command: Option<#subcommand>,
-                },
-                quote! {
-                    impl #struct_name {
-                        pub fn get_command(&self) -> #subcommand {
-                            self.command.clone().unwrap_or_default()
-                        }
-                    }
-                },
-            )
-        } else {
-            (quote! {}, quote! {})
-        };
-
-        let struct_output = TokenStream::from(quote! {
-            #[derive(clap::Args, Clone)]
-            pub struct #struct_name {
-                #target_fields
-                #additional_fields
-                #subcommand_field
-                #(#original_fields,)*
-            }
-        });
-        let mut additional_output = TokenStream::from(quote! {
-            #subcommand_impl
-        });
-        // generate the subcommand enum only when it is declared
-        if args.len() == 2 {
-            if let Some(subcommand) = subcommand_type {
-                let subcommand_ident = subcommand.path().get_ident().unwrap();
-                let subcommand_string = subcommand_ident.to_string();
-                let original_variants = Punctuated::<Variant, Comma>::new();
-                additional_output.extend(generate_subcommand_enum(
-                    subcommand_string,
-                    subcommand_ident,
-                    &original_variants,
-                ));
-            }
-        }
-        (struct_output, additional_output)
-    }
+    (struct_output, additional_output)
 }
 
 fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
     let base_type = args.get(0).unwrap();
     let base_type_string = base_type.path().get_ident().unwrap().to_string();
-    let item = parse_macro_input!(input as ItemStruct);
+
+    let item = match syn::parse::<ItemStruct>(input) {
+        Ok(data) => data,
+        Err(e) => return TokenStream::from(e.to_compile_error()),
+    };
     let item_ident = &item.ident;
-    let has_target = item.fields.iter().any(|f| {
+
+    let CollectedCommandFields {
+        fields,
+        target_type: _target_type,
+        subcommand_type: _subcommand_type,
+    } = match collect_generated_command_fields(&args, &item) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+
+    let has_target = fields.iter().any(|f| {
         if let Some(ident) = &f.ident {
             *ident == "target"
         } else {
             false
         }
     });
-    // check if the base command has subcommands
+
+    // Only forward `command` if:
+    // 1. the generated/extended struct has a `command` field
+    // 2. the base command type itself supports subcommands
     let subcommand_variant_map = get_subcommand_variant_map();
     let base_subcommand_type_string = base_type_string.replace("CmdArgs", "SubCommand");
-    let has_subcommand = subcommand_variant_map.contains_key(base_subcommand_type_string.as_str())
-        && item.fields.iter().any(|f| {
-            if let Some(ident) = &f.ident {
-                *ident == "command"
-            } else {
-                false
-            }
-        });
+    let base_has_subcommand =
+        subcommand_variant_map.contains_key(base_subcommand_type_string.as_str());
 
-    // expand
+    let has_command_field = fields.iter().any(|f| {
+        if let Some(ident) = &f.ident {
+            *ident == "command"
+        } else {
+            false
+        }
+    });
+
+    let has_subcommand = base_has_subcommand && has_command_field;
+
     let target = if has_target {
         quote! {
             target: self.target.try_into()?,
@@ -719,6 +825,7 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     } else {
         quote! {}
     };
+
     let (subcommand_let, subcommand_assign) = if has_subcommand {
         (
             quote! {
@@ -731,33 +838,13 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     } else {
         (quote! {}, quote! {})
     };
-    let fields: Vec<_> = item
-        .fields
+
+    let forwarded_fields: Vec<_> = fields
         .iter()
+        .filter(|f| has_inherit_attr(f))
         .filter_map(|f| {
             f.ident.as_ref().map(|ident| {
-                let ident_str = ident.to_string();
-                // TODO this hardcoded predicate is awful, find a way to make this better
-                if ident_str != "target"
-                    && (ident_str == "exclude"
-                        || ident_str == "features"
-                        || ident_str == "force"
-                        || ident_str == "ignore_audit"
-                        || ident_str == "ignore_typos"
-                        || ident_str == "jobs"
-                        || ident_str == "miri"
-                        || ident_str == "no_default_features"
-                        || ident_str == "no_capture"
-                        || ident_str == "only"
-                        || ident_str == "release"
-                        || ident_str == "test"
-                        || ident_str == "threads"
-                        || ident_str == "yes")
-                {
-                    quote! { #ident: self.#ident, }
-                } else {
-                    quote! {}
-                }
+                quote! { #ident: self.#ident, }
             })
         })
         .collect();
@@ -765,12 +852,13 @@ fn generate_command_args_tryinto(args: TokenStream, input: TokenStream) -> Token
     let tryinto = quote! {
         impl std::convert::TryInto<#base_type> for #item_ident {
             type Error = anyhow::Error;
+
             fn try_into(self) -> Result<#base_type, Self::Error> {
                 #subcommand_let
                 Ok(#base_type {
                     #target
                     #subcommand_assign
-                    #(#fields)*
+                    #(#forwarded_fields)*
                 })
             }
         }
@@ -800,6 +888,7 @@ pub fn declare_command_args(args: TokenStream, input: TokenStream) -> TokenStrea
 #[proc_macro_attribute]
 pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream {
     let args_clone = args.clone();
+    let input_clone = input.clone();
     let parsed_args =
         parse_macro_input!(args_clone with Punctuated::<Meta, Comma>::parse_terminated);
     if parsed_args.len() != 3 {
@@ -811,7 +900,7 @@ pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream
     }
     let mut output: TokenStream = quote! {}.into();
     let (struct_output, additional_output) = generate_command_args_struct(args.clone(), input);
-    let tryinto = generate_command_args_tryinto(args, struct_output.clone());
+    let tryinto = generate_command_args_tryinto(args, input_clone);
     output.extend(struct_output);
     output.extend(additional_output);
     output.extend(tryinto);
@@ -1140,4 +1229,37 @@ pub fn extend_subcommands(args: TokenStream, input: TokenStream) -> TokenStream 
         subcommand_ident,
     ));
     output
+}
+
+// Utils
+// =====
+
+fn has_inherit_attr(field: &syn::Field) -> bool {
+    field
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("inherit"))
+}
+
+fn strip_internal_field_attrs(field: &syn::Field) -> syn::Field {
+    let mut field = field.clone();
+    field.attrs.retain(|attr| !attr.path().is_ident("inherit"));
+    field
+}
+
+fn parse_named_fields(tokens: proc_macro2::TokenStream) -> Result<Vec<syn::Field>, syn::Error> {
+    if tokens.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let dummy: ItemStruct = syn::parse2(quote! {
+        struct __XtaskGeneratedFields {
+            #tokens
+        }
+    })?;
+
+    match dummy.fields {
+        syn::Fields::Named(fields) => Ok(fields.named.into_iter().collect()),
+        _ => unreachable!("dummy struct should always have named fields"),
+    }
 }
