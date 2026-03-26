@@ -3,18 +3,8 @@ use std::{fs, io::Write as _, path::PathBuf};
 
 use crate::{context::Context, prelude::Environment, utils::terraform};
 
-const DEFAULT_PATH: &str = "./.tfstates";
-
 #[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
-pub struct InfraCmdArgs {
-    /// Path where to generate or read the infra configuration.
-    #[arg(long, default_value = DEFAULT_PATH)]
-    pub path: PathBuf,
-
-    /// Path to the Terraform plan file used by `plan` and `apply`.
-    #[arg(long, default_value = "tfplan")]
-    pub out: PathBuf,
-}
+pub struct InfraCmdArgs {}
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
 struct InfraInstallSubCmdArgs {
