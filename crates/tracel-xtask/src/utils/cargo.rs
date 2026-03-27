@@ -5,6 +5,61 @@ use regex::Regex;
 
 use crate::{endgroup, group, utils::process::run_process};
 
+fn is_cargo_binstall_installed() -> bool {
+    Command::new("cargo")
+        .arg("binstall")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn install_cargo_binstall_without_compiling() -> anyhow::Result<()> {
+    // Official one-liner from cargo-binstall to install a prebuilt binary.
+    run_process(
+        "sh",
+        &[
+            "-c",
+            "curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash",
+        ],
+        None,
+        None,
+        "cargo-binstall should be installed",
+    )
+}
+
+fn ensure_cargo_binstall_is_installed() -> anyhow::Result<()> {
+    if is_cargo_binstall_installed() {
+        return Ok(());
+    }
+
+    group!("Cargo: install cargo-binstall");
+
+    let mut installed = install_cargo_binstall_without_compiling().is_ok();
+
+    if !installed {
+        warn!(
+            "Couldn't install cargo-binstall from prebuilt binary, falling back to 'cargo install cargo-binstall --locked'."
+        );
+        run_process(
+            "cargo",
+            &["install", "cargo-binstall", "--locked"],
+            None,
+            None,
+            "cargo-binstall should be installed",
+        )?;
+        installed = true;
+    }
+
+    endgroup!();
+
+    if installed {
+        Ok(())
+    } else {
+        anyhow::bail!("cargo-binstall should be installed")
+    }
+}
+
 /// Ensure that a cargo crate is installed
 pub fn ensure_cargo_crate_is_installed(
     crate_name: &str,
@@ -14,7 +69,10 @@ pub fn ensure_cargo_crate_is_installed(
 ) -> anyhow::Result<()> {
     if !is_cargo_crate_installed(crate_name) {
         group!("Cargo: install crate '{}'", crate_name);
-        let mut args = vec!["install", crate_name];
+
+        ensure_cargo_binstall_is_installed()?;
+
+        let mut args = vec!["binstall", "--no-confirm", crate_name];
         if locked {
             args.push("--locked");
         }
@@ -26,13 +84,41 @@ pub fn ensure_cargo_crate_is_installed(
         if let Some(version) = version {
             args.extend(vec!["--version", version]);
         }
-        run_process(
+
+        if let Err(err) = run_process(
             "cargo",
             &args,
             None,
             None,
             &format!("crate '{crate_name}' should be installed"),
-        )?;
+        ) {
+            warn!(
+                "Couldn't install '{}' with cargo-binstall ({err}), falling back to cargo install.",
+                crate_name
+            );
+
+            let mut fallback_args = vec!["install", crate_name];
+            if locked {
+                fallback_args.push("--locked");
+            }
+            if let Some(features) = features {
+                if !features.is_empty() {
+                    fallback_args.extend(vec!["--features", features]);
+                }
+            }
+            if let Some(version) = version {
+                fallback_args.extend(vec!["--version", version]);
+            }
+
+            run_process(
+                "cargo",
+                &fallback_args,
+                None,
+                None,
+                &format!("crate '{crate_name}' should be installed"),
+            )?;
+        }
+
         endgroup!();
     }
     Ok(())
