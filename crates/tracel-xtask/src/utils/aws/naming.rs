@@ -43,6 +43,7 @@ pub enum ResourceKind {
     SecretsManagerSecret,
     // Storage
     S3Bucket,
+    BackupVault,
 }
 
 impl ResourceKind {
@@ -54,7 +55,7 @@ impl ResourceKind {
             S3Bucket => 63,
             IamRole => 64,
             LaunchTemplate | IamInstanceProfile | IamRolePolicy | Instance | Volume | Vpc
-            | Subnet | SecretsManagerSecret => 128,
+            | Subnet | SecretsManagerSecret | BackupVault => 128,
             AutoScalingGroup | InternetGateway | NatGateway | Eip | SecurityGroup => 255,
             DataAmi
             | Listener
@@ -75,6 +76,7 @@ impl ResourceKind {
         match self {
             Alb => "alb",
             AutoScalingGroup => "asg",
+            BackupVault => "vault",
             DataAmi => "ami-data",
             Eip => "eip",
             IamInstanceProfile => "profile",
