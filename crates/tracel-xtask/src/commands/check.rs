@@ -92,6 +92,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
             run_process_for_workspace(
                 "cargo",
                 &["fmt", "--check"],
+                None,
                 &[],
                 None,
                 None,
@@ -114,6 +115,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
                     "cargo",
                     &member.name,
                     &["fmt", "--check", "-p", &member.name],
+                    None,
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -159,6 +161,7 @@ fn run_lint(
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
+                None,
                 &[],
                 None,
                 None,
@@ -196,6 +199,7 @@ fn run_lint(
                     "cargo",
                     &member.name,
                     &cmd_args,
+                    None,
                     excluded,
                     only,
                     &format!("Lint fix execution failed for {}", &member.name),

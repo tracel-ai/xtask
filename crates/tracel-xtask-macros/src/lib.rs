@@ -531,9 +531,16 @@ fn get_additional_cmd_args_map() -> HashMap<&'static str, proc_macro2::TokenStre
                 )]
                 pub no_default_features: bool,
                 #[inherit]
-                #[doc = r"Run tests through Miri. Requires a nightly toolchain."]
-                #[arg(long = "miri", required = false)]
-                pub miri: bool,
+                #[doc = r"Run tests through Miri. If passed without a value, defaults to all. Requires a nightly toolchain."]
+                #[arg(
+                    long = "miri",
+                    value_name = "MODE",
+                    value_enum,
+                    num_args = 0..2,
+                    default_missing_value = "all",
+                    required = false
+                )]
+                pub miri: Option<MiriMode>,
                 #[inherit]
                 #[doc = r"Force execution of tests no matter the environment (i.e. authorize to execute tests in prod)."]
                 #[arg(

@@ -38,6 +38,7 @@ pub(crate) fn run_compile(
             run_process_for_workspace(
                 "cargo",
                 &["check", "--workspace"],
+                None,
                 excluded,
                 None,
                 None,
@@ -60,6 +61,7 @@ pub(crate) fn run_compile(
                     "cargo",
                     &member.name,
                     &["check", "-p", &member.name],
+                    None,
                     excluded,
                     only,
                     &format!("Compilation failed for {}", &member.name),

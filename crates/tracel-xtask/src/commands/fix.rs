@@ -98,6 +98,7 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Re
             run_process_for_workspace(
                 "cargo",
                 &["fmt"],
+                None,
                 &[],
                 None,
                 None,
@@ -119,6 +120,7 @@ fn run_format(target: &Target, excluded: &Vec<String>, only: &Vec<String>) -> Re
                     "cargo",
                     &member.name,
                     &["fmt", "-p", &member.name],
+                    None,
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -173,6 +175,7 @@ fn run_lint(
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
+                None,
                 &[],
                 None,
                 None,
@@ -218,6 +221,7 @@ fn run_lint(
                     "cargo",
                     &member.name,
                     &cmd_args,
+                    None,
                     excluded,
                     only,
                     &format!("Lint fix execution failed for {}", &member.name),

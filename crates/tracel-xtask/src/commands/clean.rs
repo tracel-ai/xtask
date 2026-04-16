@@ -27,6 +27,7 @@ pub(crate) fn run_clean(target: &Target, args: &CleanCmdArgs) -> anyhow::Result<
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
+                None,
                 &args.exclude,
                 None,
                 None,
@@ -49,6 +50,7 @@ pub(crate) fn run_clean(target: &Target, args: &CleanCmdArgs) -> anyhow::Result<
                     "cargo",
                     &member.name,
                     &cmd_args,
+                    None,
                     &args.exclude,
                     &args.only,
                     &format!("Build command failed for {}", &member.name),

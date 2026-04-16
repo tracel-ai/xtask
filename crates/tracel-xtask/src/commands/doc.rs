@@ -63,6 +63,7 @@ fn run_documentation_build(
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
+                None,
                 excluded,
                 None,
                 None,
@@ -97,6 +98,7 @@ fn run_documentation_build(
                     "cargo",
                     &member.name,
                     &cmd_args,
+                    None,
                     excluded,
                     only,
                     &format!("Format check execution failed for {}", &member.name),
@@ -142,6 +144,7 @@ pub(crate) fn run_documentation(
             run_process_for_workspace(
                 "cargo",
                 &cmd_args,
+                None,
                 excluded,
                 Some(r"Doc-tests (\w+)"),
                 Some("Doc Tests"),
@@ -196,6 +199,7 @@ fn run_doc_test(
         "cargo",
         &member.name,
         &cmd_args,
+        None,
         excluded,
         only,
         &format!(

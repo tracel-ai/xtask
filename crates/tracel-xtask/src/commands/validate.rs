@@ -53,7 +53,7 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
             features: Some(args.features.clone()),
             no_default_features: args.no_default_features,
             no_capture: false,
-            miri: false,
+            miri: None,
             release: args.release,
         },
         env.clone(),
