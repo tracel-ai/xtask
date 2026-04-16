@@ -122,6 +122,7 @@ pub fn run_process_capture_stdout(cmd: &mut Command, label: &str) -> anyhow::Res
 pub fn run_process_for_workspace<'a>(
     name: &str,
     args: &[&'a str],
+    envs: Option<HashMap<&str, &str>>,
     excluded: &'a [String],
     group_regexp: Option<&str>,
     group_name: Option<&str>,
@@ -140,19 +141,22 @@ pub fn run_process_for_workspace<'a>(
     cmd_args.extend(binary_args);
     group_info!("Command line: cargo {}", cmd_args.join(" "));
     // process
-    let mut child = Command::new(name)
+    let mut command = Command::new(name);
+    command
         .args(&cmd_args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            anyhow::anyhow!(format!(
-                "Failed to start {} {}: {}",
-                name,
-                cmd_args.first().unwrap(),
-                e
-            ))
-        })?;
+        .stderr(Stdio::piped());
+    if let Some(envs) = envs {
+        command.envs(&envs);
+    }
+    let mut child = command.spawn().map_err(|e| {
+        anyhow::anyhow!(format!(
+            "Failed to start {} {}: {}",
+            name,
+            cmd_args.first().unwrap(),
+            e
+        ))
+    })?;
 
     // handle stdout and stderr in dedicated threads using a MPSC channel for synchronization
     let (tx, rx) = mpsc::channel();
@@ -162,7 +166,8 @@ pub fn run_process_for_workspace<'a>(
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
-                tx.send((line, false)).unwrap();
+                tx.send((line, false))
+                    .expect("stdout channel send should succeed while receiver is alive");
             }
         });
     }
@@ -172,7 +177,8 @@ pub fn run_process_for_workspace<'a>(
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().map_while(Result::ok) {
-                tx.send((line, true)).unwrap();
+                tx.send((line, true))
+                    .expect("stderr channel send should succeed while receiver is alive");
             }
         });
     }
@@ -219,7 +225,7 @@ pub fn run_process_for_workspace<'a>(
 
     let status = child
         .wait()
-        .expect("Should be able to wait for the process to finish.");
+        .expect("process wait should succeed after child process has started");
 
     if status.success() || ignore_error {
         if close_group {
@@ -237,6 +243,7 @@ pub fn run_process_for_package(
     name: &str,
     package: &String,
     args: &[&str],
+    envs: Option<HashMap<&str, &str>>,
     excluded: &[String],
     only: &[String],
     error_msg: &str,
@@ -250,19 +257,22 @@ pub fn run_process_for_package(
     let joined_args = args.join(" ");
     group_info!("Command line: cargo {}", &joined_args);
 
-    let mut child = Command::new(name)
+    let mut command = Command::new(name);
+    command
         .args(args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            anyhow::anyhow!(format!(
-                "Failed to start {} {}: {}",
-                name,
-                args.first().unwrap(),
-                e
-            ))
-        })?;
+        .stderr(Stdio::piped());
+    if let Some(envs) = envs {
+        command.envs(&envs);
+    }
+    let mut child = command.spawn().map_err(|e| {
+        anyhow::anyhow!(format!(
+            "Failed to start {} {}: {}",
+            name,
+            args.first().unwrap(),
+            e
+        ))
+    })?;
 
     // handle stdout and stderr in dedicated threads using a MPSC channel for synchronization
     let (tx, rx) = mpsc::channel();
@@ -272,7 +282,8 @@ pub fn run_process_for_package(
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
-                tx.send((line, false)).unwrap();
+                tx.send((line, false))
+                    .expect("stdout channel send should succeed while receiver is alive");
             }
         });
     }
@@ -282,7 +293,8 @@ pub fn run_process_for_package(
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().map_while(Result::ok) {
-                tx.send((line, true)).unwrap();
+                tx.send((line, true))
+                    .expect("stderr channel send should succeed while receiver is alive");
             }
         });
     }
@@ -318,7 +330,7 @@ pub fn run_process_for_package(
 
     let status = child
         .wait()
-        .expect("Should be able to wait for the process to finish.");
+        .expect("process wait should succeed after child process has started");
 
     if status.success() || ignore_error {
         anyhow::Ok(())
