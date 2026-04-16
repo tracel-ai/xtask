@@ -25,6 +25,30 @@ pub enum MiriMode {
     UbOnly,
 }
 
+impl MiriMode {
+    pub fn envs(self) -> Option<HashMap<&'static str, &'static str>> {
+        match self {
+            Self::All => None,
+            Self::UbOnly => Some(HashMap::from([("MIRIFLAGS", "-Zmiri-ignore-leaks")])),
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::All => "Undefined Behavior + Memory Leaks",
+            Self::UbOnly => "Undefined Behavior Only",
+        }
+    }
+
+    pub fn print_enabled(self) {
+        info!("Miri is enabled");
+    }
+
+    pub fn print_mode_info(self) {
+        info!("Miri mode: {}", self.description());
+    }
+}
+
 #[tracel_xtask_macros::declare_command_args(Target, TestSubCommand)]
 pub struct TestCmdArgs {}
 
@@ -119,16 +143,11 @@ fn push_test_harness_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
     }
 }
 
-fn build_miri_env(args: &TestCmdArgs) -> Option<HashMap<&'static str, &'static str>> {
-    match args.miri {
-        Some(MiriMode::UbOnly) => Some(HashMap::from([("MIRIFLAGS", "-Zmiri-ignore-leaks")])),
-        _ => None,
-    }
-}
-
 pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
-    if args.miri.is_some() {
+    if let Some(mode) = args.miri {
         ensure_miri_ready()?;
+        mode.print_enabled();
+        mode.print_mode_info();
     }
 
     match target {
@@ -137,7 +156,6 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
 
             let test = args.test.as_deref().unwrap_or("");
             let mut cmd_args = Vec::new();
-
             push_test_command_prefix(&mut cmd_args, args);
             cmd_args.extend([
                 "--workspace".to_string(),
@@ -145,18 +163,16 @@ pub fn run_unit(target: &Target, args: &TestCmdArgs) -> Result<()> {
                 "--bins".to_string(),
                 "--examples".to_string(),
             ]);
-
             if !test.is_empty() {
                 cmd_args.push(test.to_string());
             }
-
             push_cargo_optional_args(&mut cmd_args, args);
             push_test_harness_args(&mut cmd_args, args);
 
             run_process_for_workspace(
                 "cargo",
                 &cmd_args.iter().map(String::as_str).collect::<Vec<_>>(),
-                build_miri_env(args),
+                args.miri.and_then(MiriMode::envs),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Unit Tests"),
@@ -213,7 +229,7 @@ pub fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<()>
         "cargo",
         &member.name,
         &cmd_args.iter().map(String::as_str).collect::<Vec<_>>(),
-        build_miri_env(args),
+        args.miri.and_then(MiriMode::envs),
         &args.exclude,
         &args.only,
         &format!("Failed to execute unit test for '{}'", member.name),
@@ -229,8 +245,10 @@ pub fn run_unit_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<()>
 }
 
 pub fn run_integration(target: &Target, args: &TestCmdArgs) -> Result<()> {
-    if args.miri.is_some() {
+    if let Some(mode) = args.miri {
         ensure_miri_ready()?;
+        mode.print_enabled();
+        mode.print_mode_info();
     }
 
     match target {
@@ -253,7 +271,7 @@ pub fn run_integration(target: &Target, args: &TestCmdArgs) -> Result<()> {
             run_process_for_workspace(
                 "cargo",
                 &cmd_args.iter().map(String::as_str).collect::<Vec<_>>(),
-                build_miri_env(args),
+                args.miri.and_then(MiriMode::envs),
                 &args.exclude,
                 Some(r".*target/[^/]+/deps/([^-\s]+)"),
                 Some("Integration Tests"),
@@ -303,7 +321,7 @@ fn run_integration_test(member: &WorkspaceMember, args: &TestCmdArgs) -> Result<
         "cargo",
         &member.name,
         &cmd_args.iter().map(String::as_str).collect::<Vec<_>>(),
-        build_miri_env(args),
+        args.miri.and_then(MiriMode::envs),
         &args.exclude,
         &args.only,
         &format!("Failed to execute integration test for '{}'", member.name),
