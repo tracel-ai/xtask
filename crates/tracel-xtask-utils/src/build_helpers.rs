@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::Ok;
 
-use crate::{endgroup, group, utils::process::run_process};
+use crate::{endgroup, group, process::run_process};
 
 /// Allow to build additional crates outside the common build commands
 pub fn custom_crates_build(

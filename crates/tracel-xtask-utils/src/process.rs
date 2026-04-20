@@ -207,7 +207,7 @@ pub fn run_process_for_workspace<'a>(
         if let Some(log) = ignore_log {
             if line.contains(log) {
                 if let Some(msg) = ignore_msg {
-                    warn!("{msg}");
+                    log::warn!("{msg}");
                 }
                 ignore_error = true;
                 skip_line = true;
@@ -313,7 +313,7 @@ pub fn run_process_for_package(
             }
             if line.contains(log) {
                 if let Some(msg) = ignore_msg {
-                    warn!("{msg}");
+                    log::warn!("{msg}");
                     ignore_error = true;
                     skip_line = true;
                 }

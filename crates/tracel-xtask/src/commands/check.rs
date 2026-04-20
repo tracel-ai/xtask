@@ -1,16 +1,16 @@
 use anyhow::Ok;
 use strum::IntoEnumIterator;
+use tracel_xtask_utils::{
+    cargo::ensure_cargo_crate_is_installed,
+    endgroup,
+    environment::Environment,
+    group,
+    process::{run_process, run_process_for_package, run_process_for_workspace},
+    workspace::{WorkspaceMemberType, get_workspace_members},
+};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        cargo::ensure_cargo_crate_is_installed,
-        process::{run_process, run_process_for_package, run_process_for_workspace},
-        workspace::{WorkspaceMemberType, get_workspace_members},
-    },
-    versions::TYPOS_VERSION,
+    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, context::Context, versions::TYPOS_VERSION,
 };
 
 use super::Target;
@@ -20,14 +20,14 @@ pub struct CheckCmdArgs {}
 
 pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-        warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
+        log::warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
     }
 
     match args.get_command() {
         CheckSubCommand::Audit => {
             let res = run_audit();
             if res.is_err() && args.ignore_audit {
-                warn!("Ignoring audit error because of '--ignore-audit' flag.");
+                log::warn!("Ignoring audit error because of '--ignore-audit' flag.");
                 Ok(())
             } else {
                 res
@@ -44,7 +44,7 @@ pub fn handle_command(args: CheckCmdArgs, _env: Environment, _ctx: Context) -> a
         CheckSubCommand::Typos => {
             let res = run_typos();
             if res.is_err() && args.ignore_typos {
-                warn!("Ignoring typos error because of '--ignore-typos' flag.");
+                log::warn!("Ignoring typos error because of '--ignore-typos' flag.");
                 Ok(())
             } else {
                 res

@@ -31,6 +31,7 @@ strum = { workspace = true }
 time = { workspace = true }
 toml = { workspace = true }
 tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=4.16.0" }
+tracel-xtask-utils = { path = "../tracel-xtask-utils", version = "=4.16.0", features = ["all"] }
 ureq = { workspace = true }
 zip = { workspace = true }
 

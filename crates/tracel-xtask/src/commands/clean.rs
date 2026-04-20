@@ -1,14 +1,14 @@
 use anyhow::Ok;
 use strum::IntoEnumIterator;
-
-use crate::{
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        process::{run_process_for_package, run_process_for_workspace},
-        workspace::{WorkspaceMemberType, get_workspace_members},
-    },
+use tracel_xtask_utils::{
+    endgroup,
+    environment::Environment,
+    group,
+    process::{run_process_for_package, run_process_for_workspace},
+    workspace::{WorkspaceMemberType, get_workspace_members},
 };
+
+use crate::context::Context;
 
 use super::Target;
 

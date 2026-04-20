@@ -1758,6 +1758,7 @@ dependencies = [
  "time",
  "toml",
  "tracel-xtask-macros",
+ "tracel-xtask-utils",
  "ureq",
  "zip",
 ]
@@ -1777,6 +1778,32 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tracel-xtask-utils"
+version = "4.16.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ctrlc",
+ "dotenvy",
+ "env_logger",
+ "home",
+ "inquire",
+ "log",
+ "owo-colors",
+ "rand",
+ "regex",
+ "rstest",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "strum",
+ "time",
+ "toml",
+ "ureq",
+ "zip",
 ]
 
 [[package]]

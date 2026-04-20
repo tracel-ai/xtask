@@ -3,7 +3,7 @@ use std::process::Command;
 use anyhow::Ok;
 use regex::Regex;
 
-use crate::{endgroup, group, utils::process::run_process};
+use crate::{endgroup, group, process::run_process};
 
 /// Ensure that a cargo crate is installed
 pub fn ensure_cargo_crate_is_installed(

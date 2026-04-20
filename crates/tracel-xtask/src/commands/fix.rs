@@ -1,17 +1,17 @@
 use anyhow::{Ok, Result};
 use strum::IntoEnumIterator;
+use tracel_xtask_utils::{
+    cargo::ensure_cargo_crate_is_installed,
+    endgroup,
+    environment::Environment,
+    group,
+    process::{run_process, run_process_for_package, run_process_for_workspace},
+    prompt::ask_once,
+    workspace::{WorkspaceMemberType, get_workspace_members},
+};
 
 use crate::{
-    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS,
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        cargo::ensure_cargo_crate_is_installed,
-        process::{run_process, run_process_for_package, run_process_for_workspace},
-        prompt::ask_once,
-        workspace::{WorkspaceMemberType, get_workspace_members},
-    },
-    versions::TYPOS_VERSION,
+    commands::WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS, context::Context, versions::TYPOS_VERSION,
 };
 
 use super::Target;
@@ -68,7 +68,7 @@ pub fn warning_prompt(answer: Option<bool>, args: &FixCmdArgs) -> Option<bool> {
     }
     if answer.is_none() {
         if args.target == Target::Workspace && (!args.exclude.is_empty() || !args.only.is_empty()) {
-            warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
+            log::warn!("{WARN_IGNORED_EXCLUDE_AND_ONLY_ARGS}");
         }
         return Some(ask_once(
             "This will run the check with autofix mode enabled.",

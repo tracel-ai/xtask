@@ -1,15 +1,14 @@
 use anyhow::Ok;
 use strum::IntoEnumIterator;
-
-use crate::{
-    commands::WARN_IGNORED_ONLY_ARGS,
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        process::{run_process_for_package, run_process_for_workspace},
-        workspace::{WorkspaceMemberType, get_workspace_members},
-    },
+use tracel_xtask_utils::{
+    endgroup,
+    environment::Environment,
+    group,
+    process::{run_process_for_package, run_process_for_workspace},
+    workspace::{WorkspaceMemberType, get_workspace_members},
 };
+
+use crate::{commands::WARN_IGNORED_ONLY_ARGS, context::Context};
 
 use super::Target;
 
@@ -18,7 +17,7 @@ pub struct BuildCmdArgs {}
 
 pub fn handle_command(args: BuildCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{WARN_IGNORED_ONLY_ARGS}");
+        log::warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     run_build(&args.target, &args)
 }

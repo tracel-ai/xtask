@@ -2,9 +2,6 @@ mod commands;
 
 use tracel_xtask::{init_xtask, prelude::*};
 
-#[macro_use]
-extern crate log;
-
 #[macros::base_commands(
     Bump,
     Build,

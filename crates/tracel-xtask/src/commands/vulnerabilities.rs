@@ -1,18 +1,18 @@
 use anyhow::{Ok, anyhow};
+use log::info;
 use std::process::Command as StdCommand;
 
-use crate::{
-    commands::CARGO_NIGHTLY_MSG,
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        cargo::ensure_cargo_crate_is_installed,
-        process::run_process,
-        rustup::{
-            is_current_toolchain_nightly, rustup_add_component, rustup_get_installed_targets,
-        },
-    },
+use crate::commands::CARGO_NIGHTLY_MSG;
+use tracel_xtask_utils::{
+    cargo::ensure_cargo_crate_is_installed,
+    endgroup,
+    environment::Environment,
+    group,
+    process::run_process,
+    rustup::{is_current_toolchain_nightly, rustup_add_component, rustup_get_installed_targets},
 };
+
+use crate::context::Context;
 
 #[tracel_xtask_macros::declare_command_args(None, VulnerabilitiesSubCommand)]
 pub struct VulnerabilitiesCmdArgs {}
@@ -79,7 +79,7 @@ fn run_cargo_careful() -> anyhow::Result<()> {
         )?;
         endgroup!();
     } else {
-        error!("{CARGO_NIGHTLY_MSG}");
+        log::error!("{CARGO_NIGHTLY_MSG}");
     }
     Ok(())
 }
@@ -149,7 +149,7 @@ impl Sanitizer {
             }
             endgroup!();
         } else {
-            error!("{CARGO_NIGHTLY_MSG}");
+            log::error!("{CARGO_NIGHTLY_MSG}");
         }
         Ok(())
     }

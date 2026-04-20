@@ -1,0 +1,99 @@
+[package]
+authors = ["Tracel Technologies Inc."]
+categories = ["command-line-interface", "command-line-utilities", "development-tools"]
+description = "Utility functions for xtask-tracel crates."
+edition.workspace = true
+keywords = ["xtask", "utility", "dotenv", "loader"]
+license.workspace = true
+name = "tracel-xtask-utils"
+readme.workspace = true
+repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask-utils"
+rust-version = "1.85"
+version.workspace = true
+
+[features]
+default = ["all"]
+# all modules
+all = [
+  "aws",
+  "cargo",
+  "cleanup",
+  "clap",
+  "environment",
+  "git",
+  "helpers",
+  "logging",
+  "process",
+  "prompt",
+  "rustup",
+  "terraform",
+  "time",
+  "workspace",
+]
+
+aws = [
+  "process",
+  "dep:anyhow",
+  "dep:inquire",
+  "dep:owo-colors",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:time",
+]
+cargo = ["logging", "dep:anyhow", "dep:regex"]
+clap = ["dep:clap"]
+cleanup = ["logging", "dep:ctrlc"]
+environment = [
+  "git",
+  "logging",
+  "dep:anyhow",
+  "dep:dotenvy",
+  "dep:strum",
+]
+git = ["dep:anyhow"]
+helpers = ["logging", "dep:anyhow", "process"]
+logging = ["dep:log", "dep:env_logger"]
+process = [
+  "logging",
+  "dep:anyhow",
+  "dep:rand",
+  "dep:regex",
+  "dep:log",]
+prompt = []
+rustup = ["logging", "dep:anyhow", "process"]
+terraform = [
+  "environment",
+  "process",
+  "dep:anyhow",
+  "dep:home",
+  "dep:serde",
+  "dep:toml",
+  "dep:ureq",
+  "dep:zip",
+]
+time = []
+workspace = ["dep:serde_json"]
+
+[dependencies]
+anyhow = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+ctrlc = { workspace = true, optional = true }
+dotenvy = { workspace = true, optional = true }
+env_logger = { workspace = true, optional = true }
+home = { workspace = true, optional = true }
+inquire = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
+owo-colors = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+strum = { workspace = true, optional = true }
+time = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
+zip = { workspace = true, optional = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+serial_test = { workspace = true }

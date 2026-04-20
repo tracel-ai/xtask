@@ -7,7 +7,7 @@ use std::{
 
 use strum::{EnumIter, EnumString, IntoEnumIterator as _};
 
-use crate::{group_error, group_info, utils::git};
+use crate::{git, group_error, group_info};
 
 /// Implicit index which means that index '1' is omitted in display.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -204,21 +204,21 @@ impl<M: IndexStyle> Environment<M> {
     }
 }
 
-#[derive(EnumString, EnumIter, Default, Clone, Debug, PartialEq, clap::ValueEnum)]
+#[derive(EnumString, EnumIter, Default, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[strum(serialize_all = "lowercase")]
 pub enum EnvironmentName {
-    /// Development environment (alias: dev).
     #[default]
-    #[clap(alias = "dev")]
+    #[cfg_attr(feature = "clap", clap(alias = "dev"))]
     Development,
-    /// Staging environment (alias: stag).
-    #[clap(alias = "stag")]
+
+    #[cfg_attr(feature = "clap", clap(alias = "stag"))]
     Staging,
-    /// Testing environment (alias: test).
-    #[clap(alias = "test")]
+
+    #[cfg_attr(feature = "clap", clap(alias = "test"))]
     Test,
-    /// Production environment (alias: prod).
-    #[clap(alias = "prod")]
+
+    #[cfg_attr(feature = "clap", clap(alias = "prod"))]
     Production,
 }
 
@@ -280,7 +280,8 @@ impl From<u8> for EnvironmentIndex {
     }
 }
 
-#[derive(EnumString, EnumIter, Clone, Debug, PartialEq, clap::ValueEnum)]
+#[derive(EnumString, EnumIter, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 enum DotEnvFamily {
     Base,
     Secrets,

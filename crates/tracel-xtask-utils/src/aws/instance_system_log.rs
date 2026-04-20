@@ -2,7 +2,7 @@ use anyhow::Context as _;
 use serde::Deserialize;
 use std::{io::Write as _, thread, time::Duration};
 
-use crate::utils::aws;
+use crate::aws;
 
 #[derive(Deserialize)]
 struct ConsoleOutput {

@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::fmt;
 use std::time::{Duration, SystemTime};
 
-use crate::utils::process::run_process_capture_stdout;
+use crate::process::run_process_capture_stdout;
 
 #[derive(Debug, Deserialize)]
 struct Ec2Describe {

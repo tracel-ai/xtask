@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Context;
 
-use crate::{prelude::run_process, utils::process::run_process_capture_stdout};
+use crate::process::{run_process, run_process_capture_stdout};
 
 /// Run a process, discarding stdout and inheriting stderr.
 /// Fail on non-zero exit.
@@ -256,9 +256,6 @@ pub fn ec2_autoscaling_latest_instance_refresh_status(
 }
 
 pub fn ec2_autoscaling_rollback_instance_refresh(asg: &str, region: &str) -> anyhow::Result<()> {
-    use crate::prelude::anyhow::Context as _;
-    use std::process::Command;
-
     let output = Command::new("aws")
         .args([
             "autoscaling",

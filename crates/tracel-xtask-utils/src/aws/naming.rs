@@ -1,5 +1,5 @@
 /// Define naming conventions for AWS resources
-use crate::prelude::{Environment, ExplicitIndex};
+use crate::environment::{Environment, ExplicitIndex};
 
 use super::regions::Region;
 

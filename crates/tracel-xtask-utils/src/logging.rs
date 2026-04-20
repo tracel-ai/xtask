@@ -50,7 +50,7 @@ macro_rules! group {
         if std::env::var("CI").is_ok() {
             eprintln!("::group::{}", title)
         } else {
-            log!(log::Level::Info, "{}", title)
+            log::log!(log::Level::Info, "{}", title)
         }
     };
 }
@@ -63,7 +63,7 @@ macro_rules! group_info {
         if std::env::var("CI").is_ok() {
             eprintln!("{}", title)
         } else {
-            log!(log::Level::Info, "{}", title)
+            log::log!(log::Level::Info, "{}", title)
         }
     };
 }
@@ -76,7 +76,7 @@ macro_rules! group_error {
         if std::env::var("CI").is_ok() {
             eprintln!("{}", title)
         } else {
-            log!(log::Level::Error, "{}", title)
+            log::log!(log::Level::Error, "{}", title)
         }
     };
 }

@@ -9,7 +9,7 @@ use home::home_dir;
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
-use crate::prelude::{Environment, ExplicitIndex};
+use crate::environment::{Environment, ExplicitIndex};
 
 use super::process::run_process;
 

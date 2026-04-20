@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::time::{Duration, SystemTime};
 
-use crate::utils::aws;
+use crate::aws;
 
 #[derive(Debug, Deserialize)]
 struct AsgDescribe {

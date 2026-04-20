@@ -1,11 +1,13 @@
 use std::process::Command;
 
-use crate::utils::aws::instance_system_log::stream_system_log;
-use crate::{
-    context::Context,
-    prelude::{Environment, EnvironmentName, anyhow::Context as _},
-    utils::{self, aws},
+use anyhow::Context as _;
+use tracel_xtask_utils::{
+    aws::{self, instance_system_log::stream_system_log},
+    environment::{Environment, EnvironmentName},
+    process,
 };
+
+use crate::context::Context;
 
 const SSM_SESSION_DOC: &str = "Xtask-Host-InteractiveShell";
 
@@ -138,7 +140,7 @@ fn connect(args: HostConnectSubCmdArgs) -> anyhow::Result<()> {
         SSM_SESSION_DOC,
     ];
 
-    utils::process::run_process(
+    process::run_process(
         "aws",
         &args_vec,
         None,

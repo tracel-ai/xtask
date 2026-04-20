@@ -2,18 +2,20 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use clap::ValueEnum;
+use log::info;
 use strum::IntoEnumIterator;
+use tracel_xtask_utils::{
+    endgroup,
+    environment::{Environment, EnvironmentName},
+    group,
+    process::{run_process_for_package, run_process_for_workspace},
+    rustup::{is_current_toolchain_nightly, rustup_add_component},
+    workspace::{WorkspaceMember, WorkspaceMemberType, get_workspace_members},
+};
 
 use crate::{
     commands::{CARGO_NIGHTLY_MSG, WARN_IGNORED_ONLY_ARGS},
-    endgroup,
-    environment::EnvironmentName,
-    group,
-    prelude::{Context, Environment, is_current_toolchain_nightly, rustup_add_component},
-    utils::{
-        process::{run_process_for_package, run_process_for_workspace},
-        workspace::{WorkspaceMember, WorkspaceMemberType, get_workspace_members},
-    },
+    context::Context,
 };
 
 use super::Target;
@@ -54,7 +56,7 @@ pub struct TestCmdArgs {}
 
 pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     if args.target == Target::Workspace && !args.only.is_empty() {
-        warn!("{WARN_IGNORED_ONLY_ARGS}");
+        log::warn!("{WARN_IGNORED_ONLY_ARGS}");
     }
     if !check_environment(&args, &env) {
         std::process::exit(1);
@@ -93,7 +95,7 @@ pub fn handle_command(args: TestCmdArgs, env: Environment, _ctx: Context) -> any
 pub fn check_environment(args: &TestCmdArgs, env: &Environment) -> bool {
     if env.name == EnvironmentName::Production {
         if args.force {
-            warn!("Force running tests in production (--force argument is set)");
+            log::warn!("Force running tests in production (--force argument is set)");
             true
         } else {
             info!("Abort tests to avoid running them in production!");

@@ -7,15 +7,19 @@ use std::time::{Duration, Instant};
 
 use crate::prelude::anyhow::Context as _;
 use crate::prelude::*;
-use crate::utils::aws::cli::{
-    aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
-    ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
-    ecr_ensure_repo_exists, ecr_get_commit_sha_tag_from_alias_tag,
-    ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest, ecr_put_manifest,
+use tracel_xtask_utils::{
+    aws::{
+        cli::{
+            aws_account_id, ec2_autoscaling_latest_instance_refresh_status,
+            ec2_autoscaling_start_instance_refresh, ecr_compute_next_numeric_tag, ecr_docker_login,
+            ecr_ensure_repo_exists, ecr_get_commit_sha_tag_from_alias_tag,
+            ecr_get_last_pushed_commit_sha_tag, ecr_get_manifest, ecr_put_manifest,
+        },
+        instance_system_log::stream_system_log,
+    },
+    git::git_repo_root_or_cwd,
+    process::{run_process, run_process_capture_stdout},
 };
-use crate::utils::aws::instance_system_log::stream_system_log;
-use crate::utils::git::git_repo_root_or_cwd;
-use crate::utils::process::{run_process, run_process_capture_stdout};
 
 const SSM_SESSION_DOC: &str = "Xtask-Container-InteractiveShell";
 
@@ -413,7 +417,7 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
 
 fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
     let selected =
-        crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, &args.asg)?;
+        tracel_xtask_utils::aws::asg_instance_picker::pick_asg_instance(&args.region, &args.asg)?;
     if args.system_log {
         eprintln!(
             "📜 Streaming system log for {} ({}, {}) — Ctrl-C to stop",
@@ -508,7 +512,7 @@ fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
     let mut format = "detailed";
     if let Some(asg) = args.asg.as_deref() {
         let selected =
-            crate::utils::aws::asg_instance_picker::pick_asg_instance(&args.region, asg)?;
+            tracel_xtask_utils::aws::asg_instance_picker::pick_asg_instance(&args.region, asg)?;
         eprintln!(
             "🪵 Tailing CloudWatch logs for ASG instance {}\n  IP: {}\n  AZ: {}\n  Log group: {}",
             selected.instance_id,
@@ -518,7 +522,7 @@ fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
         );
 
         let stream =
-            crate::utils::aws::instance_logs::resolve_log_stream_name_containing_instance_id(
+            tracel_xtask_utils::aws::instance_logs::resolve_log_stream_name_containing_instance_id(
                 &args.region,
                 &args.log_group,
                 &selected.instance_id,
@@ -555,7 +559,7 @@ fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
         cli_args.extend(args.log_stream_name.clone());
     }
 
-    crate::utils::aws::cli::aws_cli(cli_args, None, None, "aws logs tail should succeed")
+    tracel_xtask_utils::aws::cli::aws_cli(cli_args, None, None, "aws logs tail should succeed")
 }
 
 fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {

@@ -1,10 +1,10 @@
 use anyhow::Ok;
-
-use crate::{
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{cargo::ensure_cargo_crate_is_installed, process::run_process},
+use tracel_xtask_utils::{
+    cargo::ensure_cargo_crate_is_installed, endgroup, environment::Environment, group,
+    process::run_process,
 };
+
+use crate::context::Context;
 
 #[tracel_xtask_macros::declare_command_args(None, BumpSubCommand)]
 pub struct BumpCmdArgs {}

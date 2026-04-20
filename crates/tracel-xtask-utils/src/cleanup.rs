@@ -25,7 +25,7 @@ impl CleanupHandler {
         ctrlc::set_handler(move || {
             if !handler_.registered.lock().unwrap().is_empty() {
                 println!();
-                warn!("Termination signal received, executing registered functions.");
+                log::warn!("Termination signal received, executing registered functions.");
                 handler_.terminate();
             }
             std::process::exit(1);
@@ -40,7 +40,7 @@ impl CleanupHandler {
         name: impl Into<String> + Clone,
         handler: impl FnOnce() + Send + Sync + 'static,
     ) {
-        trace!("Registering cleanup function for {}", name.clone().into());
+        log::trace!("Registering cleanup function for {}", name.clone().into());
         self.registered
             .lock()
             .unwrap()
@@ -57,7 +57,7 @@ impl CleanupHandler {
         }
         *terminated = true;
         for f in (*self.registered.lock().unwrap()).drain(..) {
-            info!("Executing cleanup function: {}", f.name);
+            log::info!("Executing cleanup function: {}", f.name);
             (f.handler)();
         }
     }
@@ -68,7 +68,7 @@ impl Drop for CleanupHandler {
     fn drop(&mut self) {
         if !self.registered.lock().unwrap().is_empty() {
             println!();
-            warn!("Cleanup handler dropped, executing registered functions.");
+            log::warn!("Cleanup handler dropped, executing registered functions.");
             self.terminate();
         }
     }

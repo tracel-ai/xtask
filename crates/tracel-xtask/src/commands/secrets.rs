@@ -3,11 +3,15 @@ use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
 use anyhow::Context as _;
 
-use crate::prelude::{Context, Environment};
-use crate::utils::aws::cli::{
-    secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
-    secretsmanager_list_secret_versions_json, secretsmanager_put_secret_string,
+use tracel_xtask_utils::{
+    aws::cli::{
+        secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
+        secretsmanager_list_secret_versions_json, secretsmanager_put_secret_string,
+    },
+    environment::Environment,
 };
+
+use crate::context::Context;
 
 const FALLBACK_EDITOR: &str = "vi";
 

@@ -1,8 +1,5 @@
 pub mod commands;
 pub mod context;
-pub mod environment;
-pub mod logging;
-pub mod utils;
 mod versions;
 
 // re-exports
@@ -13,6 +10,7 @@ pub mod prelude {
     pub use env_logger;
     pub use rand;
     pub use serde_json;
+    pub use tracel_xtask_utils as base_utils;
     pub use ureq;
 
     pub mod macros {
@@ -58,49 +56,48 @@ pub mod prelude {
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::context::Context;
-    pub use crate::endgroup;
-    pub use crate::environment::Environment;
-    pub use crate::environment::EnvironmentIndex;
-    pub use crate::environment::EnvironmentName;
-    pub use crate::environment::ExplicitIndex;
-    pub use crate::group;
-    pub use crate::group_info;
-    pub use crate::handle_cleanup;
     pub use crate::init_xtask;
     pub use crate::parse_args;
-    pub use crate::register_cleanup;
-    pub use crate::utils as base_utils;
-    pub use crate::utils::aws;
-    pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
-    pub use crate::utils::cleanup::CLEANUP_HANDLER;
-    pub use crate::utils::git;
-    pub use crate::utils::helpers;
-    pub use crate::utils::process;
-    pub use crate::utils::process::random_port;
-    pub use crate::utils::process::run_process;
-    pub use crate::utils::process::run_process_for_package;
-    pub use crate::utils::process::run_process_for_workspace;
-    pub use crate::utils::prompt::ask_once;
-    pub use crate::utils::rustup::is_current_toolchain_nightly;
-    pub use crate::utils::rustup::rustup_add_component;
-    pub use crate::utils::rustup::rustup_add_target;
-    pub use crate::utils::rustup::rustup_get_installed_targets;
-    pub use crate::utils::terraform;
-    pub use crate::utils::time::format_duration;
+    pub use base_utils::aws;
+    pub use base_utils::build_helpers;
+    pub use base_utils::cargo::ensure_cargo_crate_is_installed;
+    pub use base_utils::cleanup::CLEANUP_HANDLER;
+    pub use base_utils::endgroup;
+    pub use base_utils::environment::Environment;
+    pub use base_utils::environment::EnvironmentIndex;
+    pub use base_utils::environment::EnvironmentName;
+    pub use base_utils::environment::ExplicitIndex;
+    pub use base_utils::git;
+    pub use base_utils::group;
+    pub use base_utils::group_info;
+    pub use base_utils::handle_cleanup;
+    pub use base_utils::process;
+    pub use base_utils::process::random_port;
+    pub use base_utils::process::run_process;
+    pub use base_utils::process::run_process_for_package;
+    pub use base_utils::process::run_process_for_workspace;
+    pub use base_utils::prompt::ask_once;
+    pub use base_utils::register_cleanup;
+    pub use base_utils::rustup::is_current_toolchain_nightly;
+    pub use base_utils::rustup::rustup_add_component;
+    pub use base_utils::rustup::rustup_add_target;
+    pub use base_utils::rustup::rustup_get_installed_targets;
+    pub use base_utils::terraform;
+    pub use base_utils::time::format_duration;
     // does not re-export strum has it is incompatible with strum macros expansions
 }
 
 use std::fmt::Display;
 
 use clap::{CommandFactory as _, FromArgMatches as _};
-use environment::{Environment, EnvironmentName};
-use utils::rustup::is_current_toolchain_nightly;
+use tracel_xtask_utils::{
+    environment::{Environment, EnvironmentName},
+    group_info,
+    logging::init_logger,
+    rustup::is_current_toolchain_nightly,
+};
 
 use crate::context::Context;
-use crate::logging::init_logger;
-
-#[macro_use]
-extern crate log;
 
 const HELP_PREFIX: &str = "💡 Help";
 const XTASK_CLI_ENVVAR: &str = "XTASK_CLI";

@@ -1,7 +1,8 @@
 use anyhow::Context as _;
 use std::{fs, io::Write as _, path::PathBuf};
+use tracel_xtask_utils::{environment::Environment, terraform};
 
-use crate::{context::Context, prelude::Environment, utils::terraform};
+use crate::context::Context;
 
 #[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
 pub struct InfraCmdArgs {}

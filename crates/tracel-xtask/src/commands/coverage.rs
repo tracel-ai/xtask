@@ -1,13 +1,10 @@
 use anyhow::Ok;
-
-use crate::{
-    endgroup, group,
-    prelude::{Context, Environment},
-    utils::{
-        cargo::ensure_cargo_crate_is_installed, process::run_process, rustup::rustup_add_component,
-    },
-    versions::GRCOV_VERSION,
+use tracel_xtask_utils::{
+    cargo::ensure_cargo_crate_is_installed, endgroup, environment::Environment, group,
+    process::run_process, rustup::rustup_add_component,
 };
+
+use crate::{context::Context, versions::GRCOV_VERSION};
 
 use super::Profile;
 

@@ -1,6 +1,6 @@
 use std::process::{Command, Stdio};
 
-use crate::{endgroup, group, utils::process::run_process};
+use crate::{endgroup, group, process::run_process};
 
 /// Add a Rust target
 pub fn rustup_add_target(target: &str) -> anyhow::Result<()> {

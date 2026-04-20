@@ -1,7 +1,7 @@
 use anyhow::Context as _;
 use serde::Deserialize;
 
-use crate::utils::aws::cli::aws_cli_capture_stdout;
+use crate::aws::cli::aws_cli_capture_stdout;
 
 #[derive(Debug, Deserialize)]
 struct DescribeLogStreams {
