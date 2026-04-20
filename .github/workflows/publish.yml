@@ -13,8 +13,18 @@ on:
         default: false
 
 jobs:
+  tracel-xtask-utils:
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
+    with:
+      crate: tracel-xtask-utils
+      tag-validation: true
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+
+  # --------------------------------------------------------------------------------
   tracel-xtask-macros:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
     with:
       crate: tracel-xtask-macros
       tag-validation: true
@@ -24,19 +34,20 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
     with:
       crate: tracel-xtask
       tag-validation: true
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     needs:
       - tracel-xtask-macros
+      - tracel-xtask-utils
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
   # --------------------------------------------------------------------------------
   tracel-xtask-cli:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
     with:
       crate: tracel-xtask-cli
       tag-validation: false
