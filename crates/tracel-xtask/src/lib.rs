@@ -59,14 +59,14 @@ pub mod prelude {
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::context::Context;
+    pub use crate::handle_cleanup;
     pub use crate::init_xtask;
     pub use crate::parse_args;
+    pub use crate::register_cleanup;
     pub use crate::utils as base_utils;
     pub use crate::utils::aws;
     pub use crate::utils::build_helpers;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
-    pub use crate::handle_cleanup;
-    pub use crate::register_cleanup;
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::endgroup;
     pub use crate::utils::environment::Environment;

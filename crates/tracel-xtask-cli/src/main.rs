@@ -92,6 +92,127 @@ impl Workspace {
         self
     }
 }
+#[derive(Debug, Clone)]
+struct DispatchSummary {
+    entries: Vec<SubrepoExecutionResult>,
+}
+
+impl DispatchSummary {
+    fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, entry: SubrepoExecutionResult) {
+        self.entries.push(entry);
+    }
+
+    fn success_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|entry| entry.is_success())
+            .count()
+    }
+
+    fn failure_count(&self) -> usize {
+        self.entries.len().saturating_sub(self.success_count())
+    }
+
+    fn has_failures(&self) -> bool {
+        self.failure_count() > 0
+    }
+
+    fn final_exit_code(&self) -> ExitCode {
+        if self.has_failures() {
+            ExitCode::from(1)
+        } else {
+            ExitCode::SUCCESS
+        }
+    }
+
+    fn print(&self) {
+        eprintln!();
+        eprintln!("==================== Execution summary ====================");
+
+        if !self.has_failures() {
+            eprintln!("✅ All {} subrepos succeeded!", self.entries.len());
+            return;
+        }
+
+        for entry in &self.entries {
+            match &entry.outcome {
+                RepoExecutionOutcome::Success => {
+                    eprintln!("✅ {:<16} success", entry.repo);
+                }
+                RepoExecutionOutcome::Failure { code } => {
+                    eprintln!("❌ {:<16} failed with exit code {}", entry.repo, code);
+                }
+                RepoExecutionOutcome::Error { message } => {
+                    eprintln!("💥 {:<16} dispatch error: {}", entry.repo, message);
+                }
+            }
+        }
+
+        eprintln!();
+        eprintln!("Total subrepos : {}", self.entries.len());
+        eprintln!("Succeeded      : {}", self.success_count());
+        eprintln!("Failed         : {}", self.failure_count());
+
+        let failed = self
+            .entries
+            .iter()
+            .filter(|entry| !entry.is_success())
+            .map(|entry| entry.repo.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        eprintln!("Failed subrepos: {failed}");
+        eprintln!("===========================================================");
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SubrepoExecutionResult {
+    repo: String,
+    outcome: RepoExecutionOutcome,
+}
+
+impl SubrepoExecutionResult {
+    fn success(repo: impl Into<String>) -> Self {
+        Self {
+            repo: repo.into(),
+            outcome: RepoExecutionOutcome::Success,
+        }
+    }
+
+    fn failure(repo: impl Into<String>, code: u8) -> Self {
+        Self {
+            repo: repo.into(),
+            outcome: RepoExecutionOutcome::Failure { code },
+        }
+    }
+
+    fn error(repo: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            repo: repo.into(),
+            outcome: RepoExecutionOutcome::Error {
+                message: message.into(),
+            },
+        }
+    }
+
+    fn is_success(&self) -> bool {
+        matches!(self.outcome, RepoExecutionOutcome::Success)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum RepoExecutionOutcome {
+    Success,
+    Failure { code: u8 },
+    Error { message: String },
+}
 
 fn main() -> ExitCode {
     let mut args: Vec<OsString> = env::args_os().skip(1).collect();
@@ -158,7 +279,7 @@ fn run(
         } else {
             // :<subrepo> selector
             let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
-            return exec_cargo_xtask(git_root, &ws, args);
+            return exec_cargo_xtask(git_root, &ws, args).map(ExitCode::from);
         }
     }
 
@@ -175,12 +296,12 @@ fn run(
             xtask,
             toolchain,
         };
-        exec_cargo_xtask(git_root, &ws, args)
+        exec_cargo_xtask(git_root, &ws, args).map(ExitCode::from)
     } else {
         // Monorepo:
         if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root, toolchain)? {
             // inside a subrepo workspace at any depth then we execute in that subrepo.
-            exec_cargo_xtask(git_root, &ws, args)
+            exec_cargo_xtask(git_root, &ws, args).map(ExitCode::from)
         } else {
             // At monorepo root we dispatch to all subrepos after confirmation
             let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
@@ -588,7 +709,7 @@ fn show_all_help(
         } else {
             // :<subrepo> selector
             let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
-            run_help_one(&ws)
+            run_help_one(&ws).map(ExitCode::from)
         }
     } else {
         // No selector, behavior depends on standard repo vs monorepo.
@@ -602,12 +723,12 @@ fn show_all_help(
                 xtask,
                 toolchain,
             };
-            run_help_one(&ws)
+            run_help_one(&ws).map(ExitCode::from)
         } else {
             // Monorepo:
             if let Some(ws) = find_subrepo_workspace_root(&cwd, git_root, toolchain)? {
                 // if inside a subrepo workspace (any depth), show help for that subrepo.
-                run_help_one(&ws)
+                run_help_one(&ws).map(ExitCode::from)
             } else {
                 // At monorepo root we show help for all after confirmation
                 let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
@@ -629,20 +750,20 @@ fn show_all_help(
 }
 
 fn run_help_all(subrepos: &[Workspace]) -> Result<ExitCode, String> {
-    let mut first_failure: Option<ExitCode> = None;
+    let mut first_failure: Option<u8> = None;
 
     for ws in subrepos {
         let code = run_help_one(ws)?;
-        if code != ExitCode::SUCCESS && first_failure.is_none() {
+        if code != 0 && first_failure.is_none() {
             first_failure = Some(code);
         }
         eprintln!();
     }
 
-    Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
+    Ok(ExitCode::from(first_failure.unwrap_or(0)))
 }
 
-fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
+fn run_help_one(ws: &Workspace) -> Result<u8, String> {
     let is_subrepo = ws.dir_name != "root";
     let target_dir: &Path = if is_subrepo {
         Path::new("../target/xtask")
@@ -690,7 +811,7 @@ fn run_help_one(ws: &Workspace) -> Result<ExitCode, String> {
         )
     })?;
 
-    Ok(exit_code_from_status(status))
+    Ok(exit_code_u8_from_status(status))
 }
 
 fn exec_cargo_xtask_all(
@@ -698,22 +819,28 @@ fn exec_cargo_xtask_all(
     args: &[OsString],
     subrepos: &[Workspace],
 ) -> Result<ExitCode, String> {
-    let mut first_failure: Option<ExitCode> = None;
+    let mut summary = DispatchSummary::new();
+
     for ws in subrepos {
-        let code = exec_cargo_xtask(git_root, ws, args)?;
-        if code != ExitCode::SUCCESS && first_failure.is_none() {
-            first_failure = Some(code);
+        match exec_cargo_xtask(git_root, ws, args) {
+            Ok(0) => {
+                summary.push(SubrepoExecutionResult::success(ws.dir_name.clone()));
+            }
+            Ok(code) => {
+                summary.push(SubrepoExecutionResult::failure(ws.dir_name.clone(), code));
+            }
+            Err(err) => {
+                eprintln!("error: {err}");
+                summary.push(SubrepoExecutionResult::error(ws.dir_name.clone(), err));
+            }
         }
     }
 
-    Ok(first_failure.unwrap_or(ExitCode::SUCCESS))
+    summary.print();
+    Ok(summary.final_exit_code())
 }
 
-fn exec_cargo_xtask(
-    git_root: &Path,
-    ws: &Workspace,
-    args: &[OsString],
-) -> Result<ExitCode, String> {
+fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Result<u8, String> {
     let is_subrepo = ws.dir_name != "root";
 
     let target_path = format!("target/{}", ws.xtask.package_name());
@@ -758,13 +885,13 @@ fn exec_cargo_xtask(
         .status()
         .map_err(|e| format!("failed to execute cargo run ({}): {e}", ws.path.display()))?;
 
-    Ok(exit_code_from_status(status))
+    Ok(exit_code_u8_from_status(status))
 }
 
-fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
+fn exit_code_u8_from_status(status: std::process::ExitStatus) -> u8 {
     match status.code() {
-        Some(code) if (0..=255).contains(&code) => ExitCode::from(code as u8),
-        _ => ExitCode::from(1),
+        Some(code) if (0..=255).contains(&code) => code as u8,
+        _ => 1,
     }
 }
 
