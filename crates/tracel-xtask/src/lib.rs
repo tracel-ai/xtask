@@ -65,6 +65,8 @@ pub mod prelude {
     pub use crate::utils::aws;
     pub use crate::utils::build_helpers;
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
+    pub use crate::handle_cleanup;
+    pub use crate::register_cleanup;
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::endgroup;
     pub use crate::utils::environment::Environment;
