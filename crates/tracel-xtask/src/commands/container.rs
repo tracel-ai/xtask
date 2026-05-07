@@ -1,7 +1,7 @@
-use serde::Deserialize;
-use std::io::Write as _;
 /// Manage containers.
 /// Current implementation uses `docker` and `AWS ECR` as container registry.
+use serde::Deserialize;
+use std::io::Write as _;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -61,15 +61,12 @@ pub struct ContainerHostSubCmdArgs {
     /// Region of the Auto Scaling Group / container host
     #[arg(long)]
     pub region: String,
-
     /// Name of the Auto Scaling Group hosting the containers
     #[arg(long, value_name = "ASG_NAME")]
     pub asg: String,
-
     /// Login user for the SSM interactive shell
     #[arg(long, default_value = "ubuntu")]
     pub user: String,
-
     /// Show instance system log instead of opening an SSM shell
     #[arg(long)]
     pub system_log: bool,
@@ -194,47 +191,36 @@ pub struct ContainerRolloutSubCmdArgs {
     /// Region of the Auto Scaling Group
     #[arg(long)]
     pub region: String,
-
     /// Name of the Auto Scaling Group to refresh
     #[arg(long, value_name = "ASG_NAME")]
     pub asg: String,
-
     /// Strategy for instance refresh (Rolling is the standard choice for zero-downtime rollouts)
     #[arg(long, value_name = "Rolling", default_value_t = ContainerRolloutSubCmdArgs::default().strategy)]
     pub strategy: String,
-
     /// Seconds for instance warmup
     #[arg(long, value_name = "SECS", default_value_t = ContainerRolloutSubCmdArgs::default().instance_warmup)]
     pub instance_warmup: u64,
-
     /// Maximum healthy percentage during the rollout
     #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().max_healthy_percentage)]
     pub max_healthy_percentage: u8,
-
     /// Minimum healthy percentage during the rollout
     #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
-
     /// Container promote tag, defaults to 'latest'.
     #[arg(long)]
     pub promote_tag: Option<String>,
-
     /// Container repository.
     #[arg(long)]
     pub repository: Option<String>,
-
     /// If set, skip replacing instances that already match the launch template/config
     #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().skip_matching)]
     pub skip_matching: bool,
-
     /// Wait until the refresh completes
     #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait)]
     pub wait: bool,
-
     /// Max seconds to wait when --wait is set
     #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_timeout_secs)]
     pub wait_timeout_secs: u64,
-
     /// Poll interval seconds when --wait is set
     #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_poll_secs)]
     pub wait_poll_secs: u64,
@@ -245,19 +231,15 @@ pub struct ContainerRunSubCmdArgs {
     /// Fully qualified image reference (e.g. 123.dkr.ecr.us-east-1.amazonaws.com/bc-backend:latest)
     #[arg(long)]
     pub image: String,
-
     /// Container name
     #[arg(long)]
     pub name: Option<String>,
-
     /// Optional env-file to pass to docker
     #[arg(long)]
     pub env_file: Option<std::path::PathBuf>,
-
     /// When set, use `--network host`
     #[arg(long)]
     pub host_network: bool,
-
     /// Extra docker run args, passed as-is after the standard flags
     #[arg(long)]
     pub extra_arg: Vec<String>,

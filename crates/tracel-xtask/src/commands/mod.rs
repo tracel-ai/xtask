@@ -10,6 +10,7 @@ pub mod doc;
 pub mod docker_compose;
 pub mod fix;
 pub mod host;
+pub mod image;
 pub mod infra;
 pub mod publish;
 pub mod secrets;

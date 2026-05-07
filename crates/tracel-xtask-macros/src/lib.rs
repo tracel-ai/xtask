@@ -280,6 +280,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "Image",
+        quote! {
+            #[doc = r"Manage virtual machine images lifecycle, from build to deployment."]
+            Image(tracel_xtask::commands::image::ImageCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Infra",
         quote! {
             #[doc = r"Infrastructure management with terraform."]
@@ -1037,6 +1044,23 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Connect(HostConnectSubCmdArgs),
                 #[doc = r"Fetch the private IP of the host if any."]
                 PrivateIp(HostPrivateIpSubCmdArgs),
+            },
+        ),
+        (
+            "ImageSubCommand",
+            quote! {
+                #[doc = r"Build virtual machine images from Terraform-managed baker instances."]
+                Build(ImageBuildSubCmdArgs),
+                #[doc = r"Start a terminal session on an image baker instance."]
+                Host(ImageHostSubCmdArgs),
+                #[doc = r"Show current latest and rollback virtual machine images."]
+                List(ImageListSubCmdArgs),
+                #[doc = r"Promote a built virtual machine image to latest."]
+                Promote(ImagePromoteSubCmdArgs),
+                #[doc = r"Rollback previously promoted virtual machine image to latest."]
+                Rollback(ImageRollbackSubCmdArgs),
+                #[doc = r"Rollout last promoted virtual machine image."]
+                Rollout(ImageRolloutSubCmdArgs),
             },
         ),
         (
