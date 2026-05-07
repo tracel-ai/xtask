@@ -4,8 +4,29 @@ use tracel_xtask_utils::{environment::Environment, terraform};
 
 use crate::context::Context;
 
+const DEFAULT_TFSTATES_PATH: &str = "./.tfstates";
+const DEFAULT_TFPLAN_PATH: &str = "tfplan";
+
 #[tracel_xtask_macros::declare_command_args(None, InfraSubCommand)]
 pub struct InfraCmdArgs {}
+
+pub fn default_tfstates_path() -> PathBuf {
+    PathBuf::from(DEFAULT_TFSTATES_PATH)
+}
+
+pub fn default_tfplan_path() -> PathBuf {
+    PathBuf::from(DEFAULT_TFPLAN_PATH)
+}
+
+impl Default for InfraCmdArgs {
+    fn default() -> Self {
+        Self {
+            command: None,
+            path: default_tfstates_path(),
+            out: default_tfplan_path(),
+        }
+    }
+}
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
 struct InfraInstallSubCmdArgs {
