@@ -1067,7 +1067,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             "InfraSubCommand",
             quote! {
                 #[doc = r"Apply infra changes."]
-                Apply,
+                Apply(InfraApplySubCmdArgs),
                 #[doc = r"Create a destroy plan."]
                 Destroy,
                 #[doc = r"Initialize terraform."]

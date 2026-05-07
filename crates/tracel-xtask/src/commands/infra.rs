@@ -29,6 +29,13 @@ impl Default for InfraCmdArgs {
 }
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
+pub struct InfraApplySubCmdArgs {
+    /// Apply the Terraform plan without asking for confirmation.
+    #[arg(long)]
+    pub force: bool,
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
 struct InfraInstallSubCmdArgs {
     /// Install a specific Terraform version (e.g. 1.9.6) and update the lockfile to that version
     #[arg(long)]
@@ -70,10 +77,7 @@ struct InfraUninstallSubCmdArgs {
 
 pub fn handle_command(args: InfraCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
-        InfraSubCommand::Apply => {
-            apply(&args)?;
-            Ok(())
-        }
+        InfraSubCommand::Apply(cmd_args) => apply(&args, &cmd_args).map(|_| ()),
         InfraSubCommand::Destroy => destroy(&args),
         InfraSubCommand::Init => init(&args),
         InfraSubCommand::Install(cmd_args) => install(&cmd_args),
@@ -89,36 +93,40 @@ pub fn handle_command(args: InfraCmdArgs, _env: Environment, _ctx: Context) -> a
 // Commands ------------------------------------------------------------------
 
 /// Returns true if the user confirmed to apply the plan
-pub fn apply(args: &InfraCmdArgs) -> anyhow::Result<bool> {
+pub fn apply(args: &InfraCmdArgs, apply_args: &InfraApplySubCmdArgs) -> anyhow::Result<bool> {
     let out = args.out.to_string_lossy().to_string();
 
     // 1) Run plan
     let tf_args = ["plan", "-out", out.as_str()];
     terraform::call_terraform(&args.path, &tf_args)?;
 
-    // 2) Ask the user if they want to run apply.
-    eprintln!();
-    eprint!("Apply this Terraform plan? [y/N]: ");
-    std::io::stderr().flush()?;
+    let proceed = if apply_args.force {
+        eprintln!("⚠️ Applying Terraform plan without confirmation because '--force' is set.");
+        true
+    } else {
+        // 2) Ask the user if they want to run apply.
+        eprintln!();
+        eprint!("Apply this Terraform plan? [y/N]: ");
+        std::io::stderr().flush()?;
 
-    let mut answer = String::new();
-    std::io::stdin()
-        .read_line(&mut answer)
-        .context("Failed to read confirmation from stdin")?;
+        let mut answer = String::new();
+        std::io::stdin()
+            .read_line(&mut answer)
+            .context("Failed to read confirmation from stdin")?;
 
-    let answer = answer.trim().to_ascii_lowercase();
-    let proceed = matches!(answer.as_str(), "y" | "yes");
+        let answer = answer.trim().to_ascii_lowercase();
+        matches!(answer.as_str(), "y" | "yes")
+    };
 
-    if !proceed {
+    if proceed {
+        // 3) User approved: apply the *saved* plan file (no re-planning).
+        let tf_args = ["apply", "-auto-approve", out.as_str()];
+        terraform::call_terraform(&args.path, &tf_args)?;
+    } else {
         eprintln!("Skipping apply.");
-        return Ok(false);
     }
 
-    // 3) User approved: apply the *saved* plan file (no re-planning).
-    let apply_args = ["apply", "-auto-approve", out.as_str()];
-    terraform::call_terraform(&args.path, &apply_args)?;
-
-    Ok(true)
+    Ok(proceed)
 }
 
 pub fn destroy(args: &InfraCmdArgs) -> anyhow::Result<()> {
