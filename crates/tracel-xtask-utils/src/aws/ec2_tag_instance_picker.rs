@@ -1,51 +1,13 @@
 use anyhow::Context as _;
 use inquire::Select;
 use owo_colors::OwoColorize as _;
-use serde::Deserialize;
 use std::fmt;
 use std::time::{Duration, SystemTime};
 
+use crate::aws::Ec2Describe;
 use crate::process::run_process_capture_stdout;
 
-#[derive(Debug, Deserialize)]
-struct Ec2Describe {
-    #[serde(rename = "Reservations")]
-    reservations: Vec<Ec2Reservation>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Ec2Reservation {
-    #[serde(rename = "Instances")]
-    instances: Vec<Ec2Instance>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Ec2Instance {
-    #[serde(rename = "InstanceId")]
-    instance_id: String,
-    #[serde(rename = "Placement")]
-    placement: Ec2Placement,
-    #[serde(rename = "LaunchTime")]
-    launch_time: String,
-    #[serde(rename = "PrivateIpAddress")]
-    private_ip: Option<String>,
-    #[serde(rename = "Tags")]
-    tags: Option<Vec<Ec2Tag>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Ec2Placement {
-    #[serde(rename = "AvailabilityZone")]
-    availability_zone: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Ec2Tag {
-    #[serde(rename = "Key")]
-    key: String,
-    #[serde(rename = "Value")]
-    value: String,
-}
+use super::Ec2Tag;
 
 #[derive(Clone, Debug)]
 pub struct SelectedEc2Instance {
