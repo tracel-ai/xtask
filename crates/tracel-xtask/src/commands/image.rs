@@ -40,6 +40,9 @@ pub struct ImageBuildSubCmdArgs {
     /// Logical image names to bake. Repeatable.
     #[arg(long = "image", value_name = "IMAGE_NAME", action = clap::ArgAction::Append)]
     pub images: Vec<String>,
+    /// Additional AMI tags to apply at creation time. Repeatable, format: KEY=VALUE.
+    #[arg(long = "tag", value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
+    pub tags: Vec<String>,
     /// Timeout while waiting for baker instances to stop.
     #[arg(long, default_value_t = 3600)]
     pub stop_timeout_secs: u64,
@@ -137,19 +140,19 @@ pub struct ImageHostSubCmdArgs {
 pub fn handle_command(args: ImageCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
         ImageSubCommand::Build(build_args) => build(build_args),
-        ImageSubCommand::Promote(promote_args) => promote(promote_args, &env),
-        ImageSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env),
+        ImageSubCommand::Promote(promote_args) => promote(promote_args, &env.into_explicit()),
+        ImageSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env.into_explicit()),
         ImageSubCommand::Rollout(rollout_args) => rollout(rollout_args),
-        ImageSubCommand::List(list_args) => list(list_args, &env),
+        ImageSubCommand::List(list_args) => list(list_args, &env.into_explicit()),
         ImageSubCommand::Host(host_args) => host(host_args),
     }
 }
 
-fn promote_tag(tag: Option<String>, env: &Environment) -> String {
+fn promote_tag(tag: Option<String>, env: &Environment<ExplicitIndex>) -> String {
     tag.unwrap_or(format!("latest_{env}"))
 }
 
-fn rollback_tag(tag: Option<String>, env: &Environment) -> String {
+fn rollback_tag(tag: Option<String>, env: &Environment<ExplicitIndex>) -> String {
     tag.unwrap_or(format!("rollback_{env}"))
 }
 
@@ -167,6 +170,7 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
     }
 
     let mut created_images = Vec::new();
+    let tags = parse_tags(&args.tags)?;
 
     for image in &args.images {
         eprintln!("👩‍🍳 Looking for baker instance for image '{image}'");
@@ -202,6 +206,7 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
             &ami_name,
             image,
             args.no_reboot,
+            &tags,
         )
         .with_context(|| {
             format!(
@@ -232,7 +237,7 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn promote(args: ImagePromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn promote(args: ImagePromoteSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
     let promote_tag = promote_tag(args.promote_tag, env);
     let rollback_tag = rollback_tag(args.rollback_tag, env);
 
@@ -293,7 +298,7 @@ fn promote(args: ImagePromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()
     Ok(())
 }
 
-fn rollback(args: ImageRollbackSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn rollback(args: ImageRollbackSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
     let promote_tag = promote_tag(args.promote_tag, env);
     let rollback_tag = rollback_tag(args.rollback_tag, env);
 
@@ -347,7 +352,7 @@ fn rollout(args: ImageRolloutSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn list(args: ImageListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn list(args: ImageListSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
     let promote_tag = promote_tag(args.promote_tag, env);
     let rollback_tag = rollback_tag(args.rollback_tag, env);
 
@@ -461,4 +466,27 @@ fn utc_timestamp_compact() -> anyhow::Result<String> {
 
     let out = run_process_capture_stdout(&mut cmd, "date should be executable")?;
     Ok(out.trim().to_string())
+}
+
+fn parse_tags(tags: &[String]) -> anyhow::Result<Vec<(String, String)>> {
+    tags.iter()
+        .map(|tag| {
+            let (key, value) = tag.split_once('=').ok_or_else(|| {
+                anyhow::anyhow!("AMI tag should use KEY=VALUE format, got '{tag}'")
+            })?;
+
+            let key = key.trim();
+            let value = value.trim();
+
+            if key.is_empty() {
+                anyhow::bail!("AMI tag key should not be empty in '{tag}'");
+            }
+
+            if value.is_empty() {
+                anyhow::bail!("AMI tag value should not be empty in '{tag}'");
+            }
+
+            Ok((key.to_owned(), value.to_owned()))
+        })
+        .collect()
 }

@@ -150,7 +150,22 @@ pub fn create_image(
     ami_name: &str,
     image: &str,
     no_reboot: bool,
+    additional_tags: &[(String, String)],
 ) -> anyhow::Result<String> {
+    let mut tags = vec![
+        ("Image".to_owned(), image.to_owned()),
+        ("BakerInstanceId".to_owned(), instance_id.to_owned()),
+        ("ManagedBy".to_owned(), "xtask".to_owned()),
+    ];
+
+    tags.extend(additional_tags.iter().cloned());
+
+    let tags = tags
+        .iter()
+        .map(|(key, value)| format!("{{Key={key},Value={value}}}"))
+        .collect::<Vec<_>>()
+        .join(",");
+
     let mut cmd = std::process::Command::new("aws");
     cmd.args([
         "ec2",
@@ -162,9 +177,7 @@ pub fn create_image(
         "--name",
         ami_name,
         "--tag-specifications",
-        &format!(
-            "ResourceType=image,Tags=[{{Key=ImageName,Value={image}}},{{Key=BakerInstanceId,Value={instance_id}}},{{Key=ManagedBy,Value=xtask-image}}]"
-        ),
+        &format!("ResourceType=image,Tags=[{tags}]"),
         "--output",
         "json",
     ]);
