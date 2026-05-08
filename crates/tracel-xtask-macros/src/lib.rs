@@ -1069,7 +1069,7 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 #[doc = r"Apply infra changes."]
                 Apply(InfraApplySubCmdArgs),
                 #[doc = r"Create a destroy plan."]
-                Destroy,
+                Destroy(InfraDestroySubCmdArgs),
                 #[doc = r"Initialize terraform."]
                 Init,
                 #[doc = r"Install the locked version of terraform or the latest version if there is no lock file yet."]

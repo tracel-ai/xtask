@@ -36,6 +36,13 @@ pub struct InfraApplySubCmdArgs {
 }
 
 #[derive(clap::Args, Clone, Default, PartialEq)]
+pub struct InfraDestroySubCmdArgs {
+    /// Destroy Terraform-managed infrastructure without asking for confirmation.
+    #[arg(long)]
+    pub force: bool,
+}
+
+#[derive(clap::Args, Clone, Default, PartialEq)]
 struct InfraInstallSubCmdArgs {
     /// Install a specific Terraform version (e.g. 1.9.6) and update the lockfile to that version
     #[arg(long)]
@@ -78,7 +85,7 @@ struct InfraUninstallSubCmdArgs {
 pub fn handle_command(args: InfraCmdArgs, _env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
         InfraSubCommand::Apply(cmd_args) => apply(&args, &cmd_args).map(|_| ()),
-        InfraSubCommand::Destroy => destroy(&args),
+        InfraSubCommand::Destroy(cmd_args) => destroy(&args, &cmd_args),
         InfraSubCommand::Init => init(&args),
         InfraSubCommand::Install(cmd_args) => install(&cmd_args),
         InfraSubCommand::List => list(),
@@ -129,8 +136,15 @@ pub fn apply(args: &InfraCmdArgs, apply_args: &InfraApplySubCmdArgs) -> anyhow::
     Ok(proceed)
 }
 
-pub fn destroy(args: &InfraCmdArgs) -> anyhow::Result<()> {
-    terraform::call_terraform(&args.path, &["destroy"])
+pub fn destroy(args: &InfraCmdArgs, destroy_args: &InfraDestroySubCmdArgs) -> anyhow::Result<()> {
+    if destroy_args.force {
+        eprintln!(
+            "⚠️ Destroying Terraform-managed infrastructure without confirmation because '--force' is set."
+        );
+        terraform::call_terraform(&args.path, &["destroy", "-auto-approve"])
+    } else {
+        terraform::call_terraform(&args.path, &["destroy"])
+    }
 }
 
 pub fn init(args: &InfraCmdArgs) -> anyhow::Result<()> {
