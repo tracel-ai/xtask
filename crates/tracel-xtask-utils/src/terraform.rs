@@ -49,7 +49,7 @@ pub fn call_terraform(path: &Path, args: &[&str]) -> anyhow::Result<()> {
         args,
         None,
         Some(path),
-        "Error during terraform init.",
+        "Error during terraform execution.",
     )
 }
 

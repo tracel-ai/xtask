@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::{
     aws::{Ec2Describe, Ec2Instance},
@@ -96,19 +96,22 @@ pub fn wait_for_instance_stopped(
     timeout: Duration,
 ) -> anyhow::Result<()> {
     let poll = Duration::from_secs(10);
-    let start = Instant::now();
+    let mut spinner = Spinner::new();
 
     loop {
+        let frame = spinner.next_frame();
         let state = instance_state(region, instance_id)?;
 
-        eprint!("\r⏳ Waiting for baker instance {instance_id} to stop — state: {state:<12}\x1b[K");
+        eprint!(
+            "\r{frame} Waiting for baker instance {instance_id} to stop — state: {state:<12}{SPINNER_CLR_EOL}"
+        );
 
         if state == "stopped" {
-            eprintln!("\r✅ Baker instance {instance_id} stopped\x1b[K");
+            eprintln!("\r✅ Baker instance {instance_id} stopped{SPINNER_CLR_EOL}");
             return Ok(());
         }
 
-        if start.elapsed() >= timeout {
+        if spinner.elapsed() >= timeout {
             eprintln!();
             anyhow::bail!(
                 "Timed out after {} seconds while waiting for instance '{}' to stop",
@@ -407,8 +410,8 @@ pub fn describe_images_by_name(region: &str, image: &str) -> anyhow::Result<Vec<
         "--owners",
         "self",
         "--filters",
-        &format!("Name=tag:ImageName,Values={image}"),
-        "Name=tag:ManagedBy,Values=xtask-image",
+        &format!("Name=tag:Image,Values={image}"),
+        "Name=tag:ManagedBy,Values=xtask",
         "--output",
         "json",
     ]);
