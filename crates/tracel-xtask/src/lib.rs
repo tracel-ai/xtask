@@ -66,7 +66,10 @@ pub mod prelude {
     pub use crate::commands::image::ImageRollbackSubCmdArgs;
     pub use crate::commands::image::ImageRolloutSubCmdArgs;
     pub use crate::commands::image::ImageSubCommand;
+    pub use crate::commands::infra::InfraApplySubCmdArgs;
     pub use crate::commands::infra::InfraCmdArgs;
+    pub use crate::commands::infra::InfraOutputSubCmdArgs;
+    pub use crate::commands::infra::InfraProvidersSubCmdArgs;
     pub use crate::commands::infra::InfraSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
     pub use crate::commands::secrets::SecretsCmdArgs;
