@@ -3,7 +3,8 @@
 use serde::Deserialize;
 use std::io::Write as _;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tracel_xtask_utils::spinner::{SPINNER_CLR_EOL, Spinner};
 
 use crate::prelude::anyhow::Context as _;
 use crate::prelude::*;
@@ -936,20 +937,16 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
     eprintln!("  Console: {}", console_url);
 
     if rollout_args.wait {
-        let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let mut frame_index = 0;
+        let mut spinner = Spinner::new();
 
-        let mut start = Instant::now();
         let timeout = Duration::from_secs(rollout_args.wait_timeout_secs);
         let poll = Duration::from_secs(rollout_args.wait_poll_secs);
-        const CLR_EOL: &str = "\x1b[K";
 
         // Track whether we already triggered a container rollback
         let mut rollback_triggered = false;
 
         loop {
-            let spinner = spinner_frames[frame_index % spinner_frames.len()];
-            frame_index += 1;
+            let frame = spinner.next_frame();
 
             let status_opt = ec2_autoscaling_latest_instance_refresh_status(
                 &rollout_args.asg,
@@ -967,14 +964,11 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
                 None => ("🕐", "Waiting..."),
             };
 
-            // elapsed time in mm:ss (within current window)
-            let elapsed = start.elapsed();
-            let elapsed_secs = elapsed.as_secs();
-            let min = elapsed_secs / 60;
-            let sec = elapsed_secs % 60;
+            let elapsed = spinner.elapsed();
+            let (min, sec) = spinner.elapsed_mm_ss();
 
             print!(
-                "\r{spinner}  {emoji} ({min:02}:{sec:02}) Refreshing {asg} — Status: {msg:<20}{CLR_EOL}",
+                "\r{frame}  {emoji} ({min:02}:{sec:02}) Refreshing {asg} — Status: {msg:<20}{SPINNER_CLR_EOL}",
                 asg = rollout_args.asg,
                 msg = msg,
             );
@@ -982,7 +976,9 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
 
             match status_opt.as_deref() {
                 Some("Successful") => {
-                    println!("\r✅ Rollout completed successfully in {min:02}:{sec:02}!{CLR_EOL}");
+                    println!(
+                        "\r✅ Rollout completed successfully in {min:02}:{sec:02}!{SPINNER_CLR_EOL}"
+                    );
 
                     if rollback_triggered {
                         anyhow::bail!(
@@ -992,11 +988,11 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
                     return Ok(());
                 }
                 Some("Failed") => {
-                    println!("\r❌ Rollout failed after {min:02}:{sec:02}.{CLR_EOL}");
+                    println!("\r❌ Rollout failed after {min:02}:{sec:02}.{SPINNER_CLR_EOL}");
                     anyhow::bail!("rollout finished with status: Failed");
                 }
                 Some("Cancelled") => {
-                    println!("\r⚠️ Rollout cancelled after {min:02}:{sec:02}.{CLR_EOL}");
+                    println!("\r⚠️ Rollout cancelled after {min:02}:{sec:02}.{SPINNER_CLR_EOL}");
                     anyhow::bail!("rollout finished with status: Cancelled");
                 }
                 _ => {}
@@ -1006,7 +1002,7 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
                 if !rollback_triggered {
                     // FIRST TIMEOUT → trigger container rollback and restart the timer
                     println!(
-                        "\r⏰ Timeout after {min:02}:{sec:02} (limit: {}s).{CLR_EOL}",
+                        "\r⏰ Timeout after {min:02}:{sec:02} (limit: {}s).{SPINNER_CLR_EOL}",
                         rollout_args.wait_timeout_secs
                     );
                     eprintln!(
@@ -1026,7 +1022,7 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
 
                         rollback_triggered = true;
                         // restart the timer for a second window
-                        start = Instant::now();
+                        spinner.restart();
                         continue;
                     } else {
                         eprintln!(
@@ -1040,7 +1036,7 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
                 } else {
                     // SECOND TIMEOUT → hard error out
                     println!(
-                        "\r⏰ Timeout after container rollback: {min:02}:{sec:02} (extra limit: {}s).{CLR_EOL}",
+                        "\r⏰ Timeout after container rollback: {min:02}:{sec:02} (extra limit: {}s).{SPINNER_CLR_EOL}",
                         rollout_args.wait_timeout_secs
                     );
                     anyhow::bail!(

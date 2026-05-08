@@ -26,6 +26,7 @@ all = [
   "process",
   "prompt",
   "rustup",
+  "spinner",
   "terraform",
   "time",
   "workspace",
@@ -61,6 +62,7 @@ process = [
   "dep:log",]
 prompt = []
 rustup = ["logging", "dep:anyhow", "process"]
+spinner = []
 terraform = [
   "environment",
   "process",

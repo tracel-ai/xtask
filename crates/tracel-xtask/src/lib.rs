@@ -34,8 +34,8 @@ pub mod prelude {
     pub use crate::commands::check::CheckSubCommand;
     pub use crate::commands::clean::CleanCmdArgs;
     pub use crate::commands::compile::CompileCmdArgs;
-    pub use crate::commands::container::ContainerCmdArgs;
     pub use crate::commands::container::ContainerBuildSubCmdArgs;
+    pub use crate::commands::container::ContainerCmdArgs;
     pub use crate::commands::container::ContainerHostSubCmdArgs;
     pub use crate::commands::container::ContainerListSubCmdArgs;
     pub use crate::commands::container::ContainerLogsSubCmdArgs;

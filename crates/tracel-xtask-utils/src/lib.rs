@@ -28,6 +28,9 @@ pub mod prompt;
 #[cfg(feature = "rustup")]
 pub mod rustup;
 
+#[cfg(feature = "spinner")]
+pub mod spinner;
+
 #[cfg(feature = "terraform")]
 pub mod terraform;
 
