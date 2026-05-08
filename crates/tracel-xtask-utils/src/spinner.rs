@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 const DEFAULT_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-pub const CLR_EOL: &str = "\x1b[K";
+pub const SPINNER_CLR_EOL: &str = "\x1b[K";
 
 #[derive(Debug, Clone)]
 pub struct Spinner {

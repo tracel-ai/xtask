@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use crate::{
     aws::{Ec2Describe, Ec2Instance},
     process::{run_process, run_process_capture_stdout},
+    spinner::{SPINNER_CLR_EOL, Spinner},
 };
 
 use anyhow::Context as _;
@@ -186,15 +187,18 @@ pub fn wait_for_image_available(
     timeout: Duration,
 ) -> anyhow::Result<()> {
     let poll = Duration::from_secs(10);
-    let start = Instant::now();
+    let mut spinner = Spinner::new();
 
     loop {
+        let frame = spinner.next_frame();
         let state = image_state(region, ami_id)?.unwrap_or_else(|| "unknown".to_string());
 
-        eprint!("\r⏳ Waiting for AMI {ami_id} to become available — state: {state:<12}\x1b[K");
+        eprint!(
+            "\r{frame} Waiting for AMI {ami_id} to become available — state: {state:<12}{SPINNER_CLR_EOL}"
+        );
 
         if state == "available" {
-            eprintln!("\r✅ AMI {ami_id} available\x1b[K");
+            eprintln!("\r✅ AMI {ami_id} available{SPINNER_CLR_EOL}");
             return Ok(());
         }
 
@@ -203,7 +207,7 @@ pub fn wait_for_image_available(
             anyhow::bail!("AMI '{ami_id}' entered failed state");
         }
 
-        if start.elapsed() >= timeout {
+        if spinner.elapsed() >= timeout {
             eprintln!();
             anyhow::bail!(
                 "Timed out after {} seconds while waiting for AMI '{}' to become available",

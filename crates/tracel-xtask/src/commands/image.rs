@@ -9,7 +9,7 @@ use tracel_xtask_utils::{
     aws::{
         images::{
             create_image, create_true_tag, delete_tag, ensure_image_matches_name,
-            find_single_baker_instance, find_single_image_by_true_tag, get_image_by_id,
+            find_baker_instance, find_single_image_by_true_tag, get_image_by_id,
             print_image_summary, wait_for_image_available, wait_for_instance_stopped,
         },
         instance_system_log::stream_system_log,
@@ -169,14 +169,14 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
     let mut created_images = Vec::new();
 
     for image in &args.images {
-        eprintln!("🧱 Looking for baker instance for image '{image}'");
+        eprintln!("👩‍🍳 Looking for baker instance for image '{image}'");
 
-        let instance = find_single_baker_instance(&args.region, image).with_context(|| {
+        let instance = find_baker_instance(&args.region, image).with_context(|| {
             format!("baker instance for image '{image}' should be discoverable")
         })?;
 
         eprintln!(
-            "🧱 Found baker instance for image '{image}'\n  Instance: {}\n  State:    {}\n  IP:       {}\n  AZ:       {}",
+            "👩‍🍳 Found baker instance for image '{image}'\n  Instance: {}\n  State:    {}\n  IP:       {}\n  AZ:       {}",
             instance.instance_id,
             instance.state.name,
             instance.private_ip.as_deref().unwrap_or("no-ip"),
@@ -377,7 +377,7 @@ fn list(args: ImageListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
 }
 
 fn host(args: ImageHostSubCmdArgs) -> anyhow::Result<()> {
-    let selected = find_single_baker_instance(&args.region, &args.image)?;
+    let selected = find_baker_instance(&args.region, &args.image)?;
 
     if args.system_log {
         eprintln!(
