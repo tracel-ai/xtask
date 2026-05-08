@@ -42,7 +42,7 @@ pub struct AwsTag {
     pub value: String,
 }
 
-pub fn find_single_baker_instance(region: &str, image: &str) -> anyhow::Result<Ec2Instance> {
+pub fn find_baker_instance(region: &str, image: &str) -> anyhow::Result<Ec2Instance> {
     let instances = describe_baker_instances(region, image)?;
 
     match instances.len() {
@@ -68,7 +68,7 @@ pub fn describe_baker_instances(region: &str, image: &str) -> anyhow::Result<Vec
         region,
         "--filters",
         "Name=tag:Baker,Values=true",
-        &format!("Name=tag:ImageName,Values={image}"),
+        &format!("Name=tag:Image,Values={image}"),
         "Name=instance-state-name,Values=pending,running,stopping,stopped",
         "--output",
         "json",
