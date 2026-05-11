@@ -9,6 +9,8 @@ use crate::{
 
 use anyhow::Context as _;
 
+pub const IMAGE_NAME_TAG_VALUE: &str = "Image";
+
 #[derive(Debug, Deserialize)]
 struct CreateImageResponse {
     #[serde(rename = "ImageId")]
@@ -69,7 +71,7 @@ pub fn describe_baker_instances(region: &str, image: &str) -> anyhow::Result<Vec
         region,
         "--filters",
         "Name=tag:Baker,Values=true",
-        &format!("Name=tag:Image,Values={image}"),
+        &format!("Name=tag:{IMAGE_NAME_TAG_VALUE},Values={image}"),
         "Name=instance-state-name,Values=pending,running,stopping,stopped",
         "--output",
         "json",
@@ -156,7 +158,7 @@ pub fn create_image(
     additional_tags: &[(String, String)],
 ) -> anyhow::Result<String> {
     let mut tags = vec![
-        ("Image".to_owned(), image.to_owned()),
+        (format!("{IMAGE_NAME_TAG_VALUE}").to_owned(), image.to_owned()),
         ("BakerInstanceId".to_owned(), instance_id.to_owned()),
         ("ManagedBy".to_owned(), "xtask".to_owned()),
     ];
@@ -302,7 +304,7 @@ pub fn describe_images_by_true_tag(
         "--owners",
         "self",
         "--filters",
-        &format!("Name=tag:ImageName,Values={image}"),
+        &format!("Name=tag:{IMAGE_NAME_TAG_VALUE},Values={image}"),
         &format!("Name=tag:{tag_key},Values=true"),
         "--output",
         "json",
@@ -359,12 +361,12 @@ pub fn ensure_image_matches_name(image: &AmiImage, expected: &str) -> anyhow::Re
     let actual = image
         .tags
         .iter()
-        .find(|tag| tag.key == "ImageName")
+        .find(|tag| tag.key == IMAGE_NAME_TAG_VALUE)
         .map(|tag| tag.value.as_str());
 
     if actual != Some(expected) {
         anyhow::bail!(
-            "AMI '{}' should have tag ImageName='{}', found '{}'",
+            "AMI '{}' should have tag Image='{}', found '{}'",
             image.image_id,
             expected,
             actual.unwrap_or("<missing>")
@@ -410,7 +412,7 @@ pub fn describe_images_by_name(region: &str, image: &str) -> anyhow::Result<Vec<
         "--owners",
         "self",
         "--filters",
-        &format!("Name=tag:Image,Values={image}"),
+        &format!("Name=tag:{IMAGE_NAME_TAG_VALUE},Values={image}"),
         "Name=tag:ManagedBy,Values=xtask",
         "--output",
         "json",

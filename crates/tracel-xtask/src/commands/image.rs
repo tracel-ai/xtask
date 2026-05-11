@@ -293,7 +293,7 @@ fn promote(args: ImagePromoteSubCmdArgs, env: &Environment<ExplicitIndex>) -> an
 
     eprintln!("✅ Promoted AMI '{}'", args.ami_id);
     eprintln!("  {}=true", promote_tag);
-    eprintln!("  ImageName={}", args.image);
+    eprintln!("  Image={}", args.image);
 
     Ok(())
 }
