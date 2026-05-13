@@ -158,7 +158,10 @@ pub fn create_image(
     additional_tags: &[(String, String)],
 ) -> anyhow::Result<String> {
     let mut tags = vec![
-        (format!("{IMAGE_NAME_TAG_VALUE}").to_owned(), image.to_owned()),
+        (
+            IMAGE_NAME_TAG_VALUE.to_string().to_owned(),
+            image.to_owned(),
+        ),
         ("BakerInstanceId".to_owned(), instance_id.to_owned()),
         ("ManagedBy".to_owned(), "xtask".to_owned()),
     ];
