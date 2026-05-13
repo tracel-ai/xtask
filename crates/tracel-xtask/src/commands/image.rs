@@ -275,7 +275,7 @@ impl LiveImageBuildTable {
                 .to_owned(),
         );
         lines.push(format!(
-            "👷‍♂️ Image build status ({min:02}:{sec:02}) — stop timeout: {}, AMI timeout: {}",
+            "👷‍♂️ Image build status ({min:02}:{sec:02}) [stop timeout: {}, AMI timeout: {}]",
             format_duration(&self.stop_timeout),
             format_duration(&self.ami_timeout),
         ));
@@ -334,7 +334,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
 
 pub fn handle_command(args: ImageCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
-        ImageSubCommand::Build(build_args) => build(build_args),
+        ImageSubCommand::Build(build_args) => build(build_args, &env.into_explicit()),
         ImageSubCommand::Promote(promote_args) => promote(promote_args, &env.into_explicit()),
         ImageSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env.into_explicit()),
         ImageSubCommand::Rollout(rollout_args) => rollout(rollout_args),
@@ -351,7 +351,7 @@ fn rollback_tag(tag: Option<String>, env: &Environment<ExplicitIndex>) -> String
     tag.unwrap_or(format!("rollback_{env}"))
 }
 
-fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
+fn build(args: ImageBuildSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
     if args.images.is_empty() {
         anyhow::bail!("at least one '--image <IMAGE_NAME>' should be provided");
     }
@@ -364,7 +364,8 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
             .context("image baker Terraform state should apply successfully")?;
     }
 
-    let tags = parse_tags(&args.tags)?;
+    let mut tags = parse_tags(&args.tags)?;
+    tags.push(("env".to_owned(), env.long().to_owned()));
     let region = args.region.clone();
     let stop_timeout = Duration::from_secs(args.stop_timeout_secs);
     let ami_timeout = Duration::from_secs(args.ami_timeout_secs);
@@ -379,11 +380,13 @@ fn build(args: ImageBuildSubCmdArgs) -> anyhow::Result<()> {
             let region = region.clone();
             let tags = tags.clone();
             let event_tx = event_tx.clone();
+            let env = env.clone();
 
             handles.push(scope.spawn(move || {
                 build_image_lifecycle(
                     &region,
                     &image,
+                    &env,
                     stop_timeout,
                     ami_timeout,
                     no_reboot,
@@ -656,11 +659,14 @@ fn normalize_path(path: PathBuf) -> anyhow::Result<PathBuf> {
     }
 }
 
-fn build_ami_name(image: &str) -> anyhow::Result<String> {
+fn build_ami_name(env: &Environment<ExplicitIndex>, image: &str) -> anyhow::Result<String> {
     let git_sha = git_short_sha().unwrap_or_else(|_| "unknown".to_string());
     let timestamp = utc_timestamp_compact()?;
 
-    Ok(format!("tracel-{image}-{timestamp}-{git_sha}"))
+    Ok(format!(
+        "{}-tracel-{image}-{timestamp}-{git_sha}",
+        env.short()
+    ))
 }
 
 fn git_short_sha() -> anyhow::Result<String> {
@@ -705,6 +711,7 @@ fn parse_tags(tags: &[String]) -> anyhow::Result<Vec<(String, String)>> {
 fn build_image_lifecycle(
     region: &str,
     image: &str,
+    env: &Environment<ExplicitIndex>,
     stop_timeout: Duration,
     ami_timeout: Duration,
     no_reboot: bool,
@@ -732,7 +739,7 @@ fn build_image_lifecycle(
             )
         })?;
 
-        let ami_name = build_ami_name(image)?;
+        let ami_name = build_ami_name(env, image)?;
 
         send_image_build_state(
             event_tx,
