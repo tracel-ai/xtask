@@ -170,16 +170,32 @@ fn version_from_cargo_toml(path: &Path) -> anyhow::Result<String> {
 //  Publish ==================================================================
 
 fn local_version(crate_name: &str) -> anyhow::Result<String> {
-    let cargo_pkgid_output = Command::new("cargo")
+    let output = Command::new("cargo")
         .args(["pkgid", "-p", crate_name])
         .output()
-        .map_err(|e| anyhow!("Executing `cargo pkgid` should succeed: {}", e))?;
-    let cargo_pkgid_str = str::from_utf8(&cargo_pkgid_output.stdout)
-        .expect("cargo pkgid output should be valid UTF-8");
-    let (_, local_version) = cargo_pkgid_str
-        .split_once('#')
-        .expect("pkgid output should contain a version after '#'");
-    Ok(local_version.trim_end().to_string())
+        .with_context(|| "Executing `cargo pkgid` should succeed")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        anyhow::bail!(
+            "`cargo pkgid -p {crate_name}` should succeed.\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout.trim_end(),
+            stderr.trim_end(),
+        );
+    }
+
+    let pkgid = str::from_utf8(&output.stdout)
+        .expect("cargo pkgid output should be valid UTF-8")
+        .trim_end();
+
+    let (_, local_version) = pkgid
+        .rsplit_once('#')
+        .ok_or_else(|| anyhow!("pkgid output should contain a version after '#': {pkgid}"))?;
+
+    Ok(local_version.to_string())
 }
 
 fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
