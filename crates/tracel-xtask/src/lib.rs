@@ -59,6 +59,7 @@ pub mod prelude {
     pub use crate::commands::host::HostPrivateIpSubCmdArgs;
     pub use crate::commands::host::HostSubCommand;
     pub use crate::commands::image::ImageBuildSubCmdArgs;
+    pub use crate::commands::image::ImageCleanSubCmdArgs;
     pub use crate::commands::image::ImageCmdArgs;
     pub use crate::commands::image::ImageHostSubCmdArgs;
     pub use crate::commands::image::ImageListSubCmdArgs;

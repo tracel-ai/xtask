@@ -1051,6 +1051,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             quote! {
                 #[doc = r"Build virtual machine images from Terraform-managed baker instances."]
                 Build(ImageBuildSubCmdArgs),
+                #[doc = r"Clean obsolete virtual machine images."]
+                Clean(ImageCleanSubCmdArgs),
                 #[doc = r"Start a terminal session on an image baker instance."]
                 Host(ImageHostSubCmdArgs),
                 #[doc = r"Show current latest and rollback virtual machine images."]

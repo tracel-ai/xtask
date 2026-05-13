@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::prelude::anyhow::Context as _;
 use crate::prelude::*;
+use tracel_xtask_utils::aws::images::describe_images_by_name;
 use tracel_xtask_utils::spinner::Spinner;
 use tracel_xtask_utils::{
     aws::{
@@ -124,6 +125,25 @@ pub struct ImageListSubCmdArgs {
     /// Rollback tag key. Defaults to `rollback_<environment>`.
     #[arg(long)]
     pub rollback_tag: Option<String>,
+}
+
+#[derive(clap::Args, Default, Clone, PartialEq)]
+pub struct ImageCleanSubCmdArgs {
+    /// Region where the AMIs live.
+    #[arg(long)]
+    pub region: String,
+    /// Logical image name.
+    #[arg(long)]
+    pub image: String,
+    /// Promote tag key. Defaults to `latest_<environment>`.
+    #[arg(long)]
+    pub promote_tag: Option<String>,
+    /// Rollback tag key. Defaults to `rollback_<environment>`.
+    #[arg(long)]
+    pub rollback_tag: Option<String>,
+    /// Actually deregister obsolete AMIs. Without this flag, only prints what would be removed.
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
@@ -335,6 +355,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
 pub fn handle_command(args: ImageCmdArgs, env: Environment, _ctx: Context) -> anyhow::Result<()> {
     match args.get_command() {
         ImageSubCommand::Build(build_args) => build(build_args, &env.into_explicit()),
+        ImageSubCommand::Clean(clean_args) => clean(clean_args, &env.into_explicit()),
         ImageSubCommand::Promote(promote_args) => promote(promote_args, &env.into_explicit()),
         ImageSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env.into_explicit()),
         ImageSubCommand::Rollout(rollout_args) => rollout(rollout_args),
@@ -595,6 +616,93 @@ fn list(args: ImageListSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::
     Ok(())
 }
 
+fn clean(args: ImageCleanSubCmdArgs, env: &Environment<ExplicitIndex>) -> anyhow::Result<()> {
+    let promote_tag = promote_tag(args.promote_tag, env);
+    let rollback_tag = rollback_tag(args.rollback_tag, env);
+
+    let images = describe_images_by_name(&args.region, &args.image)
+        .context("AMIs should be discoverable before cleanup")?;
+
+    let obsolete_images = images
+        .into_iter()
+        .filter(|image| has_tag(image, "env", &env.long()))
+        .filter(|image| !has_true_tag(image, &promote_tag))
+        .filter(|image| !has_true_tag(image, &rollback_tag))
+        .collect::<Vec<_>>();
+
+    eprintln!("🧹 Cleaning obsolete AMIs");
+    eprintln!("  Image:        {}", args.image);
+    eprintln!("  Region:       {}", args.region);
+    eprintln!("  Environment:  {}", env.long());
+    eprintln!("  Keep latest:  {promote_tag}=true");
+    eprintln!("  Keep rollback:{rollback_tag}=true");
+
+    if obsolete_images.is_empty() {
+        eprintln!("✅ No obsolete AMIs found.");
+        return Ok(());
+    }
+
+    eprintln!("Found {} obsolete AMI(s):", obsolete_images.len());
+
+    for image in &obsolete_images {
+        eprintln!(
+            "• {} ({})",
+            image.image_id,
+            image.name.as_deref().unwrap_or("unnamed")
+        );
+
+        if let Some(creation_date) = &image.creation_date {
+            eprintln!("  Created: {creation_date}");
+        }
+    }
+
+    if !args.force {
+        eprintln!();
+        eprintln!("Dry run only. Re-run with '--force' to deregister these AMIs.");
+        return Ok(());
+    }
+
+    eprintln!();
+
+    for image in obsolete_images {
+        eprintln!("🗑️ Deregistering AMI {}", image.image_id);
+        deregister_image(&args.region, &image.image_id)
+            .with_context(|| format!("AMI '{}' should deregister successfully", image.image_id))?;
+    }
+
+    eprintln!("✅ Obsolete AMI cleanup completed.");
+
+    Ok(())
+}
+
+fn has_true_tag(image: &tracel_xtask_utils::aws::images::AmiImage, key: &str) -> bool {
+    has_tag(image, key, "true")
+}
+
+fn has_tag(image: &tracel_xtask_utils::aws::images::AmiImage, key: &str, value: &str) -> bool {
+    image
+        .tags
+        .iter()
+        .any(|tag| tag.key == key && tag.value == value)
+}
+
+fn deregister_image(region: &str, ami_id: &str) -> anyhow::Result<()> {
+    run_process(
+        "aws",
+        &[
+            "ec2",
+            "deregister-image",
+            "--region",
+            region,
+            "--image-id",
+            ami_id,
+        ],
+        None,
+        None,
+        "aws ec2 deregister-image should succeed",
+    )
+}
+
 fn host(args: ImageHostSubCmdArgs) -> anyhow::Result<()> {
     let selected = find_baker_instance(&args.region, &args.image)?;
 
@@ -708,6 +816,7 @@ fn parse_tags(tags: &[String]) -> anyhow::Result<Vec<(String, String)>> {
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_image_lifecycle(
     region: &str,
     image: &str,
