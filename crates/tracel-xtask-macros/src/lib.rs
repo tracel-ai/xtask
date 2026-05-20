@@ -999,6 +999,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Deny,
                 #[doc = r"Run cargo-machete to find unused dependencies `<https://crates.io/crates/cargo-machete>`"]
                 Unused,
+                #[doc = r"Run cargo update to resolve against the latest version of the dependencies."]
+                Update,
             },
         ),
         (

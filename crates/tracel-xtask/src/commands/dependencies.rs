@@ -18,6 +18,7 @@ pub fn handle_command(
     match args.get_command() {
         DependenciesSubCommand::Deny => run_cargo_deny(),
         DependenciesSubCommand::Unused => run_cargo_machete(),
+        DependenciesSubCommand::Update => run_cargo_update(),
         DependenciesSubCommand::All => DependenciesSubCommand::iter()
             .filter(|c| *c != DependenciesSubCommand::All)
             .try_for_each(|c| {
@@ -57,6 +58,21 @@ fn run_cargo_machete() -> anyhow::Result<()> {
         None,
         None,
         "Unused dependencies found!",
+    )?;
+    endgroup!();
+
+    Ok(())
+}
+
+/// Run cargo update
+fn run_cargo_update() -> anyhow::Result<()> {
+    group!("Cargo: update dependencies");
+    run_process(
+        "cargo",
+        &["update"],
+        None,
+        None,
+        "Dependencies should update successfully!",
     )?;
     endgroup!();
 
