@@ -960,6 +960,149 @@ To see the current `latest` and `rollback` images use the `list` subcommand:
 xtask -e stag container list --region AWS_REGION --repository my_image
 ```
 
+### Images
+
+The `image` command standardizes how we build, publish, promote, roll back, roll out, inspect, and clean virtual machine images.
+
+It currently targets **AWS AMIs** and relies on **Terraform-managed EC2 baker instances** to produce those images. The rollout step is also Terraform-based: once an AMI is promoted, the application infrastructure state is applied so consumers of the promoted image can pick it up.
+
+The image workflow is intentionally modeled after the `container` workflow. The goal is to keep the operational model familiar:
+
+- build produces a new immutable artifact,
+- promote moves the environment tag to that artifact,
+- rollback moves the environment tag back to the previous artifact,
+- rollout applies the promoted artifact to the running infrastructure,
+- list shows the currently promoted and rollback artifacts.
+
+#### Conceptual Model
+
+##### Deploy
+
+**Apply baker instances Terraform state** -> **Bake EC2 instance** -> **Create AMI** -> **Promote to `latest_<env_medium>`** -> **Apply application Terraform state**
+
+##### Rollback
+
+**Rollback by promoting `rollback_<env_medium>` to `latest_<env_medium>`** -> **Apply application Terraform state**
+
+#### Prerequisites
+
+- **AWS CLI** setup with permissions for EC2, AMIs, tags, and SSM.
+- **Terraform** installed locally or on your CI runners.
+- A Terraform state/root capable of creating one or more baker EC2 instances.
+- Baker instances tagged so they can be discovered by logical image name.
+- Application Terraform state configured to consume the promoted AMI tags.
+
+#### Examples
+
+The `build` command applies the baker Terraform state in `--tf-root`, waits for the baker instances to stop, and then creates AMIs from them:
+
+```sh
+xtask -e stag image build \
+  --region AWS_REGION \
+  --tf-root infra/states/images \
+  --image backend \
+  --image frontend
+```
+
+Additional AMI tags can be applied at creation time:
+
+```sh
+xtask -e stag image build \
+  --region AWS_REGION \
+  --tf-root infra/states/images \
+  --image backend \
+  --tag service=backend \
+  --tag owner=infra
+```
+
+If the baker Terraform state was already applied or you want to apply it yourself in a custom command that wraps the base `image` command,
+then skip the Terraform apply step:
+
+```sh
+xtask -e stag image build \
+  --region AWS_REGION \
+  --tf-root infra/states/images \
+  --image backend \
+  --skip-apply
+```
+
+Retrieve the AMI id from the output of the build command and promote it:
+
+```sh
+xtask -e stag image promote \
+  --region AWS_REGION \
+  --image backend \
+  --ami-id AMI_ID
+```
+
+By default this applies `latest_<environment>=true` to the promoted AMI and moves the previously promoted AMI, if any, to `rollback_<environment>=true`.
+
+Then roll out the promoted image by applying the Terraform state that consumes it:
+
+```s
+xtask -e stag image rollout \
+  --tf-root infra/states/application
+```
+
+To see the current promoted and rollback AMIs:
+
+```sh
+xtask -e stag image list \
+  --region AWS_REGION \
+  --image backend
+```
+
+To roll back to the previous promoted AMI:
+
+```sh
+xtask -e stag image rollback \
+  --region AWS_REGION \
+  --image backend
+```
+
+Then apply the consuming Terraform state again:
+
+```sh
+xtask -e stag image rollout \
+  --tf-root infra/states/application
+```
+
+To inspect or debug a baker instance, open an SSM shell:
+
+```sh
+xtask -e stag image host \
+  --region AWS_REGION \
+  --image backend
+```
+
+To stream the system log for a baker instance instead:
+
+```sh
+xtask -e stag image host \
+  --region AWS_REGION \
+  --image backend \
+  --system-log
+```
+
+To clean obsolete AMIs for the current environment, first run a dry run:
+
+```sh
+xtask -e stag image clean \
+  --region AWS_REGION \
+  --image backend
+```
+
+Then deregister the obsolete AMIs with:
+
+```sh
+xtask -e stag image clean \
+  --region AWS_REGION \
+  --image backend \
+  --force
+```
+
+Obsolete AMIs are AMIs matching the logical image name and current environment, excluding the current promoted AMI and the current rollback AMI.
+
 ### Secrets
 
 This command handles secrets to view, edit and even write an env file with them. For now it only supports AWS Secrets Manager.
