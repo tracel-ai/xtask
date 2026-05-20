@@ -1029,6 +1029,8 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 All,
                 #[doc = r"Run audit command."]
                 Audit,
+                #[doc = r"Run lint and format."]
+                Code,
                 #[doc = r"Run format command and fix formatting."]
                 Format,
                 #[doc = r"Run lint command and fix issues."]

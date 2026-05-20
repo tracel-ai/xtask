@@ -38,8 +38,9 @@ pub fn handle_command(
                 args.no_default_features,
             ),
             FixSubCommand::Typos => run_typos(),
+            FixSubCommand::Code => run_code(&args),
             FixSubCommand::All => FixSubCommand::iter()
-                .filter(|c| *c != FixSubCommand::All)
+                .filter(|c| *c != FixSubCommand::All && *c != FixSubCommand::Code)
                 .try_for_each(|c| {
                     handle_command(
                         FixCmdArgs {
@@ -88,6 +89,19 @@ pub(crate) fn run_audit() -> anyhow::Result<()> {
         "Audit check execution failed",
     )?;
     endgroup!();
+    Ok(())
+}
+
+fn run_code(args: &FixCmdArgs) -> anyhow::Result<()> {
+    run_lint(
+        &args.target,
+        &args.exclude,
+        &args.only,
+        &args.features,
+        args.no_default_features,
+    )?;
+    run_format(&args.target, &args.exclude, &args.only)?;
+
     Ok(())
 }
 
