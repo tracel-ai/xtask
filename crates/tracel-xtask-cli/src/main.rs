@@ -2,6 +2,9 @@ mod args;
 mod deps;
 mod emojis;
 
+#[cfg(test)]
+mod test;
+
 use std::{
     collections::BTreeMap,
     env,
@@ -658,30 +661,99 @@ fn select_subrepo_workspace(
         ));
     }
 
+    select_subrepo_workspace_from_list(&subrepos, selector).cloned()
+}
+
+fn select_subrepo_workspace_from_list<'a>(
+    subrepos: &'a [Workspace],
+    selector: &str,
+) -> Result<&'a Workspace, String> {
+    // Exact selector:
+    //
+    //   :product-backend
     if let Some(ws) = subrepos.iter().find(|ws| ws.dir_name == selector) {
-        return Ok(ws.clone());
+        return Ok(ws);
     }
 
-    let mut matches: Vec<Workspace> = subrepos
-        .into_iter()
+    // Prefix selector:
+    //
+    //   :product
+    //   :prod
+    //
+    // Keep the existing behavior before trying shorthand resolution.
+    let prefix_matches: Vec<&Workspace> = subrepos
+        .iter()
         .filter(|ws| ws.dir_name.starts_with(selector))
         .collect();
 
-    match matches.len() {
-        0 => Err(format!("No subrepo matches selector '{}'.", selector)),
-        1 => Ok(matches.remove(0)),
-        _ => {
-            let candidates = matches
+    match prefix_matches.len() {
+        1 => return Ok(prefix_matches[0]),
+        n if n > 1 => {
+            let candidates = prefix_matches
                 .iter()
                 .map(|ws| ws.dir_name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            Err(format!(
+            return Err(format!(
                 "Ambiguous subrepo selector '{}'. Matching candidates: {}",
+                selector, candidates
+            ));
+        }
+        _ => {}
+    }
+
+    // Shorthand selector:
+    //
+    //   product-backend -> :pb
+    //   burn-central-app -> :bca
+    //
+    // The shorthand is accepted only when it resolves to exactly one subrepo.
+    let normalized_selector = selector.to_ascii_lowercase();
+
+    let shorthand_matches: Vec<&Workspace> = subrepos
+        .iter()
+        .filter(|ws| {
+            subrepo_shorthand(&ws.dir_name)
+                .as_deref()
+                .is_some_and(|shorthand| shorthand == normalized_selector)
+        })
+        .collect();
+
+    match shorthand_matches.len() {
+        0 => Err(format!("No subrepo matches selector '{}'.", selector)),
+        1 => Ok(shorthand_matches[0]),
+        _ => {
+            let candidates = shorthand_matches
+                .iter()
+                .map(|ws| {
+                    let shorthand = subrepo_shorthand(&ws.dir_name)
+                        .expect("subrepo shorthand should exist for a shorthand match");
+
+                    format!("{} (:{})", ws.dir_name, shorthand)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Err(format!(
+                "Ambiguous subrepo shorthand selector '{}'. Matching candidates: {}",
                 selector, candidates
             ))
         }
+    }
+}
+
+fn subrepo_shorthand(name: &str) -> Option<String> {
+    let shorthand = name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter_map(|part| part.chars().next())
+        .map(|c| c.to_ascii_lowercase())
+        .collect::<String>();
+
+    if shorthand.is_empty() {
+        None
+    } else {
+        Some(shorthand)
     }
 }
 
@@ -1052,11 +1124,15 @@ fn show_xtask_cli_help(
         println!("  (none found)");
     } else {
         for ws in &subrepos {
+            let shorthand = subrepo_shorthand(&ws.dir_name)
+                .map(|shorthand| format!(":{shorthand}"))
+                .unwrap_or_else(|| "-".to_string());
+
             println!(
-                "  - {:<16}  xtask package: {:<12}  path: {}",
+                "  - {:<16}  shorthand: {:<8}  xtask: {:<12}",
                 ws.dir_name,
+                shorthand,
                 ws.xtask.package_name(),
-                ws.path.display()
             );
         }
     }
@@ -1095,6 +1171,8 @@ fn show_xtask_cli_help(
         "  - This wrapper is designed to remain transparent: it forwards your arguments to the"
     );
     println!("    underlying xtask binary in the selected workspace(s).");
+    println!("  - Subrepo selectors also support unambiguous shorthands, for example");
+    println!("    `product-backend` can be selected with `:pb`.");
     println!();
 
     cli_help_fooder();
