@@ -1,5 +1,6 @@
-/// Manage containers.
-/// Current implementation uses `docker` and `AWS ECR` as container registry.
+/// Manage AWS containers.
+/// Current implementation uses `docker`, `AWS ECR`, EC2 Auto Scaling Groups,
+/// CloudWatch Logs, and SSM.
 use serde::Deserialize;
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -24,17 +25,17 @@ use tracel_xtask_utils::{
 
 const SSM_SESSION_DOC: &str = "Xtask-Container-InteractiveShell";
 
-#[tracel_xtask_macros::declare_command_args(None, ContainerSubCommand)]
-pub struct ContainerCmdArgs {}
+#[tracel_xtask_macros::declare_command_args(None, AwsContainerSubCommand)]
+pub struct AwsContainerCmdArgs {}
 
-impl Default for ContainerSubCommand {
+impl Default for AwsContainerSubCommand {
     fn default() -> Self {
-        ContainerSubCommand::Build(ContainerBuildSubCmdArgs::default())
+        AwsContainerSubCommand::Build(AwsContainerBuildSubCmdArgs::default())
     }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerBuildSubCmdArgs {
+pub struct AwsContainerBuildSubCmdArgs {
     /// Path to build file relative to context directory (i.e. a Dockerfile)
     pub build_file: PathBuf,
     /// Build context directory (default to repository root)
@@ -58,7 +59,7 @@ pub struct ContainerBuildSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerHostSubCmdArgs {
+pub struct AwsContainerHostSubCmdArgs {
     /// Region of the Auto Scaling Group / container host
     #[arg(long)]
     pub region: String,
@@ -74,7 +75,7 @@ pub struct ContainerHostSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerListSubCmdArgs {
+pub struct AwsContainerListSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -90,7 +91,7 @@ pub struct ContainerListSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerLogsSubCmdArgs {
+pub struct AwsContainerLogsSubCmdArgs {
     /// AWS region to read logs from
     #[arg(long)]
     pub region: String,
@@ -112,7 +113,7 @@ pub struct ContainerLogsSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerPullSubCmdArgs {
+pub struct AwsContainerPullSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -128,7 +129,7 @@ pub struct ContainerPullSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerPushSubCmdArgs {
+pub struct AwsContainerPushSubCmdArgs {
     /// Local image name (the one used in the build command)
     #[arg(long)]
     pub image: String,
@@ -149,11 +150,11 @@ pub struct ContainerPushSubCmdArgs {
     pub auto_remote_tag: bool,
     /// Required container platform (e.g. linux/amd64). If set, the local image must match.
     #[arg(long)]
-    pub platform: Option<ContainerPlatform>,
+    pub platform: Option<AwsContainerPlatform>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerPromoteSubCmdArgs {
+pub struct AwsContainerPromoteSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -172,7 +173,7 @@ pub struct ContainerPromoteSubCmdArgs {
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerRollbackSubCmdArgs {
+pub struct AwsContainerRollbackSubCmdArgs {
     /// Region where the container repository lives
     #[arg(long)]
     pub region: String,
@@ -188,7 +189,7 @@ pub struct ContainerRollbackSubCmdArgs {
 }
 
 #[derive(clap::Args, Clone, PartialEq, Debug)]
-pub struct ContainerRolloutSubCmdArgs {
+pub struct AwsContainerRolloutSubCmdArgs {
     /// Region of the Auto Scaling Group
     #[arg(long)]
     pub region: String,
@@ -196,16 +197,16 @@ pub struct ContainerRolloutSubCmdArgs {
     #[arg(long, value_name = "ASG_NAME")]
     pub asg: String,
     /// Strategy for instance refresh (Rolling is the standard choice for zero-downtime rollouts)
-    #[arg(long, value_name = "Rolling", default_value_t = ContainerRolloutSubCmdArgs::default().strategy)]
+    #[arg(long, value_name = "Rolling", default_value_t = AwsContainerRolloutSubCmdArgs::default().strategy)]
     pub strategy: String,
     /// Seconds for instance warmup
-    #[arg(long, value_name = "SECS", default_value_t = ContainerRolloutSubCmdArgs::default().instance_warmup)]
+    #[arg(long, value_name = "SECS", default_value_t = AwsContainerRolloutSubCmdArgs::default().instance_warmup)]
     pub instance_warmup: u64,
     /// Maximum healthy percentage during the rollout
-    #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().max_healthy_percentage)]
+    #[arg(long, value_name = "PCT", default_value_t = AwsContainerRolloutSubCmdArgs::default().max_healthy_percentage)]
     pub max_healthy_percentage: u8,
     /// Minimum healthy percentage during the rollout
-    #[arg(long, value_name = "PCT", default_value_t = ContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
+    #[arg(long, value_name = "PCT", default_value_t = AwsContainerRolloutSubCmdArgs::default().min_healthy_percentage)]
     pub min_healthy_percentage: u8,
     /// Container promote tag, defaults to 'latest'.
     #[arg(long)]
@@ -214,21 +215,21 @@ pub struct ContainerRolloutSubCmdArgs {
     #[arg(long)]
     pub repository: Option<String>,
     /// If set, skip replacing instances that already match the launch template/config
-    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().skip_matching)]
+    #[arg(long, default_value_t = AwsContainerRolloutSubCmdArgs::default().skip_matching)]
     pub skip_matching: bool,
     /// Wait until the refresh completes
-    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait)]
+    #[arg(long, default_value_t = AwsContainerRolloutSubCmdArgs::default().wait)]
     pub wait: bool,
     /// Max seconds to wait when --wait is set
-    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_timeout_secs)]
+    #[arg(long, default_value_t = AwsContainerRolloutSubCmdArgs::default().wait_timeout_secs)]
     pub wait_timeout_secs: u64,
     /// Poll interval seconds when --wait is set
-    #[arg(long, default_value_t = ContainerRolloutSubCmdArgs::default().wait_poll_secs)]
+    #[arg(long, default_value_t = AwsContainerRolloutSubCmdArgs::default().wait_poll_secs)]
     pub wait_poll_secs: u64,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct ContainerRunSubCmdArgs {
+pub struct AwsContainerRunSubCmdArgs {
     /// Fully qualified image reference (e.g. 123.dkr.ecr.us-east-1.amazonaws.com/bc-backend:latest)
     #[arg(long)]
     pub image: String,
@@ -246,7 +247,7 @@ pub struct ContainerRunSubCmdArgs {
     pub extra_arg: Vec<String>,
 }
 
-impl Default for ContainerRolloutSubCmdArgs {
+impl Default for AwsContainerRolloutSubCmdArgs {
     fn default() -> Self {
         Self {
             region: String::new(),
@@ -266,16 +267,16 @@ impl Default for ContainerRolloutSubCmdArgs {
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
-pub enum ContainerPlatform {
+pub enum AwsContainerPlatform {
     LinuxAmd64,
     LinuxArm64,
 }
 
-impl std::fmt::Display for ContainerPlatform {
+impl std::fmt::Display for AwsContainerPlatform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ContainerPlatform::LinuxAmd64 => write!(f, "linux/amd64"),
-            ContainerPlatform::LinuxArm64 => write!(f, "linux/arm64"),
+            AwsContainerPlatform::LinuxAmd64 => write!(f, "linux/amd64"),
+            AwsContainerPlatform::LinuxArm64 => write!(f, "linux/arm64"),
         }
     }
 }
@@ -322,21 +323,21 @@ fn manifest_digest_short8(manifest_json: &str) -> anyhow::Result<Option<String>>
 }
 
 pub fn handle_command(
-    args: ContainerCmdArgs,
+    args: AwsContainerCmdArgs,
     env: Environment,
     _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
-        ContainerSubCommand::Build(build_args) => build(build_args),
-        ContainerSubCommand::Host(host_args) => host(host_args),
-        ContainerSubCommand::List(list_args) => list(list_args, &env),
-        ContainerSubCommand::Logs(logs_args) => logs(logs_args),
-        ContainerSubCommand::Pull(pull_args) => pull(pull_args),
-        ContainerSubCommand::Push(push_args) => push(push_args),
-        ContainerSubCommand::Promote(promote_args) => promote(promote_args, &env),
-        ContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env),
-        ContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args, &env),
-        ContainerSubCommand::Run(run_args) => run(run_args),
+        AwsContainerSubCommand::Build(build_args) => build(build_args),
+        AwsContainerSubCommand::Host(host_args) => host(host_args),
+        AwsContainerSubCommand::List(list_args) => list(list_args, &env),
+        AwsContainerSubCommand::Logs(logs_args) => logs(logs_args),
+        AwsContainerSubCommand::Pull(pull_args) => pull(pull_args),
+        AwsContainerSubCommand::Push(push_args) => push(push_args),
+        AwsContainerSubCommand::Promote(promote_args) => promote(promote_args, &env),
+        AwsContainerSubCommand::Rollback(rollback_args) => rollback(rollback_args, &env),
+        AwsContainerSubCommand::Rollout(rollout_args) => rollout(rollout_args, &env),
+        AwsContainerSubCommand::Run(run_args) => run(run_args),
     }
 }
 
@@ -348,7 +349,7 @@ fn rollback_tag(tag: Option<String>, env: &Environment) -> String {
     tag.unwrap_or(format!("rollback_{env}"))
 }
 
-fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
+fn build(build_args: AwsContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     let context_dir = build_args.context_dir.unwrap_or(git_repo_root_or_cwd()?);
     let build_file_path = if build_args.build_file.is_absolute() {
         build_args.build_file.clone()
@@ -398,7 +399,7 @@ fn build(build_args: ContainerBuildSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
+fn host(args: AwsContainerHostSubCmdArgs) -> anyhow::Result<()> {
     let selected =
         tracel_xtask_utils::aws::asg_instance_picker::pick_asg_instance(&args.region, &args.asg)?;
     if args.system_log {
@@ -437,7 +438,7 @@ fn host(args: ContainerHostSubCmdArgs) -> anyhow::Result<()> {
     }
 }
 
-fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn list(list_args: AwsContainerListSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let ecr_repository = &list_args.repository;
     let latest_tag = promote_tag(list_args.latest_tag, env);
     let rollback_tag = rollback_tag(list_args.rollback_tag, env);
@@ -491,7 +492,7 @@ fn list(list_args: ContainerListSubCmdArgs, env: &Environment) -> anyhow::Result
     Ok(())
 }
 
-fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
+fn logs(mut args: AwsContainerLogsSubCmdArgs) -> anyhow::Result<()> {
     let mut format = "detailed";
     if let Some(asg) = args.asg.as_deref() {
         let selected =
@@ -545,7 +546,7 @@ fn logs(mut args: ContainerLogsSubCmdArgs) -> anyhow::Result<()> {
     tracel_xtask_utils::aws::cli::aws_cli(cli_args, None, None, "aws logs tail should succeed")
 }
 
-fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
+fn pull(args: AwsContainerPullSubCmdArgs) -> anyhow::Result<()> {
     let account_id = aws_account_id()?;
     eprintln!(
         "📥 Pulling image from ECR\n Account: {account_id}\n Region:  {}\n Repo:    {}\n Tag:     {}",
@@ -579,7 +580,7 @@ fn pull(args: ContainerPullSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
+fn push(push_args: AwsContainerPushSubCmdArgs) -> anyhow::Result<()> {
     // check for repository existenz
     ecr_ensure_repo_exists(&push_args.repository, &push_args.region)?;
     // check for correct container platform
@@ -702,7 +703,7 @@ fn push(push_args: ContainerPushSubCmdArgs) -> anyhow::Result<()> {
 }
 
 /// promote: point N to `latest` and move the previous `latest` to `rollback`
-fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn promote(promote_args: AwsContainerPromoteSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     let promote_tag = promote_tag(promote_args.promote_tag, env);
     eprintln!(
         "Promoting '{}' to '{}'...",
@@ -712,7 +713,7 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
     // Fetch current 'latest' manifest and the new manifest to promote.
     let current_latest_manifest =
         ecr_get_manifest(&promote_args.repository, &promote_args.region, &promote_tag)
-            .context("current '{promote_tag}' manifest should be retrievable")?;
+            .with_context(|| format!("current '{promote_tag}' manifest should be retrievable"))?;
     if let Some(ref current) = current_latest_manifest {
         eprintln!(
             "Found previously promoted image with tag '{promote_tag}': {}",
@@ -757,7 +758,7 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
             &promote_args.region,
             &rollback_tag,
         )
-        .context("current '{rollback_tag}' manifest should be retrievable")?;
+        .with_context(|| format!("current '{rollback_tag}' manifest should be retrievable"))?;
         if let Some(rollback_manifest) = current_rollback_manifest
             && rollback_manifest == current_manifest
         {
@@ -812,7 +813,10 @@ fn promote(promote_args: ContainerPromoteSubCmdArgs, env: &Environment) -> anyho
 }
 
 /// rollback: promote current 'rollback_tag' container to 'promote_tag' and then remove 'rollback_tag'
-fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+fn rollback(
+    rollback_args: AwsContainerRollbackSubCmdArgs,
+    env: &Environment,
+) -> anyhow::Result<()> {
     let rollback_tag = rollback_tag(rollback_args.rollback_tag, env);
     // Fetch the manifest of the 'rollback' tag
     let current_rb_manifest = ecr_get_manifest(
@@ -891,8 +895,8 @@ fn rollback(rollback_args: ContainerRollbackSubCmdArgs, env: &Environment) -> an
     Ok(())
 }
 
-/// rollout: rollout latest promoted container for current environment
-fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
+/// rollout: rollout latest promoted AWS container for current environment
+fn rollout(rollout_args: AwsContainerRolloutSubCmdArgs, env: &Environment) -> anyhow::Result<()> {
     // Build preferences JSON strictly from flags
     let preferences = serde_json::json!({
         "InstanceWarmup": rollout_args.instance_warmup,
@@ -1011,14 +1015,14 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
 
                     let rollback_tag = rollback_tag(None, env);
                     if let Some(ref repo) = rollout_args.repository {
-                        let rb_args = ContainerRollbackSubCmdArgs {
+                        let rb_args = AwsContainerRollbackSubCmdArgs {
                             region: rollout_args.region.clone(),
                             repository: repo.clone(),
                             promote_tag: Some(promote_tag.clone()),
                             rollback_tag: Some(rollback_tag),
                         };
 
-                        rollback(rb_args, env).context("Container rollback should succeed")?;
+                        rollback(rb_args, env).context("AWS Container rollback should succeed")?;
 
                         rollback_triggered = true;
                         // restart the timer for a second window
@@ -1053,7 +1057,7 @@ fn rollout(rollout_args: ContainerRolloutSubCmdArgs, env: &Environment) -> anyho
     Ok(())
 }
 
-fn run(args: ContainerRunSubCmdArgs) -> anyhow::Result<()> {
+fn run(args: AwsContainerRunSubCmdArgs) -> anyhow::Result<()> {
     let mut cli_args: Vec<String> = vec!["run".into(), "--rm".into()];
 
     if let Some(ref name) = args.name {

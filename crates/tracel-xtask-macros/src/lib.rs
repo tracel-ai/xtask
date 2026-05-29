@@ -231,10 +231,11 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
-        "Container",
+        "AwsContainer",
         quote! {
-            #[doc = r"Manage containers lifecycle, from build to deployment."]
-            Container(tracel_xtask::commands::container::ContainerCmdArgs)
+            #[command(alias = "container")]
+            #[doc = r"Manage AWS containers lifecycle, from build to deployment."]
+            AwsContainer(tracel_xtask::commands::aws_container::AwsContainerCmdArgs)
         },
     );
     variant_map.insert(
@@ -270,6 +271,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Fix issues found with the 'check' command."]
             Fix(tracel_xtask::commands::fix::FixCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "GcpContainer",
+        quote! {
+            #[doc = r"Manage GCP containers lifecycle, from build to deployment."]
+            GcpContainer(tracel_xtask::commands::gcp_container::GcpContainerCmdArgs)
         },
     );
     variant_map.insert(
@@ -955,28 +963,28 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
-            "ContainerSubCommand",
+            "AwsContainerSubCommand",
             quote! {
                 #[doc = r"Build a container."]
-                Build(ContainerBuildSubCmdArgs),
+                Build(AwsContainerBuildSubCmdArgs),
                 #[doc = r"Start a terminal session on a container host instance."]
-                Host(ContainerHostSubCmdArgs),
+                Host(AwsContainerHostSubCmdArgs),
                 #[doc = r"Show current latest and rollback images in registry."]
-                List(ContainerListSubCmdArgs),
+                List(AwsContainerListSubCmdArgs),
                 #[doc = r"Show Cloudwatch logs of the container."]
-                Logs(ContainerLogsSubCmdArgs),
+                Logs(AwsContainerLogsSubCmdArgs),
                 #[doc = r"Pull a container from a registry."]
-                Pull(ContainerPullSubCmdArgs),
+                Pull(AwsContainerPullSubCmdArgs),
                 #[doc = r"Push a container to a registry."]
-                Push(ContainerPushSubCmdArgs),
+                Push(AwsContainerPushSubCmdArgs),
                 #[doc = r"Promote a pushed container to latest."]
-                Promote(ContainerPromoteSubCmdArgs),
+                Promote(AwsContainerPromoteSubCmdArgs),
                 #[doc = r"Rollback previously released container to latest."]
-                Rollback(ContainerRollbackSubCmdArgs),
+                Rollback(AwsContainerRollbackSubCmdArgs),
                 #[doc = r"Rollout last promoted container."]
-                Rollout(ContainerRolloutSubCmdArgs),
+                Rollout(AwsContainerRolloutSubCmdArgs),
                 #[doc = r"Run a local container."]
-                Run(ContainerRunSubCmdArgs),
+                Run(AwsContainerRunSubCmdArgs),
             },
         ),
         (
@@ -1039,6 +1047,27 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Lint,
                 #[doc = r"Find typos in source code and fix them."]
                 Typos,
+            },
+        ),
+        (
+            "GcpContainerSubCommand",
+            quote! {
+                #[doc = r"Build a GCP container."]
+                Build(GcpContainerBuildSubCmdArgs),
+                #[doc = r"Show current latest and rollback images in Artifact Registry."]
+                List(GcpContainerListSubCmdArgs),
+                #[doc = r"Pull a container from Artifact Registry."]
+                Pull(GcpContainerPullSubCmdArgs),
+                #[doc = r"Push a container to Artifact Registry."]
+                Push(GcpContainerPushSubCmdArgs),
+                #[doc = r"Promote a pushed container to the environment tag."]
+                Promote(GcpContainerPromoteSubCmdArgs),
+                #[doc = r"Rollback previously released container to the environment tag."]
+                Rollback(GcpContainerRollbackSubCmdArgs),
+                #[doc = r"Rollout last promoted container through a GCP Managed Instance Group."]
+                Rollout(GcpContainerRolloutSubCmdArgs),
+                #[doc = r"Run a local container."]
+                Run(GcpContainerRunSubCmdArgs),
             },
         ),
         (

@@ -1,12 +1,12 @@
 use tracel_xtask::prelude::*;
 
 #[macros::base_commands(
+    AwsContainer,
     Build,
     Bump,
     Check,
     Clean,
     Compile,
-    Container,
     Coverage,
     Dependencies,
     Doc,

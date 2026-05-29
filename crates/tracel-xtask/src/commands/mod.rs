@@ -1,14 +1,15 @@
+pub mod aws_container;
 pub mod build;
 pub mod bump;
 pub mod check;
 pub mod clean;
 pub mod compile;
-pub mod container;
 pub mod coverage;
 pub mod dependencies;
 pub mod doc;
 pub mod docker_compose;
 pub mod fix;
+pub mod gcp_container;
 pub mod host;
 pub mod image;
 pub mod infra;

@@ -20,6 +20,7 @@ all = [
   "cleanup",
   "clap",
   "environment",
+  "gcp",
   "git",
   "helpers",
   "logging",
@@ -50,6 +51,15 @@ environment = [
   "dep:anyhow",
   "dep:dotenvy",
   "dep:strum",
+]
+gcp = [
+  "process",
+  "dep:anyhow",
+  "dep:inquire",
+  "dep:owo-colors",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:time",
 ]
 git = ["dep:anyhow"]
 helpers = ["logging", "dep:anyhow", "process"]

@@ -10,6 +10,9 @@ pub mod cleanup;
 #[cfg(feature = "environment")]
 pub mod environment;
 
+#[cfg(feature = "gcp")]
+pub mod gcp;
+
 #[cfg(feature = "git")]
 pub mod git;
 
