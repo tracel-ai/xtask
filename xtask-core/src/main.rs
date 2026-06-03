@@ -2,6 +2,7 @@ use tracel_xtask::prelude::*;
 
 #[macros::base_commands(
     AwsContainer,
+    AwsSecrets,
     Build,
     Bump,
     Check,
@@ -12,10 +13,11 @@ use tracel_xtask::prelude::*;
     Doc,
     DockerCompose,
     Fix,
+    GcpContainer,
+    GcpSecrets,
     Host,
     Infra,
     Publish,
-    Secrets,
     Test,
     Validate,
     Vulnerabilities

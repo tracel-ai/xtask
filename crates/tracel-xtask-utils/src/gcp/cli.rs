@@ -1,9 +1,35 @@
-use std::path::Path;
+use std::{
+    ffi::OsString,
+    io::Write as _,
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 
 use anyhow::Context as _;
 use serde::Deserialize;
 
-use crate::process::{run_process, run_process_capture_stdout};
+use crate::{group_info, process::run_process_capture_stdout};
+
+fn gcloud_program() -> OsString {
+    if let Some(program) = std::env::var_os("GCLOUD") {
+        if !program.is_empty() {
+            return program;
+        }
+    }
+
+    if let Some(program) = default_sdk_gcloud_path() {
+        return program.into_os_string();
+    }
+
+    "gcloud".into()
+}
+
+fn default_sdk_gcloud_path() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let path = PathBuf::from(home).join("google-cloud-sdk/bin/gcloud");
+
+    path.exists().then_some(path)
+}
 
 pub fn gcloud_cli(
     args: Vec<String>,
@@ -11,18 +37,39 @@ pub fn gcloud_cli(
     path: Option<&Path>,
     error_msg: &str,
 ) -> anyhow::Result<()> {
-    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    run_process("gcloud", &arg_refs, envs, path, error_msg)
+    let joined_args = args.join(" ");
+    group_info!("Command line: gcloud {}", &joined_args);
+
+    let mut command = std::process::Command::new(gcloud_program());
+
+    if let Some(path) = path {
+        command.current_dir(path);
+    }
+
+    if let Some(envs) = envs {
+        command.envs(&envs);
+    }
+
+    let status = command
+        .args(args)
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute gcloud {}: {}", joined_args, e))?;
+
+    if !status.success() {
+        anyhow::bail!("{error_msg} ({status})");
+    }
+
+    Ok(())
 }
 
 pub fn gcloud_capture_stdout(args: Vec<String>, error_msg: &str) -> anyhow::Result<String> {
-    let mut cmd = std::process::Command::new("gcloud");
+    let mut cmd = std::process::Command::new(gcloud_program());
     cmd.args(args);
     run_process_capture_stdout(&mut cmd, error_msg)
 }
 
 fn gcloud_output_quiet(args: &[&str], context: &str) -> anyhow::Result<std::process::Output> {
-    std::process::Command::new("gcloud")
+    std::process::Command::new(gcloud_program())
         .args(args)
         .arg("--quiet")
         .output()
@@ -500,5 +547,209 @@ pub fn mig_wait_until_stable(project: &str, region: &str, mig: &str) -> anyhow::
 pub fn mig_console_url(project: &str, region: &str, mig: &str) -> String {
     format!(
         "https://console.cloud.google.com/compute/instanceGroups/details/{region}/{mig}?project={project}"
+    )
+}
+
+// Secret Manager ------------------------------------------------------------
+
+fn push_secret_location_args(args: &mut Vec<String>, location: Option<&str>) {
+    if let Some(location) = location {
+        args.push("--location".into());
+        args.push(location.into());
+    }
+}
+
+/// Create a Secret Manager secret metadata resource.
+///
+/// If `replication_locations` is provided, user-managed replication is used.
+/// Otherwise automatic replication is used.
+pub fn secret_manager_create_secret(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+    replication_locations: Option<&str>,
+) -> anyhow::Result<()> {
+    let mut args = vec![
+        "secrets".into(),
+        "create".into(),
+        secret_id.into(),
+        "--project".into(),
+        project.into(),
+        "--quiet".into(),
+    ];
+
+    push_secret_location_args(&mut args, location);
+
+    if let Some(replication_locations) = replication_locations {
+        args.push("--replication-policy".into());
+        args.push("user-managed".into());
+        args.push("--locations".into());
+        args.push(replication_locations.into());
+    } else if location.is_none() {
+        args.push("--replication-policy".into());
+        args.push("automatic".into());
+    }
+
+    gcloud_cli(args, None, None, "gcloud secrets create should succeed")
+}
+
+/// Fetch the latest Secret Manager version payload as a string.
+pub fn secret_manager_get_secret_string(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+) -> anyhow::Result<String> {
+    let mut args = vec![
+        "secrets".into(),
+        "versions".into(),
+        "access".into(),
+        "latest".into(),
+        "--secret".into(),
+        secret_id.into(),
+        "--project".into(),
+        project.into(),
+    ];
+
+    push_secret_location_args(&mut args, location);
+
+    let out = gcloud_capture_stdout(args, "gcloud secrets versions access should succeed")?;
+
+    Ok(out.trim_end().to_string())
+}
+
+/// Add a new Secret Manager version for the given secret.
+/// The secret value is sent through stdin using `--data-file=-`, so it is not
+/// exposed as a command-line argument.
+pub fn secret_manager_put_secret_string(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+    secret_string: &str,
+) -> anyhow::Result<()> {
+    let mut cmd = std::process::Command::new(gcloud_program());
+
+    cmd.arg("secrets")
+        .arg("versions")
+        .arg("add")
+        .arg(secret_id)
+        .arg("--data-file=-")
+        .arg("--project")
+        .arg(project)
+        .arg("--quiet")
+        .stdin(Stdio::piped());
+
+    if let Some(location) = location {
+        cmd.arg("--location").arg(location);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .with_context(|| "gcloud secrets versions add should start".to_string())?;
+
+    child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| anyhow::anyhow!("gcloud secrets versions add stdin should be available"))?
+        .write_all(secret_string.as_bytes())
+        .with_context(|| "writing secret payload to gcloud stdin should succeed")?;
+
+    let status = child
+        .wait()
+        .with_context(|| "gcloud secrets versions add should finish".to_string())?;
+
+    if !status.success() {
+        anyhow::bail!("gcloud secrets versions add should succeed (exit status {status})");
+    }
+
+    Ok(())
+}
+
+/// List all versions for a given secret as raw JSON.
+pub fn secret_manager_list_secret_versions_json(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+) -> anyhow::Result<String> {
+    let mut args = vec![
+        "secrets".into(),
+        "versions".into(),
+        "list".into(),
+        secret_id.into(),
+        "--project".into(),
+        project.into(),
+        "--format".into(),
+        "json".into(),
+    ];
+
+    push_secret_location_args(&mut args, location);
+
+    let out = gcloud_capture_stdout(args, "gcloud secrets versions list should succeed")?;
+
+    Ok(out.trim_end().to_string())
+}
+
+/// Describe a Secret Manager secret as raw JSON.
+pub fn secret_manager_describe_secret_json(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+) -> anyhow::Result<String> {
+    let mut args = vec![
+        "secrets".into(),
+        "describe".into(),
+        secret_id.into(),
+        "--project".into(),
+        project.into(),
+        "--format".into(),
+        "json".into(),
+    ];
+
+    push_secret_location_args(&mut args, location);
+
+    let out = gcloud_capture_stdout(args, "gcloud secrets describe should succeed")?;
+
+    Ok(out.trim_end().to_string())
+}
+
+/// Return Ok(true) if the secret exists, Ok(false) if it does not.
+pub fn secret_manager_secret_exists(
+    secret_id: &str,
+    project: &str,
+    location: Option<&str>,
+) -> anyhow::Result<bool> {
+    let mut cmd = std::process::Command::new(gcloud_program());
+
+    cmd.arg("secrets")
+        .arg("describe")
+        .arg(secret_id)
+        .arg("--project")
+        .arg(project)
+        .arg("--quiet");
+
+    if let Some(location) = location {
+        cmd.arg("--location").arg(location);
+    }
+
+    let output = cmd.output().with_context(|| {
+        format!(
+            "Invoking 'gcloud secrets describe' for '{}' in project '{}' should succeed",
+            secret_id, project
+        )
+    })?;
+
+    if output.status.success() {
+        return Ok(true);
+    }
+
+    if gcloud_missing_resource(&output.stderr) {
+        return Ok(false);
+    }
+
+    anyhow::bail!(
+        "gcloud secrets describe for '{}' in project '{}' should succeed (exit status: {}, stderr: {})",
+        secret_id,
+        project,
+        output.status,
+        gcloud_stderr(&output),
     )
 }

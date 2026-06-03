@@ -1,161 +1,190 @@
-/// Manage AWS Secrets Manager secrets.
+/// Manage GCP Secret Manager secrets.
 use std::{collections::HashMap, fmt::Write as _, fs, io, path::PathBuf};
 
 use anyhow::Context as _;
 
 use tracel_xtask_utils::{
-    aws::cli::{
-        secretsmanager_create_empty_secret, secretsmanager_get_secret_string,
-        secretsmanager_list_secret_versions_json, secretsmanager_put_secret_string,
-    },
     environment::Environment,
+    gcp::cli::{
+        secret_manager_create_secret, secret_manager_get_secret_string,
+        secret_manager_list_secret_versions_json, secret_manager_put_secret_string,
+    },
 };
 
 use crate::context::Context;
 
 const FALLBACK_EDITOR: &str = "vi";
 
-#[tracel_xtask_macros::declare_command_args(None, AwsSecretsSubCommand)]
-pub struct AwsSecretsCmdArgs {}
+#[tracel_xtask_macros::declare_command_args(None, GcpSecretsSubCommand)]
+pub struct GcpSecretsCmdArgs {}
 
-impl Default for AwsSecretsSubCommand {
+impl Default for GcpSecretsSubCommand {
     fn default() -> Self {
-        AwsSecretsSubCommand::View(AwsSecretsViewSubCmdArgs::default())
+        GcpSecretsSubCommand::View(GcpSecretsViewSubCmdArgs::default())
     }
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsCreateSubCmdArgs {
-    /// Region where the secret will be created
+pub struct GcpSecretsCreateSubCmdArgs {
+    /// GCP project where the secret will be created
     #[arg(long)]
-    pub region: String,
-
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
     /// Secret name to create with an initial empty JSON value
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
-
-    /// Optional description for the secret
+    /// Optional comma-separated user-managed replication locations.
+    /// If omitted, automatic replication is used.
     #[arg(long)]
-    pub description: Option<String>,
+    pub replication_locations: Option<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsCopySubCmdArgs {
-    /// Region where the secrets live
+pub struct GcpSecretsCopySubCmdArgs {
+    /// GCP project where the secrets live
     #[arg(long)]
-    pub region: String,
-
-    /// Source secret identifier (name or ARN)
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+    /// Source secret identifier
     #[arg(long, value_name = "FROM_SECRET_ID")]
     pub from: String,
-
-    /// Target secret identifier (name or ARN)
+    /// Target secret identifier
     #[arg(long, value_name = "TO_SECRET_ID")]
     pub to: String,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsEditSubCmdArgs {
-    /// Region where the secret lives
+pub struct GcpSecretsEditSubCmdArgs {
+    /// GCP project where the secret lives
     #[arg(long)]
-    pub region: String,
-
-    /// Secret identifier (name or ARN)
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+    /// Secret identifier
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
-
     /// Push the new secret version without asking for confirmation
     #[arg(short = 'y', long = "yes")]
     pub yes: bool,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsEnvFileSubCmdArgs {
+pub struct GcpSecretsEnvFileSubCmdArgs {
     /// Output file path. If omitted, writes to stdout.
     #[arg(long)]
     pub output: Option<std::path::PathBuf>,
-
-    /// Region where the secrets live
+    /// GCP project where the secrets live
     #[arg(long)]
-    pub region: String,
-
-    /// Secret identifiers (names or ARN), can provide multiple ones.
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+    /// Secret identifiers, can provide multiple ones.
     #[arg(value_name = "SECRET_ID", num_args(1..), required = true)]
     pub secret_ids: Vec<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsListSubCmdArgs {
-    /// Region where the secret lives
+pub struct GcpSecretsListSubCmdArgs {
+    /// GCP project where the secret lives
     #[arg(long)]
-    pub region: String,
+    pub project: String,
 
-    /// Secret identifier (name or ARN)
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+
+    /// Secret identifier
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsPushSubCmdArgs {
-    /// Region where the secret lives
+pub struct GcpSecretsPushSubCmdArgs {
+    /// GCP project where the secret lives
     #[arg(long)]
-    pub region: String,
-
-    /// Secret identifier (name or ARN)
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+    /// Secret identifier
     #[arg(long, value_name = "SECRET_ID")]
     pub secret_id: String,
-
     /// Push the new secret version without asking for confirmation
     #[arg(short = 'y', long = "yes")]
     pub yes: bool,
-
     /// Key-value updates in the form KEY=VALUE
     #[arg(value_name = "KEY=VALUE", num_args(1..), required = true)]
     pub kv: Vec<String>,
 }
 
 #[derive(clap::Args, Default, Clone, PartialEq)]
-pub struct AwsSecretsViewSubCmdArgs {
-    /// Region where the secret lives
+pub struct GcpSecretsViewSubCmdArgs {
+    /// GCP project where the secret lives
     #[arg(long)]
-    pub region: String,
-
-    /// Secret identifier (name or ARN)
+    pub project: String,
+    /// Optional GCP Secret Manager location for regional secrets.
+    /// Omit for regular project-scoped secrets.
+    #[arg(long)]
+    pub location: Option<String>,
+    /// Secret identifier
     #[arg(value_name = "SECRET_ID")]
     pub secret_id: String,
 }
 
 pub fn handle_command(
-    args: AwsSecretsCmdArgs,
+    args: GcpSecretsCmdArgs,
     _env: Environment,
     _ctx: Context,
 ) -> anyhow::Result<()> {
     match args.get_command() {
-        AwsSecretsSubCommand::Create(create_args) => create(create_args),
-        AwsSecretsSubCommand::Copy(copy_args) => copy(copy_args),
-        AwsSecretsSubCommand::Edit(edit_args) => edit(edit_args),
-        AwsSecretsSubCommand::EnvFile(env_args) => env_file(env_args),
-        AwsSecretsSubCommand::List(list_args) => list(list_args),
-        AwsSecretsSubCommand::Push(push_args) => push(push_args),
-        AwsSecretsSubCommand::View(view_args) => view(view_args),
+        GcpSecretsSubCommand::Create(create_args) => create(create_args),
+        GcpSecretsSubCommand::Copy(copy_args) => copy(copy_args),
+        GcpSecretsSubCommand::Edit(edit_args) => edit(edit_args),
+        GcpSecretsSubCommand::EnvFile(env_args) => env_file(env_args),
+        GcpSecretsSubCommand::List(list_args) => list(list_args),
+        GcpSecretsSubCommand::Push(push_args) => push(push_args),
+        GcpSecretsSubCommand::View(view_args) => view(view_args),
     }
 }
 
 /// Create a secret and attach an initial empty JSON (`{}`) version as plain text.
-fn create(args: AwsSecretsCreateSubCmdArgs) -> anyhow::Result<()> {
-    // create the secret metadata
-    secretsmanager_create_empty_secret(&args.secret_id, &args.region, args.description.as_deref())?;
-    // add a first version as an empty JSON object.
-    secretsmanager_put_secret_string(&args.secret_id, &args.region, "{}")?;
+fn create(args: GcpSecretsCreateSubCmdArgs) -> anyhow::Result<()> {
+    secret_manager_create_secret(
+        &args.secret_id,
+        &args.project,
+        args.location.as_deref(),
+        args.replication_locations.as_deref(),
+    )?;
+
+    secret_manager_put_secret_string(
+        &args.secret_id,
+        &args.project,
+        args.location.as_deref(),
+        "{}",
+    )?;
+
     eprintln!(
-        "✅ Created secret '{}' in region '{}' with an initial empty JSON value.",
-        args.secret_id, args.region
+        "✅ Created secret '{}' in project '{}' with an initial empty JSON value.",
+        args.secret_id, args.project
     );
+
     Ok(())
 }
 
-/// Copy a secret value from one secret ID to another in the same region.
-pub fn copy(args: AwsSecretsCopySubCmdArgs) -> anyhow::Result<()> {
+/// Copy a secret value from one secret ID to another in the same project/location.
+pub fn copy(args: GcpSecretsCopySubCmdArgs) -> anyhow::Result<()> {
     if args.from == args.to {
         eprintln!(
             "Source and target secrets are identical ('{}'), nothing to do.",
@@ -165,21 +194,22 @@ pub fn copy(args: AwsSecretsCopySubCmdArgs) -> anyhow::Result<()> {
     }
 
     eprintln!(
-        "Fetching source secret '{}' in region '{}'...",
-        args.from, args.region
+        "Fetching source secret '{}' in project '{}'...",
+        args.from, args.project
     );
-    let value = secretsmanager_get_secret_string(&args.from, &args.region, "text")?;
 
-    // Check if the target already has a current version.
-    // If we can successfully fetch it, we consider that a current version exists
-    // and ask for confirmation before creating a new one.
+    let value =
+        secret_manager_get_secret_string(&args.from, &args.project, args.location.as_deref())?;
+
     let target_has_version =
-        secretsmanager_get_secret_string(&args.to, &args.region, "text").is_ok();
+        secret_manager_get_secret_string(&args.to, &args.project, args.location.as_deref()).is_ok();
+
     if target_has_version {
         eprintln!(
-            "Secret '{}' already has a current version in region '{}'.",
-            args.to, args.region
+            "Secret '{}' already has a current version in project '{}'.",
+            args.to, args.project
         );
+
         if !confirm_push()? {
             eprintln!("Aborting: new secret version was not pushed.");
             return Ok(());
@@ -187,10 +217,12 @@ pub fn copy(args: AwsSecretsCopySubCmdArgs) -> anyhow::Result<()> {
     }
 
     eprintln!(
-        "Writing target secret '{}' in region '{}'...",
-        args.to, args.region
+        "Writing target secret '{}' in project '{}'...",
+        args.to, args.project
     );
-    secretsmanager_put_secret_string(&args.to, &args.region, &value)?;
+
+    secret_manager_put_secret_string(&args.to, &args.project, args.location.as_deref(), &value)?;
+
     eprintln!(
         "✅ Copied secret value from '{}' to '{}'.",
         args.from, args.to
@@ -206,48 +238,53 @@ pub fn copy(args: AwsSecretsCopySubCmdArgs) -> anyhow::Result<()> {
 /// - If the secret is JSON, it is pretty-printed for editing and stored back
 ///   minified on a single line.
 /// - If the secret is not JSON, it is treated as an opaque string.
-fn edit(args: AwsSecretsEditSubCmdArgs) -> anyhow::Result<()> {
-    // 1) fetch current secret value
-    let original_raw = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
+fn edit(args: GcpSecretsEditSubCmdArgs) -> anyhow::Result<()> {
+    let original_raw =
+        secret_manager_get_secret_string(&args.secret_id, &args.project, args.location.as_deref())?;
     let original_raw_trimmed = original_raw.trim_end_matches('\n');
-    // 2) make things pretty if possible
+
     let to_edit =
         pretty_json(original_raw_trimmed).unwrap_or_else(|| original_raw_trimmed.to_string());
-    // 3) write the secrets to a temp file for editing
+
     let tmp_path = temp_file_path(&args.secret_id);
     fs::write(&tmp_path, &to_edit)?;
+
     eprintln!(
-        "Editing secret '{}' in region '{}' using temporary file:\n  {}",
+        "Editing secret '{}' in project '{}' using temporary file:\n  {}",
         args.secret_id,
-        args.region,
+        args.project,
         tmp_path.display()
     );
-    // 4) open editor
+
     let editor = detect_editor();
     let mut parts = editor.split_whitespace();
     let cmd = parts.next().unwrap_or(FALLBACK_EDITOR);
+
     let mut command = std::process::Command::new(cmd);
     for arg in parts {
         command.arg(arg);
     }
     command.arg(&tmp_path);
+
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("launching editor '{editor}' should succeed: {e}"))?;
+
     if !status.success() {
         fs::remove_file(&tmp_path).ok();
         return Err(anyhow::anyhow!(
             "editor '{editor}' should exit successfully (exit status {status})"
         ));
     }
-    // 5) read updated contents of file and do some cleanup
+
     let edited_raw = fs::read_to_string(&tmp_path)?;
     fs::remove_file(&tmp_path).ok();
+
     let edited_raw_trimmed = edited_raw.trim_end_matches('\n');
-    // Try to treat content as JSON on both sides
+
     let original_norm_json = normalize_json(original_raw_trimmed);
     let edited_norm_json = normalize_json(edited_raw_trimmed);
-    // If both are valid JSON, compare and store minified JSON
+
     if let (Some(orig_norm), Some(edited_norm)) = (original_norm_json, edited_norm_json) {
         if orig_norm == edited_norm {
             eprintln!(
@@ -255,53 +292,74 @@ fn edit(args: AwsSecretsEditSubCmdArgs) -> anyhow::Result<()> {
             );
             return Ok(());
         }
+
         eprintln!("Secret JSON content has changed.");
+
         if !args.yes && !confirm_push()? {
             eprintln!("Aborting: new secret version was not pushed.");
             return Ok(());
         }
-        // Store minified JSON
-        secretsmanager_put_secret_string(&args.secret_id, &args.region, &edited_norm)?;
+
+        secret_manager_put_secret_string(
+            &args.secret_id,
+            &args.project,
+            args.location.as_deref(),
+            &edited_norm,
+        )?;
+
         eprintln!(
-            "✅ New JSON version pushed for secret '{}' in region '{}'.",
-            args.secret_id, args.region
+            "✅ New JSON version pushed for secret '{}' in project '{}'.",
+            args.secret_id, args.project
         );
+
         return Ok(());
     }
-    // 6) Fallback for non-JSON secrets
+
     if edited_raw_trimmed == original_raw_trimmed {
         eprintln!("No changes detected, not pushing a new secret version.");
         return Ok(());
     }
+
     eprintln!("Secret content has changed.");
+
     if !args.yes && !confirm_push()? {
         eprintln!("Aborting: new secret version was not pushed.");
         return Ok(());
     }
-    secretsmanager_put_secret_string(&args.secret_id, &args.region, edited_raw_trimmed)?;
+
+    secret_manager_put_secret_string(
+        &args.secret_id,
+        &args.project,
+        args.location.as_deref(),
+        edited_raw_trimmed,
+    )?;
+
     eprintln!(
-        "✅ New version pushed for secret '{}' in region '{}'.",
-        args.secret_id, args.region
+        "✅ New version pushed for secret '{}' in project '{}'.",
+        args.secret_id, args.project
     );
 
     Ok(())
 }
 
-pub fn env_file(args: AwsSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
+pub fn env_file(args: GcpSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     if args.secret_ids.is_empty() {
         eprintln!("No secrets provided.");
         return Ok(());
     }
-    // In case of multiple same secret names, the latest wins
+
     let mut merged: HashMap<String, String> = HashMap::new();
+
     for id in &args.secret_ids {
         eprintln!("Fetching secret '{id}'...");
-        let s = secretsmanager_get_secret_string(id, &args.region, "text")?;
+
+        let s = secret_manager_get_secret_string(id, &args.project, args.location.as_deref())?;
         let s = s.trim();
+
         if s.is_empty() {
             continue;
         }
-        // 1) try JSON object
+
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(s) {
             if let Some(obj) = value.as_object() {
                 for (k, v) in obj {
@@ -314,33 +372,35 @@ pub fn env_file(args: AwsSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
                 continue;
             }
         }
-        // 2) fallback to .env style format
+
         for line in s.lines() {
             let line = line.trim();
+
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
+
             if let Some((k, v)) = line.split_once('=') {
                 merged.insert(k.trim().to_string(), v.trim().to_string());
             }
         }
     }
 
-    // Expand variable inside values
     let merged = expand_env_map(&merged);
 
-    // Sort the env vars for deterministic ordering
     let mut entries: Vec<(String, String)> = merged.into_iter().collect();
     entries.sort_by(|a, b| a.0.cmp(&b.0));
-    // Write to passed path or to stdout if no path has been passed
+
     let mut buf = String::new();
     for (k, v) in entries {
         writeln!(&mut buf, "{k}={v}")?;
     }
+
     if let Some(path) = args.output {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
+
         std::fs::write(&path, buf)?;
         eprintln!("Wrote env file to {}", path.display());
     } else {
@@ -350,25 +410,28 @@ pub fn env_file(args: AwsSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// list all versions of the secrets.
-fn list(args: AwsSecretsListSubCmdArgs) -> anyhow::Result<()> {
+/// List all versions of the secret.
+fn list(args: GcpSecretsListSubCmdArgs) -> anyhow::Result<()> {
     eprintln!(
-        "Listing versions for secret '{}' in region '{}'...",
-        args.secret_id, args.region
+        "Listing versions for secret '{}' in project '{}'...",
+        args.secret_id, args.project
     );
-    let json = secretsmanager_list_secret_versions_json(&args.secret_id, &args.region)?;
-    let v: serde_json::Value = serde_json::from_str(&json).context(
-        "Parsing Secrets Manager list-secret-version-ids response as JSON should succeed",
+
+    let json = secret_manager_list_secret_versions_json(
+        &args.secret_id,
+        &args.project,
+        args.location.as_deref(),
     )?;
-    let versions = v
-        .get("Versions")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "AWS response for secret '{}' should contain a 'Versions' array",
-                args.secret_id
-            )
-        })?;
+
+    let versions: serde_json::Value = serde_json::from_str(&json)
+        .context("Parsing Secret Manager versions JSON should succeed")?;
+
+    let versions = versions.as_array().ok_or_else(|| {
+        anyhow::anyhow!(
+            "GCP response for secret '{}' should be a JSON array",
+            args.secret_id
+        )
+    })?;
 
     if versions.is_empty() {
         println!("No versions found for secret '{}'.", args.secret_id);
@@ -378,82 +441,72 @@ fn list(args: AwsSecretsListSubCmdArgs) -> anyhow::Result<()> {
     struct Row {
         id: String,
         created: String,
-        stages: String,
+        state: String,
     }
 
     let mut rows: Vec<Row> = Vec::new();
     let mut id_w = "VersionId".len();
     let mut created_w = "Created".len();
-    let mut stages_w = "Stages".len();
+    let mut state_w = "State".len();
 
     for ver in versions {
-        let id = ver
-            .get("VersionId")
+        let name = ver.get("name").and_then(|x| x.as_str()).unwrap_or("");
+
+        let id = name
+            .rsplit('/')
+            .next()
+            .filter(|x| !x.is_empty())
+            .unwrap_or(name)
+            .to_string();
+
+        let created = ver
+            .get("createTime")
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
 
-        let created = match ver.get("CreatedDate") {
-            Some(serde_json::Value::String(s)) => s.clone(),
-            Some(serde_json::Value::Number(n)) => n.to_string(),
-            Some(other) => other.to_string(),
-            None => "".to_string(),
-        };
-
-        let stages = ver
-            .get("VersionStages")
-            .and_then(|x| x.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            })
-            .unwrap_or_default();
+        let state = ver
+            .get("state")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
 
         id_w = id_w.max(id.len());
         created_w = created_w.max(created.len());
-        stages_w = stages_w.max(stages.len());
+        state_w = state_w.max(state.len());
 
-        rows.push(Row {
-            id,
-            created,
-            stages,
-        });
+        rows.push(Row { id, created, state });
     }
 
-    // Header
     println!(
-        "{:<id_w$}  {:<created_w$}  {:<stages_w$}",
+        "{:<id_w$}  {:<created_w$}  {:<state_w$}",
         "VersionId",
         "Created",
-        "Stages",
+        "State",
         id_w = id_w,
         created_w = created_w,
-        stages_w = stages_w,
+        state_w = state_w,
     );
 
-    // Separator
     println!(
-        "{:-<id_w$}  {:-<created_w$}  {:-<stages_w$}",
+        "{:-<id_w$}  {:-<created_w$}  {:-<state_w$}",
         "",
         "",
         "",
         id_w = id_w,
         created_w = created_w,
-        stages_w = stages_w,
+        state_w = state_w,
     );
 
-    // Rows
     for r in rows {
         println!(
-            "{:<id_w$}  {:<created_w$}  {:<stages_w$}",
+            "{:<id_w$}  {:<created_w$}  {:<state_w$}",
             r.id,
             r.created,
-            r.stages,
+            r.state,
             id_w = id_w,
             created_w = created_w,
-            stages_w = stages_w,
+            state_w = state_w,
         );
     }
 
@@ -462,14 +515,17 @@ fn list(args: AwsSecretsListSubCmdArgs) -> anyhow::Result<()> {
 
 /// Push updates to a JSON secret by setting one or more KEY=VALUE pairs.
 /// The secret must be a JSON object and updated value is stored on a single line.
-pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
-    // 1) fetch current secrets
+pub fn push(args: GcpSecretsPushSubCmdArgs) -> anyhow::Result<()> {
     eprintln!(
-        "Fetching secret '{}' in region '{}'...",
-        args.secret_id, args.region
+        "Fetching secret '{}' in project '{}'...",
+        args.secret_id, args.project
     );
-    let original = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
+
+    let original =
+        secret_manager_get_secret_string(&args.secret_id, &args.project, args.location.as_deref())?;
+
     let original_trimmed = original.trim_end_matches('\n');
+
     let mut value: serde_json::Value =
         serde_json::from_str(original_trimmed).with_context(|| {
             format!(
@@ -477,6 +533,7 @@ pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
                 args.secret_id
             )
         })?;
+
     let obj = value.as_object_mut().ok_or_else(|| {
         anyhow::anyhow!(
             "Secret '{}' should be a JSON object to use the 'push' subcommand",
@@ -484,9 +541,10 @@ pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    // 2) Add key-value pairs to secret
     let mut changed = false;
+
     eprintln!("Changed entries to update:");
+
     for kv in &args.kv {
         let (key, val) = kv.split_once('=').ok_or_else(|| {
             anyhow::anyhow!(
@@ -494,26 +552,31 @@ pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
                 args.secret_id
             )
         })?;
+
         let key = key.trim();
         let val = val.trim();
+
         if key.is_empty() {
             anyhow::bail!(
                 "Key in '{kv}' should not be empty for secret '{}'",
                 args.secret_id
             );
         }
+
         let existing = obj.get(key);
-        // If existing value is the same string, skip
+
         if let Some(existing_val) = existing {
             if existing_val.is_string() && existing_val.as_str() == Some(val) {
-                // skip value if it has not changed
                 continue;
             }
         }
+
         obj.insert(key.to_string(), serde_json::Value::String(val.to_string()));
         changed = true;
+
         eprintln!("  - {key}");
     }
+
     if !changed {
         eprintln!("None.");
         eprintln!(
@@ -522,30 +585,38 @@ pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // 3) Confirmation prompt
     eprintln!("Secret JSON content has changed.");
+
     if !args.yes && !confirm_push()? {
         eprintln!("Aborting: new secret version was not pushed.");
         return Ok(());
     }
 
-    // 4) Store the new version of the secrets as a minified JSON format
     let normalized =
         serde_json::to_string(&value).context("Serializing updated JSON secret should succeed")?;
-    secretsmanager_put_secret_string(&args.secret_id, &args.region, &normalized)?;
+
+    secret_manager_put_secret_string(
+        &args.secret_id,
+        &args.project,
+        args.location.as_deref(),
+        &normalized,
+    )?;
+
     eprintln!(
-        "✅ Updated secret '{}' in region '{}' with {} key(s).",
+        "✅ Updated secret '{}' in project '{}' with {} key(s).",
         args.secret_id,
-        args.region,
+        args.project,
         args.kv.len()
     );
 
     Ok(())
 }
 
-/// fetch and print the secret.
-fn view(args: AwsSecretsViewSubCmdArgs) -> anyhow::Result<()> {
-    let value = secretsmanager_get_secret_string(&args.secret_id, &args.region, "text")?;
+/// Fetch and print the secret.
+fn view(args: GcpSecretsViewSubCmdArgs) -> anyhow::Result<()> {
+    let value =
+        secret_manager_get_secret_string(&args.secret_id, &args.project, args.location.as_deref())?;
+
     let trimmed = value.trim_end_matches('\n');
 
     if let Some(pretty) = pretty_json(trimmed) {
@@ -563,11 +634,14 @@ fn temp_file_path(secret_id: &str) -> PathBuf {
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
+
     if base.len() > 64 {
         base.truncate(64);
     }
+
     let pid = std::process::id();
-    let filename = format!("tracel-secret-{base}-{pid}.tmp");
+    let filename = format!("tracel-gcp-secret-{base}-{pid}.tmp");
+
     std::env::temp_dir().join(filename)
 }
 
@@ -578,7 +652,7 @@ fn detect_editor() -> String {
         .unwrap_or_else(|_| FALLBACK_EDITOR.to_string())
 }
 
-/// Try to pretty-print JSON
+/// Try to pretty-print JSON.
 fn pretty_json(s: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(s).ok()?;
     serde_json::to_string_pretty(&value).ok()
@@ -599,7 +673,9 @@ fn confirm_push() -> anyhow::Result<bool> {
 
     let mut answer = String::new();
     io::stdin().read_line(&mut answer)?;
+
     let answer = answer.trim().to_lowercase();
+
     Ok(answer == "y" || answer == "yes")
 }
 
@@ -609,32 +685,31 @@ fn expand_value(input: &str, vars: &HashMap<String, String>) -> String {
     let mut rest = input;
 
     while let Some(start) = rest.find("${") {
-        // keep everything before the placeholder
         out.push_str(&rest[..start]);
+
         let after = &rest[start + 2..];
-        // find the closing brace
+
         if let Some(end_rel) = after.find('}') {
             let var_name = &after[..end_rel];
+
             if let Some(val) = vars.get(var_name) {
-                // known var: substitute
                 out.push_str(val);
             } else {
-                // unknown var: keep the placeholder as-is
                 out.push_str("${");
                 out.push_str(var_name);
                 out.push('}');
             }
-            // continue after the closing brace
+
             rest = &after[end_rel + 1..];
         } else {
-            // no closing brace, keep the rest as-is
             out.push_str(&rest[start..]);
             rest = "";
             break;
         }
     }
-    // trailing part without placeholders
+
     out.push_str(rest);
+
     out
 }
 
@@ -642,10 +717,12 @@ fn expand_value(input: &str, vars: &HashMap<String, String>) -> String {
 /// Note: this is a single pass expansion, preserving quotes and formatting.
 fn expand_env_map(merged: &HashMap<String, String>) -> HashMap<String, String> {
     let mut expanded = HashMap::new();
+
     for (key, value) in merged {
         let new_val = expand_value(value, merged);
         expanded.insert(key.clone(), new_val);
     }
+
     expanded
 }
 
@@ -658,7 +735,6 @@ mod tests {
     #[test]
     #[serial]
     fn test_expand_env_map_simple_expansion() {
-        // Clean any prior values that might confuse debugging
         unsafe {
             env::remove_var("LOG_LEVEL_TEST");
             env::remove_var("RUST_LOG_TEST");
@@ -758,7 +834,6 @@ mod tests {
             .get("USES_UNKNOWN_TEST")
             .expect("USES_UNKNOWN_TEST should be present after expansion");
 
-        // Unknown placeholders should be preserved exactly
         assert_eq!(
             uses_unknown, "value=${UNKNOWN_PLACEHOLDER_TEST}",
             "Unknown placeholder should be left intact"
@@ -776,12 +851,10 @@ mod tests {
 
         let mut merged: HashMap<String, String> = HashMap::new();
         merged.insert("LOG_LEVEL_TEST".to_string(), "info".to_string());
-        // placeholder inside double quotes
         merged.insert(
             "RUST_LOG_QUOTED_TEST".to_string(),
             " \"xtask=${LOG_LEVEL_TEST},server=${LOG_LEVEL_TEST}\" ".to_string(),
         );
-        // value that contains spaces and is already quoted
         merged.insert("CRON_TEST".to_string(), "'0 0 0 * * *'".to_string());
 
         let expanded = expand_env_map(&merged);
@@ -793,8 +866,8 @@ mod tests {
             .get("CRON_TEST")
             .expect("CRON_TEST should be present after expansion");
 
-        // RUST_LOG_QUOTED_TEST should still start and end with a double quote (after trimming)
         let rust_trimmed = rust_log.trim();
+
         assert!(
             rust_trimmed.starts_with('"') && rust_trimmed.ends_with('"'),
             "RUST_LOG_QUOTED_TEST should still be double-quoted, got: {rust_log}"
@@ -804,7 +877,6 @@ mod tests {
             "RUST_LOG_QUOTED_TEST should contain the expanded value; got: {rust_trimmed}"
         );
 
-        // CRON_TEST should be unchanged, quotes preserved
         assert_eq!(
             cron, "'0 0 0 * * *'",
             "CRON_TEST should keep its single quotes and content"

@@ -27,13 +27,6 @@ pub mod prelude {
     pub use crate::XtaskArgs;
     pub use crate::commands as base_commands;
     pub use crate::commands::Target;
-    pub use crate::commands::build::BuildCmdArgs;
-    pub use crate::commands::bump::BumpCmdArgs;
-    pub use crate::commands::bump::BumpSubCommand;
-    pub use crate::commands::check::CheckCmdArgs;
-    pub use crate::commands::check::CheckSubCommand;
-    pub use crate::commands::clean::CleanCmdArgs;
-    pub use crate::commands::compile::CompileCmdArgs;
     pub use crate::commands::aws_container::AwsContainerBuildSubCmdArgs;
     pub use crate::commands::aws_container::AwsContainerCmdArgs;
     pub use crate::commands::aws_container::AwsContainerHostSubCmdArgs;
@@ -45,6 +38,15 @@ pub mod prelude {
     pub use crate::commands::aws_container::AwsContainerRollbackSubCmdArgs;
     pub use crate::commands::aws_container::AwsContainerRolloutSubCmdArgs;
     pub use crate::commands::aws_container::AwsContainerSubCommand;
+    pub use crate::commands::aws_secrets::AwsSecretsCmdArgs;
+    pub use crate::commands::aws_secrets::AwsSecretsSubCommand;
+    pub use crate::commands::build::BuildCmdArgs;
+    pub use crate::commands::bump::BumpCmdArgs;
+    pub use crate::commands::bump::BumpSubCommand;
+    pub use crate::commands::check::CheckCmdArgs;
+    pub use crate::commands::check::CheckSubCommand;
+    pub use crate::commands::clean::CleanCmdArgs;
+    pub use crate::commands::compile::CompileCmdArgs;
     pub use crate::commands::coverage::CoverageCmdArgs;
     pub use crate::commands::dependencies::DependenciesCmdArgs;
     pub use crate::commands::dependencies::DependenciesSubCommand;
@@ -83,8 +85,6 @@ pub mod prelude {
     pub use crate::commands::infra::InfraProvidersSubCmdArgs;
     pub use crate::commands::infra::InfraSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
-    pub use crate::commands::aws_secrets::SecretsCmdArgs;
-    pub use crate::commands::aws_secrets::SecretsSubCommand;
     pub use crate::commands::test::MiriMode;
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::test::TestSubCommand;

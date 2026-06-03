@@ -196,6 +196,22 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     // Supported commands and their quoted expansions
     let mut variant_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
     variant_map.insert(
+        "AwsContainer",
+        quote! {
+            #[command(alias = "container")]
+            #[doc = r"Manage AWS containers lifecycle, from build to deployment."]
+            AwsContainer(tracel_xtask::commands::aws_container::AwsContainerCmdArgs)
+        },
+    );
+    variant_map.insert(
+        "AwsSecrets",
+        quote! {
+            #[command(alias = "secrets")]
+            #[doc = r"Manage secrets through AWS secrets manager."]
+            AwsSecrets(tracel_xtask::commands::aws_secrets::AwsSecretsCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Build",
         quote! {
             #[doc = r"Build the code."]
@@ -228,14 +244,6 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Compile check the code (does not write binaries to disk)."]
             Compile(tracel_xtask::commands::compile::CompileCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "AwsContainer",
-        quote! {
-            #[command(alias = "container")]
-            #[doc = r"Manage AWS containers lifecycle, from build to deployment."]
-            AwsContainer(tracel_xtask::commands::aws_container::AwsContainerCmdArgs)
         },
     );
     variant_map.insert(
@@ -281,6 +289,13 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         },
     );
     variant_map.insert(
+        "GcpSecrets",
+        quote! {
+            #[doc = r"Manage secrets through GCP secrets manager."]
+            GcpSecrets(tracel_xtask::commands::gcp_secrets::GcpSecretsCmdArgs)
+        },
+    );
+    variant_map.insert(
         "Host",
         quote! {
             #[doc = r"Commands related to an host like connecting, getting info, etc..."]
@@ -306,13 +321,6 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = r"Publish a crate to crates.io."]
             Publish(tracel_xtask::commands::publish::PublishCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Secrets",
-        quote! {
-            #[doc = r"Manage secrets."]
-            Secrets(tracel_xtask::commands::secrets::SecretsCmdArgs)
         },
     );
     variant_map.insert(
@@ -935,6 +943,50 @@ pub fn extend_command_args(args: TokenStream, input: TokenStream) -> TokenStream
 fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStream> {
     HashMap::from([
         (
+            "AwsContainerSubCommand",
+            quote! {
+                #[doc = r"Build a container."]
+                Build(AwsContainerBuildSubCmdArgs),
+                #[doc = r"Start a terminal session on a container host instance."]
+                Host(AwsContainerHostSubCmdArgs),
+                #[doc = r"Show current latest and rollback images in registry."]
+                List(AwsContainerListSubCmdArgs),
+                #[doc = r"Show Cloudwatch logs of the container."]
+                Logs(AwsContainerLogsSubCmdArgs),
+                #[doc = r"Pull a container from a registry."]
+                Pull(AwsContainerPullSubCmdArgs),
+                #[doc = r"Push a container to a registry."]
+                Push(AwsContainerPushSubCmdArgs),
+                #[doc = r"Promote a pushed container to latest."]
+                Promote(AwsContainerPromoteSubCmdArgs),
+                #[doc = r"Rollback previously released container to latest."]
+                Rollback(AwsContainerRollbackSubCmdArgs),
+                #[doc = r"Rollout last promoted container."]
+                Rollout(AwsContainerRolloutSubCmdArgs),
+                #[doc = r"Run a local container."]
+                Run(AwsContainerRunSubCmdArgs),
+            },
+        ),
+        (
+            "AwsSecretsSubCommand",
+            quote! {
+                #[doc = r"Create an empty secret (metadata only, no version)."]
+                Create(AwsSecretsCreateSubCmdArgs),
+                #[doc = r"Copy a secret value from one secret ID to another in the same region."]
+                Copy(AwsSecretsCopySubCmdArgs),
+                #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
+                Edit(AwsSecretsEditSubCmdArgs),
+                #[doc = r"Fetch the secrets and write an environment file to a specified path."]
+                EnvFile(AwsSecretsEnvFileSubCmdArgs),
+                #[doc = r"List all versions of a secret."]
+                List(AwsSecretsListSubCmdArgs),
+                #[doc = r"Push new key-value pairs to existing secrets."]
+                Push(AwsSecretsPushSubCmdArgs),
+                #[doc = r"Show the latest version of a secret."]
+                View(AwsSecretsViewSubCmdArgs),
+            },
+        ),
+        (
             "BumpSubCommand",
             quote! {
                 #[doc = r"Bump the major version (x.0.0)."]
@@ -960,31 +1012,6 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Lint,
                 #[doc = r"Report typos in source code."]
                 Typos,
-            },
-        ),
-        (
-            "AwsContainerSubCommand",
-            quote! {
-                #[doc = r"Build a container."]
-                Build(AwsContainerBuildSubCmdArgs),
-                #[doc = r"Start a terminal session on a container host instance."]
-                Host(AwsContainerHostSubCmdArgs),
-                #[doc = r"Show current latest and rollback images in registry."]
-                List(AwsContainerListSubCmdArgs),
-                #[doc = r"Show Cloudwatch logs of the container."]
-                Logs(AwsContainerLogsSubCmdArgs),
-                #[doc = r"Pull a container from a registry."]
-                Pull(AwsContainerPullSubCmdArgs),
-                #[doc = r"Push a container to a registry."]
-                Push(AwsContainerPushSubCmdArgs),
-                #[doc = r"Promote a pushed container to latest."]
-                Promote(AwsContainerPromoteSubCmdArgs),
-                #[doc = r"Rollback previously released container to latest."]
-                Rollback(AwsContainerRollbackSubCmdArgs),
-                #[doc = r"Rollout last promoted container."]
-                Rollout(AwsContainerRolloutSubCmdArgs),
-                #[doc = r"Run a local container."]
-                Run(AwsContainerRunSubCmdArgs),
             },
         ),
         (
@@ -1071,6 +1098,25 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
             },
         ),
         (
+            "GcpSecretsSubCommand",
+            quote! {
+                #[doc = r"Create an empty secret (metadata only, no version)."]
+                Create(GcpSecretsCreateSubCmdArgs),
+                #[doc = r"Copy a secret value from one secret ID to another in the same region."]
+                Copy(GcpSecretsCopySubCmdArgs),
+                #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
+                Edit(GcpSecretsEditSubCmdArgs),
+                #[doc = r"Fetch the secrets and write an environment file to a specified path."]
+                EnvFile(GcpSecretsEnvFileSubCmdArgs),
+                #[doc = r"List all versions of a secret."]
+                List(GcpSecretsListSubCmdArgs),
+                #[doc = r"Push new key-value pairs to existing secrets."]
+                Push(GcpSecretsPushSubCmdArgs),
+                #[doc = r"Show the latest version of a secret."]
+                View(GcpSecretsViewSubCmdArgs),
+            },
+        ),
+        (
             "HostSubCommand",
             quote! {
                 #[doc = r"Connect to the host."]
@@ -1122,25 +1168,6 @@ fn get_subcommand_variant_map() -> HashMap<&'static str, proc_macro2::TokenStrea
                 Uninstall(InfraUninstallSubCmdArgs),
                 #[doc = r"Update locked version of terraform to latest."]
                 Update,
-            },
-        ),
-        (
-            "SecretsSubCommand",
-            quote! {
-                #[doc = r"Create an empty secret (metadata only, no version)."]
-                Create(SecretsCreateSubCmdArgs),
-                #[doc = r"Copy a secret value from one secret ID to another in the same region."]
-                Copy(SecretsCopySubCmdArgs),
-                #[doc = r"Fetch latest version of a secret and open the default editor to edit it."]
-                Edit(SecretsEditSubCmdArgs),
-                #[doc = r"Fetch the secrets and write an environment file to a specified path."]
-                EnvFile(SecretsEnvFileSubCmdArgs),
-                #[doc = r"List all versions of a secret."]
-                List(SecretsListSubCmdArgs),
-                #[doc = r"Push new key-value pairs to existing secrets."]
-                Push(SecretsPushSubCmdArgs),
-                #[doc = r"Show the latest version of a secret."]
-                View(SecretsViewSubCmdArgs),
             },
         ),
         (

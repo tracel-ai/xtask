@@ -1,4 +1,5 @@
 pub mod aws_container;
+pub mod aws_secrets;
 pub mod build;
 pub mod bump;
 pub mod check;
@@ -10,11 +11,11 @@ pub mod doc;
 pub mod docker_compose;
 pub mod fix;
 pub mod gcp_container;
+pub mod gcp_secrets;
 pub mod host;
 pub mod image;
 pub mod infra;
 pub mod publish;
-pub mod aws_secrets;
 pub mod test;
 pub mod validate;
 pub mod vulnerabilities;
