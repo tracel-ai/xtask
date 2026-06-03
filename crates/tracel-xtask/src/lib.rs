@@ -83,8 +83,8 @@ pub mod prelude {
     pub use crate::commands::infra::InfraProvidersSubCmdArgs;
     pub use crate::commands::infra::InfraSubCommand;
     pub use crate::commands::publish::PublishCmdArgs;
-    pub use crate::commands::secrets::SecretsCmdArgs;
-    pub use crate::commands::secrets::SecretsSubCommand;
+    pub use crate::commands::aws_secrets::SecretsCmdArgs;
+    pub use crate::commands::aws_secrets::SecretsSubCommand;
     pub use crate::commands::test::MiriMode;
     pub use crate::commands::test::TestCmdArgs;
     pub use crate::commands::test::TestSubCommand;

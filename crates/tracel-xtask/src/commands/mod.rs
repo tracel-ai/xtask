@@ -14,7 +14,7 @@ pub mod host;
 pub mod image;
 pub mod infra;
 pub mod publish;
-pub mod secrets;
+pub mod aws_secrets;
 pub mod test;
 pub mod validate;
 pub mod vulnerabilities;
