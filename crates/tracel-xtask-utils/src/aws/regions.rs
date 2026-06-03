@@ -8,7 +8,6 @@ use strum::EnumIter;
 pub enum Region {
     // Africa
     AfSouth1, // af-south-1
-
     // Asia Pacific
     ApEast1,      // ap-east-1
     ApSouth1,     // ap-south-1
@@ -20,10 +19,8 @@ pub enum Region {
     ApNortheast1, // ap-northeast-1
     ApNortheast2, // ap-northeast-2
     ApNortheast3, // ap-northeast-3
-
     // Canada
     CaCentral1, // ca-central-1
-
     // Europe
     EuCentral1, // eu-central-1
     EuCentral2, // eu-central-2
@@ -34,14 +31,11 @@ pub enum Region {
     EuSouth1,   // eu-south-1
     EuSouth2,   // eu-south-2
     IlCentral1, // il-central-1
-
     // Middle East
     MeSouth1,   // me-south-1
     MeCentral1, // me-central-1
-
     // South America
     SaEast1, // sa-east-1
-
     // US
     UsEast1, // us-east-1
     UsEast2, // us-east-2
@@ -159,7 +153,6 @@ impl Region {
         match self {
             // Africa
             AfSouth1 => &["af-south-1a", "af-south-1b", "af-south-1c"],
-
             // Asia Pacific
             ApEast1 => &["ap-east-1a", "ap-east-1b", "ap-east-1c"],
             ApSouth1 => &["ap-south-1a", "ap-south-1b", "ap-south-1c"],
@@ -176,10 +169,8 @@ impl Region {
             ],
             ApNortheast2 => &["ap-northeast-2a", "ap-northeast-2b", "ap-northeast-2c"],
             ApNortheast3 => &["ap-northeast-3a", "ap-northeast-3b", "ap-northeast-3c"],
-
             // Canada
             CaCentral1 => &["ca-central-1a", "ca-central-1b", "ca-central-1d"],
-
             // Europe
             EuCentral1 => &["eu-central-1a", "eu-central-1b", "eu-central-1c"],
             EuCentral2 => &["eu-central-2a", "eu-central-2b", "eu-central-2c"],
@@ -190,14 +181,11 @@ impl Region {
             EuSouth1 => &["eu-south-1a", "eu-south-1b", "eu-south-1c"],
             EuSouth2 => &["eu-south-2a", "eu-south-2b", "eu-south-2c"],
             IlCentral1 => &["il-central-1a", "il-central-1b", "il-central-1c"],
-
             // Middle East
             MeSouth1 => &["me-south-1a", "me-south-1b", "me-south-1c"],
             MeCentral1 => &["me-central-1a", "me-central-1b", "me-central-1c"],
-
             // South America
             SaEast1 => &["sa-east-1a", "sa-east-1b", "sa-east-1c"],
-
             // United States
             UsEast1 => &[
                 "us-east-1a",
