@@ -911,29 +911,22 @@ jobs:
 This command provides a subcommand to install the necessary dependencies for performing code coverage and a subcommand to generate the
 coverage info file that can then be uploaded to a service provider like codecov. See dedicated section `Enable and generate coverage information`.
 
-### AWS Container
+### Containers
 
-The `aws-container` command standardizes how we build, publish, promote, roll back, roll out, inspect, and run containers on AWS.
+The container interface is shared across the supported cloud environments, with provider-specific command names:
 
-It currently uses:
+| Command                             | Supported environment | Backend                                                                    |
+|-------------------------------------|-----------------------|----------------------------------------------------------------------------|
+| `aws-container` (`container` alias) | AWS                   | Docker, ECR, EC2 Auto Scaling Groups, CloudWatch Logs, SSM Session Manager |
+| `gcp-container`                     | GCP                   | Docker, Artifact Registry, Compute Engine regional Managed Instance Groups |
 
-- **Docker** for local container builds and local runs,
-- **AWS ECR** as the container registry,
-- **EC2 Auto Scaling Groups (ASG)** for rollouts,
-- **CloudWatch Logs** for logs,
-- **SSM Session Manager** for opening an interactive shell on a selected container host.
+Both variants use the same deployment model:
 
-#### Conceptual Model
+**Build container** -> **Push to registry** -> **Promote to `<env_medium>`** -> **Roll out hosts**
 
-##### Deploy
+Rollback promotes `rollback_<env_medium>` back to `<env_medium>` and then runs the same rollout step.
 
-**Build container** -> **Push to ECR** -> **Promote to `<env_medium>`** -> **Start ASG instance refresh**
-
-##### Rollback
-
-**Promote `rollback_<env_medium>` back to `<env_medium>`** -> **Start ASG instance refresh**
-
-The AWS container command keeps two mutable deployment tags by default:
+Both variants keep two mutable deployment tags by default:
 
 - `<env_medium>`: the currently promoted image for the target environment,
 - `rollback_<env_medium>`: the previously promoted image for the target environment.
@@ -943,13 +936,27 @@ Build tags are usually immutable commit SHA tags. Promotion moves the environmen
 #### Prerequisites
 
 - **Docker** installed locally or on your CI runners.
-- **AWS CLI** configured with permissions for ECR, Auto Scaling, CloudWatch Logs, EC2, and SSM.
-- ECR repositories either already created or creatable by the command.
-- EC2 instances configured for SSM if you want to use the `host` subcommand.
+- For `aws-container`: **AWS CLI** configured with permissions for ECR and EC2 Auto Scaling, with ECR repositories available or creatable by the command. CloudWatch Logs, EC2, and SSM permissions are also needed for the AWS-only `logs` and `host` subcommands.
+- For `gcp-container`: **gcloud CLI** installed and authenticated, Artifact Registry enabled, a Docker Artifact Registry repository available or creatable in the target location, and a regional Compute Engine Managed Instance Group if you use the `rollout` subcommand.
+
+#### Shared Subcommands
+
+| Subcommand | Description                                                                                                                        |
+|------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `build`    | Build the container locally. The command skips the Docker build if the build tag already exists remotely, unless `--force` is set. |
+| `push`     | Push a local image tag to the provider registry.                                                                                   |
+| `promote`  | Promote a build tag to the target environment tag and update the rollback tag.                                                     |
+| `rollback` | Promote the rollback tag back to the target environment tag.                                                                       |
+| `rollout`  | Roll out the promoted image to the runtime group: ASG instance refresh on AWS, MIG rolling action on GCP.                          |
+| `list`     | Show the currently promoted, rollback, and last pushed images.                                                                     |
+| `pull`     | Pull an image from the provider registry.                                                                                          |
+| `run`      | Run a fully qualified image locally with Docker.                                                                                   |
+
+`aws-container` also provides `logs` for CloudWatch Logs and `host` for SSM Session Manager access to an ASG instance.
 
 #### Examples
 
-Build the container locally. The command skips the Docker build if the tag already exists in ECR, unless `--force` is set:
+Build and push a commit-tagged image:
 
 ```sh
 xtask -e stag aws-container build \
@@ -958,22 +965,16 @@ xtask -e stag aws-container build \
   --image my_image \
   --build-tag SHA \
   --region AWS_REGION
-```
 
-Pass Docker build arguments with repeated `--build-args` flags:
-
-```sh
-xtask -e stag aws-container build \
+xtask -e stag gcp-container build \
   Dockerfile \
   --context-dir . \
   --image my_image \
   --build-tag SHA \
-  --build-args VERSION=1.2.3 \
-  --build-args PROFILE=release \
-  --region AWS_REGION
+  --project GCP_PROJECT_ID \
+  --location northamerica-northeast1 \
+  --repository my_repository
 ```
-
-Push a local image tag to ECR. The primary remote tag is usually a commit SHA:
 
 ```sh
 xtask -e stag aws-container push \
@@ -981,223 +982,35 @@ xtask -e stag aws-container push \
   --local-tag SHA \
   --repository my_image \
   --region AWS_REGION \
-  --auto-remote-tag \
-  --platform linux-amd64
-```
+  --auto-remote-tag
 
-Add an explicit extra remote tag while pushing:
-
-```sh
-xtask -e stag aws-container push \
+xtask -e stag gcp-container push \
   --image my_image \
   --local-tag SHA \
-  --repository my_image \
-  --region AWS_REGION \
-  --additional-tag candidate
+  --project GCP_PROJECT_ID \
+  --location northamerica-northeast1 \
+  --repository my_repository \
+  --auto-remote-tag
 ```
 
-Promote the pushed image for the target environment:
+Promote, roll out, and roll back:
 
 ```sh
 xtask -e stag aws-container promote \
   --repository my_image \
   --build-tag SHA \
   --region AWS_REGION
-```
 
-By default, this promotes the image to the current environment name, for example `stag`, and moves the previous promoted image to `rollback_stag`.
-You can override both tags:
-
-```sh
-xtask -e stag aws-container promote \
-  --repository my_image \
-  --build-tag SHA \
-  --promote-tag latest \
-  --rollback-tag rollback_latest \
-  --region AWS_REGION
-```
-
-Roll out the promoted container by starting an ASG instance refresh:
-
-```sh
 xtask -e stag aws-container rollout \
   --region AWS_REGION \
   --asg ASG_NAME \
   --repository my_image \
   --wait
-```
 
-Rollback the promoted tag to the rollback tag:
-
-```sh
 xtask -e stag aws-container rollback \
   --region AWS_REGION \
   --repository my_image
 ```
-
-After rollback, start a rollout again:
-
-```sh
-xtask -e stag aws-container rollout \
-  --region AWS_REGION \
-  --asg ASG_NAME \
-  --repository my_image \
-  --wait
-```
-
-Show the currently promoted, rollback, and last pushed images:
-
-```sh
-xtask -e stag aws-container list \
-  --region AWS_REGION \
-  --repository my_image
-```
-
-Pull an image from ECR:
-
-```sh
-xtask -e stag aws-container pull \
-  --region AWS_REGION \
-  --repository my_image \
-  --tag SHA
-```
-
-Tail CloudWatch logs:
-
-```sh
-xtask -e stag aws-container logs \
-  --region AWS_REGION \
-  --log-group /my/log/group \
-  --since 1h \
-  --follow
-```
-
-Pick an instance from an ASG and tail the log stream containing that instance id:
-
-```sh
-xtask -e stag aws-container logs \
-  --region AWS_REGION \
-  --log-group /my/log/group \
-  --asg ASG_NAME \
-  --follow
-```
-
-Open an SSM shell on a selected ASG instance:
-
-```sh
-xtask -e stag aws-container host \
-  --region AWS_REGION \
-  --asg ASG_NAME
-```
-
-Stream the selected instance system log instead:
-
-```sh
-xtask -e stag aws-container host \
-  --region AWS_REGION \
-  --asg ASG_NAME \
-  --system-log
-```
-
-Run a container locally:
-
-```sh
-xtask -e stag aws-container run \
-  --image 123456789012.dkr.ecr.us-east-1.amazonaws.com/my_image:SHA \
-  --env-file .env.stag \
-  --name my-container
-```
-
-### GCP Container
-
-The `gcp-container` command standardizes how we build, publish, promote, roll back, roll out, and run containers on GCP.
-
-It currently uses:
-
-- **Docker** for local container builds and local runs,
-- **GCP Artifact Registry** as the container registry,
-- **Compute Engine regional Managed Instance Groups (MIG)** for deployment rollouts.
-
-#### Conceptual Model
-
-##### Deploy
-
-**Build container** -> **Push to Artifact Registry** -> **Promote to `<env_medium>`** -> **Start MIG rolling action**
-
-##### Rollback
-
-**Promote `rollback_<env_medium>` back to `<env_medium>`** -> **Start MIG rolling action**
-
-The GCP container command keeps two mutable deployment tags by default:
-
-- `<env_medium>`: the currently promoted image for the target environment,
-- `rollback_<env_medium>`: the previously promoted image for the target environment.
-
-Build tags are usually immutable commit SHA tags. Promotion moves the environment tag to the selected build tag and moves the previous environment tag to the rollback tag.
-
-#### Prerequisites
-
-- **Docker** installed locally or on your CI runners.
-- **gcloud CLI** installed and authenticated.
-- A GCP project with Artifact Registry enabled.
-- A Docker Artifact Registry repository in the target location, or permissions for the command to create it.
-- A regional Compute Engine Managed Instance Group if you want to use the `rollout` subcommand.
-
-#### Examples
-
-Build the container locally. The command skips the Docker build if the tag already exists in Artifact Registry, unless `--force` is set:
-
-```sh
-xtask -e stag gcp-container build \
-  Dockerfile \
-  --context-dir . \
-  --image my_image \
-  --build-tag SHA \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository
-```
-
-Use a different remote image name than the local Docker image name:
-
-```sh
-xtask -e stag gcp-container build \
-  Dockerfile \
-  --context-dir . \
-  --image local_image \
-  --remote-image remote_image \
-  --build-tag SHA \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository
-```
-
-Push a local image tag to Artifact Registry:
-
-```sh
-xtask -e stag gcp-container push \
-  --image my_image \
-  --local-tag SHA \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --auto-remote-tag \
-  --platform linux-amd64
-```
-
-Add an explicit extra remote tag while pushing:
-
-```sh
-xtask -e stag gcp-container push \
-  --image my_image \
-  --local-tag SHA \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --additional-tag candidate
-```
-
-Promote the pushed image for the target environment:
 
 ```sh
 xtask -e stag gcp-container promote \
@@ -1206,25 +1019,7 @@ xtask -e stag gcp-container promote \
   --repository my_repository \
   --image my_image \
   --build-tag SHA
-```
 
-By default, this promotes the image to the current environment name, for example `stag`, and moves the previous promoted image to `rollback_stag`.
-You can override both tags:
-
-```sh
-xtask -e stag gcp-container promote \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --image my_image \
-  --build-tag SHA \
-  --promote-tag latest \
-  --rollback-tag rollback_latest
-```
-
-Roll out the promoted container by starting a MIG rolling action:
-
-```sh
 xtask -e stag gcp-container rollout \
   --project GCP_PROJECT_ID \
   --region northamerica-northeast1 \
@@ -1233,25 +1028,7 @@ xtask -e stag gcp-container rollout \
   --repository my_repository \
   --image my_image \
   --wait
-```
 
-The default rolling action is `replace`, which is useful when the VM startup path or container pull path needs to run again.
-You can override the action and rollout bounds:
-
-```sh
-xtask -e stag gcp-container rollout \
-  --project GCP_PROJECT_ID \
-  --region northamerica-northeast1 \
-  --mig MIG_NAME \
-  --action restart \
-  --max-surge 1 \
-  --max-unavailable 0 \
-  --wait
-```
-
-Rollback the promoted tag to the rollback tag:
-
-```sh
 xtask -e stag gcp-container rollback \
   --project GCP_PROJECT_ID \
   --location northamerica-northeast1 \
@@ -1259,43 +1036,14 @@ xtask -e stag gcp-container rollback \
   --image my_image
 ```
 
-After rollback, start a rollout again:
+Run a promoted image locally:
 
 ```sh
-xtask -e stag gcp-container rollout \
-  --project GCP_PROJECT_ID \
-  --region northamerica-northeast1 \
-  --mig MIG_NAME \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --image my_image \
-  --wait
-```
+xtask -e stag aws-container run \
+  --image 123456789012.dkr.ecr.us-east-1.amazonaws.com/my_image:SHA \
+  --env-file .env.stag \
+  --name my-container
 
-Show the currently promoted, rollback, and last pushed images:
-
-```sh
-xtask -e stag gcp-container list \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --image my_image
-```
-
-Pull an image from Artifact Registry:
-
-```sh
-xtask -e stag gcp-container pull \
-  --project GCP_PROJECT_ID \
-  --location northamerica-northeast1 \
-  --repository my_repository \
-  --image my_image \
-  --tag SHA
-```
-
-Run a container locally:
-
-```sh
 xtask -e stag gcp-container run \
   --image northamerica-northeast1-docker.pkg.dev/GCP_PROJECT_ID/my_repository/my_image:SHA \
   --env-file .env.stag \
@@ -1447,14 +1195,51 @@ Obsolete AMIs are AMIs matching the logical image name and current environment, 
 
 ### Secrets
 
-This command handles secrets to view, edit and even write an env file with them. For now it only supports AWS Secrets Manager.
+The secrets interface is shared across the supported cloud environments, with provider-specific command names:
+
+| Command                         | Supported environment | Backend             |
+|---------------------------------|-----------------------|---------------------|
+| `aws-secrets` (`secrets` alias) | AWS                   | AWS Secrets Manager |
+| `gcp-secrets`                   | GCP                   | GCP Secret Manager  |
+
+Both variants provide the same high-level subcommands:
+
+| Subcommand | Description                                                                                    |
+|------------|------------------------------------------------------------------------------------------------|
+| `create`   | Create a secret with an initial empty JSON value.                                              |
+| `copy`     | Copy one secret value to another secret.                                                       |
+| `edit`     | Open the secret value in an editor and write a new version.                                    |
+| `env-file` | Fetch one or more secrets and write an environment file, or stdout when `--output` is omitted. |
+| `list`     | List versions for a secret.                                                                    |
+| `push`     | Push key-value updates to an existing JSON secret.                                             |
+| `view`     | Print a secret value.                                                                          |
 
 #### Examples
 
 View secrets:
 
 ```sh
-xtask -e stag secrets view --region AWS_REGION my_secret
+xtask -e stag aws-secrets view --region AWS_REGION my_secret
+
+xtask -e stag gcp-secrets view \
+  --project GCP_PROJECT_ID \
+  --location northamerica-northeast1 \
+  my_secret
+```
+
+Create an env file from one or more secrets:
+
+```sh
+xtask -e stag aws-secrets env-file \
+  --region AWS_REGION \
+  --output .env.stag.secrets \
+  my_secret
+
+xtask -e stag gcp-secrets env-file \
+  --project GCP_PROJECT_ID \
+  --location northamerica-northeast1 \
+  --output .env.stag.secrets \
+  my_secret
 ```
 
 ### Docker Compose
