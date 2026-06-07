@@ -351,7 +351,9 @@ mod tests {
             .max_len()
             .expect("GCP region instance group manager names should have a max length");
 
-        let raw = sanitize_rfc1035("stg-thyme-this-is-a-very-long-component-that-will-be-trimmed-mig-nane1");
+        let raw = sanitize_rfc1035(
+            "stg-thyme-this-is-a-very-long-component-that-will-be-trimmed-mig-nane1",
+        );
         let trimmed = trim_to_rfc1035_boundary(&raw, max_len - suffix.len());
         let name = format!("{trimmed}{suffix}");
 

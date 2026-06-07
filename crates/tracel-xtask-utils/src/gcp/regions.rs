@@ -305,7 +305,11 @@ impl Region {
                 "australia-southeast2-c",
             ],
             // Europe
-            EuropeCentral2 => &["europe-central2-a", "europe-central2-b", "europe-central2-c"],
+            EuropeCentral2 => &[
+                "europe-central2-a",
+                "europe-central2-b",
+                "europe-central2-c",
+            ],
             EuropeNorth1 => &["europe-north1-a", "europe-north1-b", "europe-north1-c"],
             EuropeSouthwest1 => &[
                 "europe-southwest1-a",
@@ -470,10 +474,7 @@ mod tests {
                     zone.starts_with(region_name),
                     "{zone} should start with region {region_name}"
                 );
-                assert!(
-                    !zone.contains("-ai"),
-                    "{zone} should not be an AI zone"
-                );
+                assert!(!zone.contains("-ai"), "{zone} should not be an AI zone");
             }
         }
     }

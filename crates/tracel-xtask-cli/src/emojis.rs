@@ -2,6 +2,7 @@ const SUBREPO_EMOJIS: &[(&str, &str)] = &[
     ("admin", "⚙️"),
     ("api", "🔌"),
     ("app", "📱"),
+    ("application", "📱"),
     ("backend", "🧠"),
     ("cd", "🚀"),
     ("ci", "🤖"),
@@ -9,13 +10,18 @@ const SUBREPO_EMOJIS: &[(&str, &str)] = &[
     ("data", "🗄️"),
     ("db", "🗄️"),
     ("dev", "👨‍💻"),
+    ("finance", "💰"),
     ("frontend", "🖥️"),
+    ("gallery", "🖼️"),
     ("infra", "🏗️"),
-    ("ops", "🧰"),
+    ("ledger", "💰"),
     ("monitor", "🚨"),
+    ("money", "💰"),
+    ("ops", "🧰"),
     ("platform", "🏗️"),
     ("plugin", "🧩"),
     ("server", "🛰️"),
+    ("stack", "🧱"),
     ("tool", "🛠️"),
     ("ui", "🎨"),
     ("web", "🌐"),
@@ -23,13 +29,19 @@ const SUBREPO_EMOJIS: &[(&str, &str)] = &[
 
 pub fn emoji_for_subrepo(name: &str) -> Option<&'static str> {
     let n = name.to_ascii_lowercase();
+    let mut best_match: Option<(&str, &str)> = None;
+
     for (needle, emoji) in SUBREPO_EMOJIS {
-        if n.starts_with(needle) {
-            return Some(*emoji);
+        if n.contains(needle)
+            && best_match
+                .map(|(best_needle, _)| needle.len() > best_needle.len())
+                .unwrap_or(true)
+        {
+            best_match = Some((*needle, *emoji));
         }
     }
 
-    None
+    best_match.map(|(_, emoji)| emoji)
 }
 
 pub fn format_repo_label(name: &str) -> String {

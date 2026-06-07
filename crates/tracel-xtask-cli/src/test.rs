@@ -117,3 +117,23 @@ fn exact_selector_takes_precedence_over_prefix() {
         "product"
     );
 }
+
+#[test]
+fn emoji_for_subrepo_supports_domain_keywords() {
+    assert_eq!(emojis::emoji_for_subrepo("finance"), Some("💰"));
+    assert_eq!(emojis::emoji_for_subrepo("gallery"), Some("🖼️"));
+    assert_eq!(emojis::emoji_for_subrepo("stack"), Some("🧱"));
+}
+
+#[test]
+fn emoji_for_subrepo_matches_keyword_inside_subrepo_name() {
+    assert_eq!(emojis::emoji_for_subrepo("tracel-finance-api"), Some("💰"));
+    assert_eq!(emojis::emoji_for_subrepo("shared-gallery-ui"), Some("🖼️"));
+    assert_eq!(emojis::emoji_for_subrepo("fullstack-worker"), Some("🧱"));
+}
+
+#[test]
+fn emoji_for_subrepo_prefers_the_longest_matching_keyword() {
+    assert_eq!(emojis::emoji_for_subrepo("api-finance"), Some("💰"));
+    assert_eq!(emojis::emoji_for_subrepo("console-frontend"), Some("🖥️"));
+}
