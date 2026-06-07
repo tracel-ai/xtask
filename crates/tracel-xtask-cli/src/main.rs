@@ -1,6 +1,7 @@
 mod args;
 mod deps;
 mod emojis;
+mod skill;
 
 #[cfg(test)]
 mod test;
@@ -221,6 +222,15 @@ fn main() -> ExitCode {
     let mut args: Vec<OsString> = env::args_os().skip(1).collect();
     let toolchain = take_toolchain_override(&mut args);
 
+    if is_skill_invocation(&args) {
+        if args.len() > 1 {
+            eprintln!("xtask +skill does not accept additional arguments.");
+            return ExitCode::from(1);
+        }
+        skill::print();
+        return ExitCode::SUCCESS;
+    }
+
     let git_root = match git_repo_root()
         .map_err(|e| format!("xtask should run inside a git repository: {e}"))
     {
@@ -364,6 +374,10 @@ fn confirm_dispatch_all() -> Result<bool, String> {
 
 fn is_cli_help_invocation(args: &[OsString]) -> bool {
     args.is_empty()
+}
+
+fn is_skill_invocation(args: &[OsString]) -> bool {
+    args.first() == Some(&OsString::from("+skill"))
 }
 
 fn is_transparent_help_invocation(args: &[OsString]) -> bool {
@@ -1016,6 +1030,7 @@ fn show_xtask_cli_help(
     println!("USAGE");
     println!("-----");
     println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
+    println!("  {cli_name} +skill");
     println!();
 
     println!("BEHAVIOR");
@@ -1048,6 +1063,7 @@ fn show_xtask_cli_help(
     println!("  - `{cli_name}`                   Shows this screen.");
     println!("  - `{cli_name} --help`            Shows underlying xtask help (transparent mode).");
     println!("  - `{cli_name} <command> --help`  Shows help of <command>.");
+    println!("  - `{cli_name} +skill`            Prints agent-oriented instructions for xtask.");
     println!();
 
     if !is_monorepo {

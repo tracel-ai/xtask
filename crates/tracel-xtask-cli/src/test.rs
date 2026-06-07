@@ -17,6 +17,40 @@ fn select<'a>(subrepos: &'a [Workspace], selector: &str) -> Result<&'a str, Stri
 }
 
 #[test]
+fn skill_invocation_is_detected_as_a_wrapper_special_command() {
+    assert!(is_skill_invocation(&[OsString::from("+skill")]));
+}
+
+#[test]
+fn skill_invocation_must_be_the_first_argument() {
+    assert!(!is_skill_invocation(&[
+        OsString::from("check"),
+        OsString::from("+skill")
+    ]));
+}
+
+#[test]
+fn skill_text_contains_agent_operating_cues() {
+    let text = skill::text();
+
+    assert!(text.contains("Tracel xtask agent skill"));
+    assert!(text.contains("xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]"));
+    assert!(text.contains("XTASK_CLI=1"));
+    assert!(text.contains("Testing model"));
+    assert!(
+        text.contains("Unit tests are tests compiled with library, binary, and example targets")
+    );
+    assert!(text.contains("Integration tests are crate-level test targets"));
+    assert!(text.contains("Environment management"));
+    assert!(text.contains("stag2"));
+    assert!(text.contains("dotenvy::from_path"));
+    assert!(text.contains("Dependency synchronization"));
+    assert!(text.contains("does not overwrite or remove the feature selection"));
+    assert!(text.contains("Agent workflow"));
+    assert!(text.contains("Do not assume a repository is standard or monorepo"));
+}
+
+#[test]
 fn shorthand_uses_first_letter_of_each_name_segment() {
     assert_eq!(subrepo_shorthand("product-backend").as_deref(), Some("pb"));
     assert_eq!(
