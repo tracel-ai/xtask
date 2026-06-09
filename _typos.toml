@@ -7,3 +7,5 @@ extend-exclude = [
 OT = "OT"
 UE = "UE"
 ue = "ue"
+# abbreviation of northamerica-northeast
+nane = "nane"
