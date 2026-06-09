@@ -231,6 +231,20 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if is_update_invocation(&args) {
+        if args.len() > 1 {
+            eprintln!("xtask +update does not accept additional arguments.");
+            return ExitCode::from(1);
+        }
+        return match update_cli() {
+            Ok(code) => code,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
+        };
+    }
+
     let git_root = match git_repo_root()
         .map_err(|e| format!("xtask should run inside a git repository: {e}"))
     {
@@ -378,6 +392,10 @@ fn is_cli_help_invocation(args: &[OsString]) -> bool {
 
 fn is_skill_invocation(args: &[OsString]) -> bool {
     args.first() == Some(&OsString::from("+skill"))
+}
+
+fn is_update_invocation(args: &[OsString]) -> bool {
+    args.first() == Some(&OsString::from("+update"))
 }
 
 fn is_transparent_help_invocation(args: &[OsString]) -> bool {
@@ -974,6 +992,17 @@ fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Resul
     Ok(exit_code_u8_from_status(status))
 }
 
+fn update_cli() -> Result<ExitCode, String> {
+    eprintln!("🔄 Updating xtask CLI...");
+
+    let status = Command::new("cargo")
+        .args(["install", "tracel-xtask-cli"])
+        .status()
+        .map_err(|e| format!("failed to execute cargo install tracel-xtask-cli: {e}"))?;
+
+    Ok(ExitCode::from(exit_code_u8_from_status(status)))
+}
+
 fn exit_code_u8_from_status(status: std::process::ExitStatus) -> u8 {
     match status.code() {
         Some(code) if (0..=255).contains(&code) => code as u8,
@@ -1031,6 +1060,7 @@ fn show_xtask_cli_help(
     println!("-----");
     println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
     println!("  {cli_name} +skill");
+    println!("  {cli_name} +update");
     println!();
 
     println!("BEHAVIOR");
@@ -1064,6 +1094,7 @@ fn show_xtask_cli_help(
     println!("  - `{cli_name} --help`            Shows underlying xtask help (transparent mode).");
     println!("  - `{cli_name} <command> --help`  Shows help of <command>.");
     println!("  - `{cli_name} +skill`            Prints agent-oriented instructions for xtask.");
+    println!("  - `{cli_name} +update`           Updates the installed xtask CLI.");
     println!();
 
     if !is_monorepo {

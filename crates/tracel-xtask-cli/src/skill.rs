@@ -18,12 +18,15 @@ crate as the project-specific implementation.
 ```text
 xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]
 xtask +skill
+xtask +update
 ```
 
 - `xtask` with no arguments prints wrapper help.
 - `xtask --help` forwards to the underlying repository xtask help.
 - `xtask <command> --help` forwards command help to the selected xtask crate.
 - `+skill` is handled by the wrapper and prints this agent guide.
+- `+update` is handled by the wrapper and runs `cargo install tracel-xtask-cli`
+  to update itself.
 - `+nightly` and `+n` run the selected xtask through the nightly toolchain.
 
 ## Repository discovery

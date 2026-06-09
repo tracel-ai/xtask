@@ -22,10 +22,23 @@ fn skill_invocation_is_detected_as_a_wrapper_special_command() {
 }
 
 #[test]
+fn update_invocation_is_detected_as_a_wrapper_special_command() {
+    assert!(is_update_invocation(&[OsString::from("+update")]));
+}
+
+#[test]
 fn skill_invocation_must_be_the_first_argument() {
     assert!(!is_skill_invocation(&[
         OsString::from("check"),
         OsString::from("+skill")
+    ]));
+}
+
+#[test]
+fn update_invocation_must_be_the_first_argument() {
+    assert!(!is_update_invocation(&[
+        OsString::from("check"),
+        OsString::from("+update")
     ]));
 }
 
@@ -35,6 +48,7 @@ fn skill_text_contains_agent_operating_cues() {
 
     assert!(text.contains("Tracel xtask agent skill"));
     assert!(text.contains("xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]"));
+    assert!(text.contains("xtask +update"));
     assert!(text.contains("XTASK_CLI=1"));
     assert!(text.contains("Testing model"));
     assert!(
