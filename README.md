@@ -305,6 +305,13 @@ tokio = { version = "1.48.0", features = ["full"] }
 Note that it is possible to drop `features = ["full"]` from the `Dependencies.toml` file and make the decision about which
 feature to use at the subrepo or even crate level.
 
+To apply dependency synchronization across the root workspace of a standard repository or every subrepo of a monorepo
+without compiling or running any repository-local xtask command, use:
+
+```bash
+xtask +sync
+```
+
 ## Anatomy of a base command
 
 We use the derive API of clap which is based on structs, enums and attribute proc macros. Each base command is a

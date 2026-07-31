@@ -245,6 +245,11 @@ fn main() -> ExitCode {
         };
     }
 
+    if is_sync_invocation(&args) && args.len() > 1 {
+        eprintln!("xtask +sync does not accept additional arguments.");
+        return ExitCode::from(1);
+    }
+
     let git_root = match git_repo_root()
         .map_err(|e| format!("xtask should run inside a git repository: {e}"))
     {
@@ -254,6 +259,16 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+
+    if is_sync_invocation(&args) {
+        return match sync_all_dependencies(&git_root) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
+        };
+    }
 
     if is_cli_help_invocation(&args) {
         match show_xtask_cli_help(&git_root, toolchain) {
@@ -346,20 +361,24 @@ fn run(
     }
 }
 
-/// Sync dependency versions from the root fake Dependencies.toml
-fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result<(), String> {
+/// Sync dependency versions from the root fake Dependencies.toml.
+///
+/// Returns `None` when the repository does not provide a Dependencies.toml.
+fn sync_dependencies(
+    git_root: &Path,
+    repository_roots: &[PathBuf],
+) -> Result<Option<deps::SyncReport>, String> {
     let deps_toml = git_root.join("Dependencies.toml");
     if !deps_toml.exists() {
-        return Ok(());
+        return Ok(None);
     }
     eprintln!(
         "🔗 Syncing dependencies from {}...",
         deps_toml.file_name().unwrap().to_string_lossy()
     );
-    let subrepo_roots: Vec<PathBuf> = subrepos.iter().map(|ws| ws.path.clone()).collect();
-    let report = deps::sync_subrepos(&deps_toml, &subrepo_roots)
+    let report = deps::sync_subrepos(&deps_toml, repository_roots)
         .map_err(|e| format!("dependency sync should succeed: {e}"))?;
-    for (manifest, table_path, dep) in report.missing_canonical_dependencies {
+    for (manifest, table_path, dep) in &report.missing_canonical_dependencies {
         eprintln!(
             "warning: {} declares dependency '{}' in [{}] but it is missing from root [workspace.dependencies]",
             manifest.display(),
@@ -368,6 +387,50 @@ fn sync_monorepo_dependencies(git_root: &Path, subrepos: &[Workspace]) -> Result
         );
     }
 
+    Ok(Some(report))
+}
+
+fn sync_workspace_dependencies(git_root: &Path, workspaces: &[Workspace]) -> Result<(), String> {
+    let repository_roots = workspaces
+        .iter()
+        .map(|workspace| workspace.path.clone())
+        .collect::<Vec<_>>();
+    sync_dependencies(git_root, &repository_roots).map(|_| ())
+}
+
+/// Apply dependency synchronization without invoking a repository-local xtask.
+fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
+    let repository_roots = if is_workspace(git_root)?.is_some() {
+        vec![git_root.to_path_buf()]
+    } else {
+        let subrepos = list_subrepo_workspaces(git_root, None)?;
+        if subrepos.is_empty() {
+            return Err(format!(
+                "No xtask workspaces found under git root: {}",
+                git_root.display()
+            ));
+        }
+
+        subrepos
+            .into_iter()
+            .map(|workspace| workspace.path)
+            .collect()
+    };
+
+    let Some(report) = sync_dependencies(git_root, &repository_roots)? else {
+        eprintln!(
+            "No Dependencies.toml found at git root: {}",
+            git_root.display()
+        );
+        return Ok(());
+    };
+
+    eprintln!(
+        "✅ Dependency sync complete: {} dependencies updated in {} manifests, {} warnings.",
+        report.updated_dependencies,
+        report.changed_manifests.len(),
+        report.missing_canonical_dependencies.len()
+    );
     Ok(())
 }
 
@@ -396,6 +459,10 @@ fn is_skill_invocation(args: &[OsString]) -> bool {
 
 fn is_update_invocation(args: &[OsString]) -> bool {
     args.first() == Some(&OsString::from("+update"))
+}
+
+fn is_sync_invocation(args: &[OsString]) -> bool {
+    args.first() == Some(&OsString::from("+sync"))
 }
 
 fn is_transparent_help_invocation(args: &[OsString]) -> bool {
@@ -954,7 +1021,7 @@ fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Resul
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     };
 
-    sync_monorepo_dependencies(git_root, std::slice::from_ref(ws))?;
+    sync_workspace_dependencies(git_root, std::slice::from_ref(ws))?;
 
     eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
 
@@ -1060,6 +1127,7 @@ fn show_xtask_cli_help(
     println!("-----");
     println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
     println!("  {cli_name} +skill");
+    println!("  {cli_name} +sync");
     println!("  {cli_name} +update");
     println!();
 
@@ -1094,6 +1162,9 @@ fn show_xtask_cli_help(
     println!("  - `{cli_name} --help`            Shows underlying xtask help (transparent mode).");
     println!("  - `{cli_name} <command> --help`  Shows help of <command>.");
     println!("  - `{cli_name} +skill`            Prints agent-oriented instructions for xtask.");
+    println!(
+        "  - `{cli_name} +sync`             Syncs dependencies without running an xtask command."
+    );
     println!("  - `{cli_name} +update`           Updates the installed xtask CLI.");
     println!();
 
@@ -1203,9 +1274,11 @@ fn show_xtask_cli_help(
     println!();
     println!("  {cli_name} :all build");
     println!("      Run `build` xtask command in every subrepo, regardless of current");
-    println!("      directory within the monorepo. Useful to easily sync the dependencies");
-    println!("      of `Dependencies.toml` with all the subrepos and verify that they all");
-    println!("      still build without errors.");
+    println!("      directory within the monorepo.");
+    println!();
+    println!("  {cli_name} +sync");
+    println!("      Sync `Dependencies.toml` into every subrepo without compiling or running");
+    println!("      any repository-local xtask command.");
     println!();
 
     println!("NOTES");

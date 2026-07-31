@@ -1,5 +1,40 @@
 use super::*;
 
+fn create_test_workspace(path: &Path, xtask_package: &str) {
+    fs::create_dir_all(path.join("xtask")).expect("xtask directory should be created");
+    fs::write(
+        path.join("Cargo.toml"),
+        r#"[workspace]
+members = ["xtask"]
+
+[workspace.dependencies]
+serde = "1.0.0"
+"#,
+    )
+    .expect("workspace manifest should be written");
+    fs::write(
+        path.join("xtask/Cargo.toml"),
+        format!(
+            r#"[package]
+name = "{xtask_package}"
+version = "0.1.0"
+edition = "2024"
+"#
+        ),
+    )
+    .expect("xtask manifest should be written");
+}
+
+fn create_test_dependencies_manifest(path: &Path) {
+    fs::write(
+        path.join("Dependencies.toml"),
+        r#"[workspace.dependencies]
+serde = "2.0.0"
+"#,
+    )
+    .expect("dependencies manifest should be written");
+}
+
 fn workspace(name: &str) -> Workspace {
     Workspace {
         path: PathBuf::from(name),
@@ -27,6 +62,11 @@ fn update_invocation_is_detected_as_a_wrapper_special_command() {
 }
 
 #[test]
+fn sync_invocation_is_detected_as_a_wrapper_special_command() {
+    assert!(is_sync_invocation(&[OsString::from("+sync")]));
+}
+
+#[test]
 fn skill_invocation_must_be_the_first_argument() {
     assert!(!is_skill_invocation(&[
         OsString::from("check"),
@@ -43,12 +83,22 @@ fn update_invocation_must_be_the_first_argument() {
 }
 
 #[test]
+fn sync_invocation_must_be_the_first_argument() {
+    assert!(!is_sync_invocation(&[
+        OsString::from("check"),
+        OsString::from("+sync")
+    ]));
+}
+
+#[test]
 fn skill_text_contains_agent_operating_cues() {
     let text = skill::text();
 
     assert!(text.contains("Tracel xtask agent skill"));
     assert!(text.contains("xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]"));
     assert!(text.contains("xtask +update"));
+    assert!(text.contains("xtask +sync"));
+    assert!(text.contains("without running a repository-local xtask command"));
     assert!(text.contains("XTASK_CLI=1"));
     assert!(text.contains("Testing model"));
     assert!(
@@ -62,6 +112,42 @@ fn skill_text_contains_agent_operating_cues() {
     assert!(text.contains("does not overwrite or remove the feature selection"));
     assert!(text.contains("Agent workflow"));
     assert!(text.contains("Do not assume a repository is standard or monorepo"));
+}
+
+#[test]
+fn sync_all_dependencies_updates_a_standard_repository_root() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    create_test_workspace(repository.path(), "xtask");
+    create_test_dependencies_manifest(repository.path());
+
+    sync_all_dependencies(repository.path()).expect("dependency sync should succeed");
+
+    let manifest = fs::read_to_string(repository.path().join("Cargo.toml"))
+        .expect("workspace manifest should be readable");
+    assert!(manifest.contains("serde = \"2.0.0\""));
+    assert!(!repository.path().join("target").exists());
+}
+
+#[test]
+fn sync_all_dependencies_updates_every_monorepo_subrepo() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    create_test_dependencies_manifest(repository.path());
+
+    for subrepo in ["backend", "frontend"] {
+        create_test_workspace(
+            &repository.path().join(subrepo),
+            &format!("xtask-{subrepo}"),
+        );
+    }
+
+    sync_all_dependencies(repository.path()).expect("dependency sync should succeed");
+
+    for subrepo in ["backend", "frontend"] {
+        let manifest = fs::read_to_string(repository.path().join(subrepo).join("Cargo.toml"))
+            .expect("subrepo manifest should be readable");
+        assert!(manifest.contains("serde = \"2.0.0\""));
+    }
+    assert!(!repository.path().join("target").exists());
 }
 
 #[test]

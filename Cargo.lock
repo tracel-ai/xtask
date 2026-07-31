@@ -1767,6 +1767,7 @@ dependencies = [
 name = "tracel-xtask-cli"
 version = "1.1.6"
 dependencies = [
+ "tempfile",
  "toml_edit 0.24.1+spec-1.1.0",
 ]
 

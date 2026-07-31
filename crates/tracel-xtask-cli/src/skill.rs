@@ -18,6 +18,7 @@ crate as the project-specific implementation.
 ```text
 xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]
 xtask +skill
+xtask +sync
 xtask +update
 ```
 
@@ -25,6 +26,9 @@ xtask +update
 - `xtask --help` forwards to the underlying repository xtask help.
 - `xtask <command> --help` forwards command help to the selected xtask crate.
 - `+skill` is handled by the wrapper and prints this agent guide.
+- `+sync` is handled by the wrapper and applies dependency synchronization to
+  the root workspace in a standard repository or to every subrepo in a
+  monorepo, without running a repository-local xtask command.
 - `+update` is handled by the wrapper and runs `cargo install tracel-xtask-cli`
   to update itself.
 - `+nightly` and `+n` run the selected xtask through the nightly toolchain.
@@ -186,6 +190,8 @@ that root table to the selected subrepo `Cargo.toml` files.
 
 Important sync rules:
 
+- `xtask +sync` applies these rules to the whole repository and exits without
+  compiling or running any repository-local xtask command.
 - Sync only touches dependencies already declared in a subrepo manifest; it does
   not add every root dependency everywhere.
 - It checks `[workspace.dependencies]`, top-level `dependencies`,
