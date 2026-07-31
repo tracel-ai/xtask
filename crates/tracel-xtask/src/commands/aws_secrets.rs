@@ -203,8 +203,8 @@ pub fn copy(args: AwsSecretsCopySubCmdArgs) -> anyhow::Result<()> {
 /// ask to commit or discard on close and then push a new version if confirmed.
 ///
 /// Behavior:
-/// - If the secret is JSON, it is pretty-printed for editing and stored back
-///   minified on a single line.
+/// - If the secret is JSON, it is pretty-printed for editing, validated after
+///   editing, and stored back minified on a single line.
 /// - If the secret is not JSON, it is treated as an opaque string.
 fn edit(args: AwsSecretsEditSubCmdArgs) -> anyhow::Result<()> {
     // 1) fetch current secret value
@@ -246,7 +246,8 @@ fn edit(args: AwsSecretsEditSubCmdArgs) -> anyhow::Result<()> {
     let edited_raw_trimmed = edited_raw.trim_end_matches('\n');
     // Try to treat content as JSON on both sides
     let original_norm_json = normalize_json(original_raw_trimmed);
-    let edited_norm_json = normalize_json(edited_raw_trimmed);
+    let edited_norm_json =
+        normalize_edited_content(original_norm_json.is_some(), edited_raw_trimmed)?;
     // If both are valid JSON, compare and store minified JSON
     if let (Some(orig_norm), Some(edited_norm)) = (original_norm_json, edited_norm_json) {
         if orig_norm == edited_norm {
@@ -590,6 +591,22 @@ fn normalize_json(s: &str) -> Option<String> {
     serde_json::to_string(&value).ok()
 }
 
+/// Normalize edited JSON, requiring it to remain valid when the original secret was JSON.
+fn normalize_edited_content(
+    original_is_json: bool,
+    edited: &str,
+) -> anyhow::Result<Option<String>> {
+    if !original_is_json {
+        return Ok(normalize_json(edited));
+    }
+
+    let value: serde_json::Value = serde_json::from_str(edited)
+        .context("Edited secret is not valid JSON; no new secret version was pushed")?;
+    let normalized =
+        serde_json::to_string(&value).context("Serializing edited JSON secret should succeed")?;
+    Ok(Some(normalized))
+}
+
 /// Ask user to confirm pushing a new secret version.
 fn confirm_push() -> anyhow::Result<bool> {
     use std::io::Write as _;
@@ -654,6 +671,31 @@ mod tests {
     use super::*;
     use serial_test::serial;
     use std::env;
+
+    #[test]
+    fn test_json_secret_edit_must_remain_valid_json() {
+        let error = normalize_edited_content(true, r#"{"key": "value""#).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Edited secret is not valid JSON; no new secret version was pushed"
+        );
+        assert!(format!("{error:#}").contains("EOF while parsing an object"));
+    }
+
+    #[test]
+    fn test_json_secret_edit_is_normalized() {
+        let normalized = normalize_edited_content(true, "{\n  \"key\": \"value\"\n}\n").unwrap();
+
+        assert_eq!(normalized.as_deref(), Some(r#"{"key":"value"}"#));
+    }
+
+    #[test]
+    fn test_non_json_secret_edit_remains_supported() {
+        let normalized = normalize_edited_content(false, "opaque secret").unwrap();
+
+        assert_eq!(normalized, None);
+    }
 
     #[test]
     #[serial]
