@@ -100,7 +100,7 @@ fn run_documentation_build(
                     None,
                     excluded,
                     only,
-                    &format!("Format check execution failed for {}", &member.name),
+                    &format!("Format check execution failed for {}", member.name),
                     None,
                     None,
                 )?;
@@ -201,14 +201,11 @@ fn run_doc_test(
         None,
         excluded,
         only,
-        &format!(
-            "Failed to execute documentation test for '{}'",
-            &member.name
-        ),
+        &format!("Failed to execute documentation test for '{}'", member.name),
         Some("no library targets found"),
         Some(&format!(
             "No library found to test documentation for in the crate '{}'",
-            &member.name
+            member.name
         )),
     )?;
     endgroup!();

@@ -118,7 +118,7 @@ fn run_format(target: &Target, excluded: &[String], only: &[String]) -> anyhow::
                     None,
                     excluded,
                     only,
-                    &format!("Format check execution failed for {}", &member.name),
+                    &format!("Format check execution failed for {}", member.name),
                     None,
                     None,
                 )?;
@@ -202,7 +202,7 @@ fn run_lint(
                     None,
                     excluded,
                     only,
-                    &format!("Lint fix execution failed for {}", &member.name),
+                    &format!("Lint fix execution failed for {}", member.name),
                     None,
                     None,
                 )?;

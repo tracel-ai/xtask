@@ -357,7 +357,7 @@ fn update() -> anyhow::Result<()> {
                 dest.display()
             );
         } else {
-            eprintln!("Installing terraform {}...", &latest);
+            eprintln!("Installing terraform {}...", latest);
             let bytes = terraform::download_terraform_zip(&agent, &latest)?;
             terraform::extract_and_install(&bytes, &dest)?;
             eprintln!("Installed terraform {} to {}", latest, dest.display());

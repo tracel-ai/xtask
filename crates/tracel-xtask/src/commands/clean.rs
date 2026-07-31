@@ -53,7 +53,7 @@ pub(crate) fn run_clean(target: &Target, args: &CleanCmdArgs) -> anyhow::Result<
                     None,
                     &args.exclude,
                     &args.only,
-                    &format!("Build command failed for {}", &member.name),
+                    &format!("Build command failed for {}", member.name),
                     None,
                     None,
                 )?;

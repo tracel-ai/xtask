@@ -707,7 +707,7 @@ fn promote(promote_args: AwsContainerPromoteSubCmdArgs, env: &Environment) -> an
     let promote_tag = promote_tag(promote_args.promote_tag, env);
     eprintln!(
         "Promoting '{}' to '{}'...",
-        &promote_args.build_tag, &promote_tag
+        promote_args.build_tag, promote_tag
     );
 
     // Fetch current 'latest' manifest and the new manifest to promote.

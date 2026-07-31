@@ -228,10 +228,7 @@ fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
         &["publish", "-p", &crate_name, "--dry-run"],
         None,
         None,
-        &format!(
-            "Publish dry run should succeed for crate '{}'.",
-            &crate_name
-        ),
+        &format!("Publish dry run should succeed for crate '{}'.", crate_name),
     )?;
 
     if dry_run_only {
@@ -247,7 +244,7 @@ fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
     if !status.success() {
         return Err(anyhow!(
             "Publish should succeed for crate '{}'.",
-            &crate_name
+            crate_name
         ));
     }
     Ok(())

@@ -63,7 +63,7 @@ pub(crate) fn run_compile(
                     None,
                     excluded,
                     only,
-                    &format!("Compilation failed for {}", &member.name),
+                    &format!("Compilation failed for {}", member.name),
                     None,
                     None,
                 )?;
