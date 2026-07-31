@@ -1142,16 +1142,22 @@ fn show_xtask_cli_help(
     println!("                otherwise prompts then run the command in all the subrepos.");
     println!();
 
-    println!("TOOLCHAIN");
-    println!("---------");
+    println!("SPECIAL COMMANDS");
+    println!("----------------");
     println!("  - `+nightly`  Runs the underlying xtask with `cargo +nightly run ...`.");
     println!("  - `+n`        Short alias for `+nightly`.");
+    println!("  - `+sync`     Syncs dependencies in the root repo or every subrepo");
+    println!("                without running an underlying xtask command.");
+    println!("  - `+update`   Updates the installed CLI with `cargo install tracel-xtask-cli`.");
     match toolchain {
         Some(toolchain) => {
-            println!("  - Current override: {}", toolchain.display_name());
+            println!(
+                "  - Current toolchain override: {}",
+                toolchain.display_name()
+            );
         }
         None => {
-            println!("  - Current override: none");
+            println!("  - Current toolchain override: none");
         }
     }
     println!();
