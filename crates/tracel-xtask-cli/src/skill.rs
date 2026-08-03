@@ -28,7 +28,8 @@ xtask +update
 - `+skill` is handled by the wrapper and prints this agent guide.
 - `+sync` is handled by the wrapper and applies dependency synchronization to
   the root workspace in a standard repository or to every subrepo in a
-  monorepo, without running a repository-local xtask command.
+  monorepo, without running a repository-local xtask command. It also updates
+  each affected `Cargo.lock` without compiling the workspace.
 - `+update` is handled by the wrapper and runs `cargo install tracel-xtask-cli`
   to update itself.
 - `+nightly` and `+n` run the selected xtask through the nightly toolchain.
@@ -191,7 +192,8 @@ that root table to the selected subrepo `Cargo.toml` files.
 Important sync rules:
 
 - `xtask +sync` applies these rules to the whole repository and exits without
-  compiling or running any repository-local xtask command.
+  compiling or running any repository-local xtask command. It refreshes each
+  affected workspace's `Cargo.lock` with `cargo update --workspace`.
 - Sync only touches dependencies already declared in a subrepo manifest; it does
   not add every root dependency everywhere.
 - It checks `[workspace.dependencies]`, top-level `dependencies`,

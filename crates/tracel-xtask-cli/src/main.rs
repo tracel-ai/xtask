@@ -398,7 +398,37 @@ fn sync_workspace_dependencies(git_root: &Path, workspaces: &[Workspace]) -> Res
     sync_dependencies(git_root, &repository_roots).map(|_| ())
 }
 
-/// Apply dependency synchronization without invoking a repository-local xtask.
+/// Update each repository lockfile without compiling the workspace.
+fn update_lockfiles(repository_roots: &[PathBuf]) -> Result<(), String> {
+    for repository_root in repository_roots {
+        eprintln!(
+            "🔒 Updating {}...",
+            repository_root.join("Cargo.lock").display()
+        );
+
+        let status = Command::new("cargo")
+            .args(["update", "--workspace"])
+            .current_dir(repository_root)
+            .status()
+            .map_err(|e| {
+                format!(
+                    "failed to execute cargo update --workspace ({}): {e}",
+                    repository_root.display()
+                )
+            })?;
+
+        if !status.success() {
+            return Err(format!(
+                "cargo update --workspace failed for {} with status {status}",
+                repository_root.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Apply dependency synchronization and update lockfiles without compiling the workspaces.
 fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
     let repository_roots = if is_workspace(git_root)?.is_some() {
         vec![git_root.to_path_buf()]
@@ -425,10 +455,13 @@ fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
         return Ok(());
     };
 
+    update_lockfiles(&repository_roots)?;
+
     eprintln!(
-        "✅ Dependency sync complete: {} dependencies updated in {} manifests, {} warnings.",
+        "✅ Dependency sync complete: {} dependencies updated in {} manifests, {} Cargo.lock files refreshed, {} warnings.",
         report.updated_dependencies,
         report.changed_manifests.len(),
+        repository_roots.len(),
         report.missing_canonical_dependencies.len()
     );
     Ok(())
@@ -1147,7 +1180,7 @@ fn show_xtask_cli_help(
     println!("  - `+nightly`  Runs the underlying xtask with `cargo +nightly run ...`.");
     println!("  - `+n`        Short alias for `+nightly`.");
     println!("  - `+sync`     Syncs dependencies in the root repo or every subrepo");
-    println!("                without running an underlying xtask command.");
+    println!("                and updates Cargo.lock without compiling the workspace.");
     println!("  - `+update`   Updates the installed CLI with `cargo install tracel-xtask-cli`.");
     match toolchain {
         Some(toolchain) => {

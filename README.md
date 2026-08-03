@@ -306,7 +306,7 @@ Note that it is possible to drop `features = ["full"]` from the `Dependencies.to
 feature to use at the subrepo or even crate level.
 
 To apply dependency synchronization across the root workspace of a standard repository or every subrepo of a monorepo
-without compiling or running any repository-local xtask command, use:
+and update each workspace's `Cargo.lock` without compiling or running any repository-local xtask command, use:
 
 ```bash
 xtask +sync
