@@ -23,13 +23,21 @@ xtask +sync
 xtask +update
 ```
 
+Normal help forwarding:
+
 - `xtask` with no arguments prints wrapper help.
 - `xtask --help` forwards to the underlying repository xtask help.
 - `xtask <command> --help` forwards command help to the selected xtask crate.
-- `+clean` runs `cargo clean` against the selected persistent xtask target
-  directory. In a standard repository it cleans the root xtask cache; in a
-  monorepo it cleans every discovered subrepo's cache. Use `+n +clean` to clean
-  the nightly cache variant.
+
+## Wrapper modifiers and special commands
+
+- `+nightly` and `+n` select the nightly toolchain for a repository-local
+  command or for `+clean`.
+- `+clean` runs `cargo clean --target-dir <persistent-target>` against the
+  persistent xtask build cache. In a standard repository it cleans the root
+  xtask cache; in a monorepo it cleans every discovered subrepo's cache. Use
+  `+n +clean` to clean the nightly cache variant. It accepts neither additional
+  arguments nor subrepo selectors.
 - `+skill` is handled by the wrapper and prints this agent guide.
 - `+sync` is handled by the wrapper and applies dependency synchronization to
   the root workspace in a standard repository or to every subrepo in a
@@ -37,7 +45,9 @@ xtask +update
   each affected `Cargo.lock` without compiling the workspace.
 - `+update` is handled by the wrapper and runs `cargo install tracel-xtask-cli`
   to update itself.
-- `+nightly` and `+n` run the selected xtask through the nightly toolchain.
+
+The `+clean`, `+skill`, `+sync`, and `+update` forms are wrapper-owned special
+commands. They are not forwarded to the repository-local xtask crate.
 
 ## Repository discovery
 
@@ -63,16 +73,50 @@ Monorepo:
   shorthands are accepted. A shorthand is built from the first letter of each
   name segment, so `product-backend` can be selected as `:pb`.
 
+## Persistent xtask cache
+
+Repository-local xtasks always compile into an external Cargo target directory:
+
+```text
+~/.cache/xtask/targets/v1/<clone-parent>/<repository>/
+  [<workspace>/]<xtask-package>/<toolchain>
+```
+
+- `<clone-parent>` is the name of the directory containing the repository
+  clone, and `<repository>` is the clone directory name. For a checkout at
+  `/src/github/tracel/xtask`, these components are `tracel/xtask`.
+- `<workspace>` is present only for a monorepo subrepo and is its path relative
+  to the git root. It is omitted in a standard repository.
+- `<xtask-package>` is the repository-local Cargo package name.
+- `<toolchain>` is `default` for normal invocations and `nightly` when `+n` or
+  `+nightly` is used. `default` means no explicit Rust toolchain override; it is
+  not the Cargo build profile.
+
+For example:
+
+```text
+# Standard repository
+~/.cache/xtask/targets/v1/<clone-parent>/<repository>/<xtask-package>/default
+
+# Monorepo subrepo
+~/.cache/xtask/targets/v1/<clone-parent>/<repository>/<workspace>/<xtask-package>/default
+```
+
+The logical repository path, workspace, package, and toolchain identify a
+single stable target directory. Cargo's fingerprints decide whether the xtask
+must be recompiled, so edits rebuild it while unchanged inputs reuse it. An
+ordinary project `cargo clean` does not touch this external target.
+
+Use `xtask +clean` to discard the default cached build, or `xtask +n +clean` to
+discard its nightly counterpart. In a monorepo these commands clean every
+discovered subrepo cache; they do not accept a `:<subrepo>` selector.
+
 ## What the wrapper does before execution
 
 - Sets `XTASK_CLI=1` for the repository-local xtask process.
 - Sets `XTASK_MONOREPO=1` when running inside a selected monorepo subrepo.
-- Always keeps repository-local xtask builds in a repository- and
-  toolchain-specific Cargo target directory under
-  `~/.cache/xtask/targets/v1/<clone-parent>/<repository>/[<workspace>/]<xtask-package>/<toolchain>`.
-  Because that directory is outside the repository, an ordinary project
-  `cargo clean` does not remove the compiled xtask. Cargo still checks whether
-  its inputs changed before use.
+- Passes the persistent target from the preceding section to Cargo with
+  `--target-dir`.
 - If a monorepo has `Dependencies.toml` at the git root, synchronizes matching
   dependency declarations into selected subrepo `Cargo.toml` files before
   executing commands. See "Dependency synchronization" below before assuming
@@ -224,8 +268,8 @@ Important sync rules:
 
 1. Run `xtask +skill` if you need this guide.
 2. Run `xtask` to understand wrapper context and subrepo discovery.
-3. Run `xtask +clean` only when the persistent repository xtask build should be
-   discarded.
+3. Run `xtask +clean` only when the persistent default-toolchain xtask build
+   should be discarded. Use `xtask +n +clean` for the nightly build.
 4. Run `xtask --help` or `xtask :<subrepo> --help` to see project commands.
 5. Prefer explicit selectors in monorepos:
    - `xtask :api check all`
@@ -254,6 +298,9 @@ Important sync rules:
 - Put repository-local global options before the repository-local command.
 - Treat `--help` as transparent help for the selected underlying xtask, not as
   wrapper help.
+- Do not append repository-local arguments or subrepo selectors to wrapper
+  special commands. In particular, `+clean` always uses its repository-wide
+  standard or monorepo behavior.
 - Use `:all` deliberately; it can run many commands and may edit many subrepos.
 "#;
 
