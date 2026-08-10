@@ -223,6 +223,29 @@ fn repository_identity_uses_clone_parent_and_directory_names() {
 }
 
 #[test]
+fn xtask_run_command_uses_the_release_profile() {
+    let workspace = workspace("root");
+    let target_dir = Path::new("persistent-target");
+
+    let command = xtask_run_command(&workspace, target_dir);
+    let args = command.get_args().collect::<Vec<_>>();
+
+    assert_eq!(
+        args,
+        [
+            OsStr::new("run"),
+            OsStr::new("--release"),
+            OsStr::new("--target-dir"),
+            target_dir.as_os_str(),
+            OsStr::new("--package"),
+            OsStr::new("xtask"),
+            OsStr::new("--bin"),
+            OsStr::new("xtask-root"),
+        ]
+    );
+}
+
+#[test]
 fn clean_xtask_target_runs_cargo_clean_for_external_directory() {
     let repository = tempfile::tempdir().expect("temporary repository should be created");
     let target_root = tempfile::tempdir().expect("temporary target root should be created");
@@ -262,6 +285,52 @@ edition = "2024"
 }
 
 #[test]
+fn clean_legacy_dev_target_preserves_release_artifacts() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    let target_root = tempfile::tempdir().expect("temporary target root should be created");
+    let target = target_root.path().join("cargo-target");
+    fs::create_dir_all(repository.path().join("src"))
+        .expect("package source directory should be created");
+    fs::write(
+        repository.path().join("Cargo.toml"),
+        r#"[package]
+name = "legacy-clean-test"
+version = "0.1.0"
+edition = "2024"
+"#,
+    )
+    .expect("package manifest should be written");
+    fs::write(repository.path().join("src/main.rs"), "fn main() {}\n")
+        .expect("package source should be written");
+    let build_status = Command::new("cargo")
+        .arg("check")
+        .arg("--quiet")
+        .arg("--target-dir")
+        .arg(&target)
+        .current_dir(repository.path())
+        .status()
+        .expect("cargo check should execute");
+    assert!(build_status.success());
+    let release_artifact = target.join("release/cached-xtask");
+    fs::create_dir_all(
+        release_artifact
+            .parent()
+            .expect("release artifact should have a parent"),
+    )
+    .expect("release target directory should be created");
+    fs::write(&release_artifact, "cached release xtask")
+        .expect("release artifact should be written");
+    let mut workspace = workspace("root");
+    workspace.path = repository.path().to_path_buf();
+
+    clean_legacy_dev_target(&workspace, &target)
+        .expect("legacy debug-profile cache clean should succeed");
+
+    assert!(!target.join("debug").exists());
+    assert!(release_artifact.exists());
+}
+
+#[test]
 fn skill_text_contains_agent_operating_cues() {
     let text = skill::text();
 
@@ -274,6 +343,7 @@ fn skill_text_contains_agent_operating_cues() {
     assert!(text.contains("arguments nor subrepo selectors"));
     assert!(text.contains("Persistent xtask cache"));
     assert!(text.contains("Repository-local xtasks always compile into an external Cargo target"));
+    assert!(text.contains("Cargo's release profile"));
     assert!(text.contains("<clone-parent>/<repository>"));
     assert!(text.contains("/src/github/tracel/xtask"));
     assert!(text.contains("`default` means no explicit Rust toolchain override"));

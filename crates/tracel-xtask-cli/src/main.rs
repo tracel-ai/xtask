@@ -615,6 +615,44 @@ fn clean_xtask_target(workspace: &Workspace, target_dir: &Path) -> Result<(), St
     Ok(())
 }
 
+fn clean_legacy_dev_target(workspace: &Workspace, target_dir: &Path) -> Result<(), String> {
+    if !target_dir.join("debug").exists() {
+        return Ok(());
+    }
+
+    eprintln!(
+        "🧹 Removing legacy debug-profile xtask cache: {}",
+        target_dir.display()
+    );
+
+    let mut cmd = Command::new("cargo");
+    if let Some(toolchain) = workspace.toolchain {
+        cmd.arg(toolchain.as_rustup_arg());
+    }
+    apply_toolchain_env(&mut cmd, workspace.toolchain);
+    let status = cmd
+        .args(["clean", "--profile", "dev", "--quiet"])
+        .arg("--target-dir")
+        .arg(target_dir)
+        .current_dir(&workspace.path)
+        .status()
+        .map_err(|e| {
+            format!(
+                "failed to clean the legacy debug-profile xtask cache for {}: {e}",
+                workspace.path.display()
+            )
+        })?;
+
+    if !status.success() {
+        return Err(format!(
+            "cleaning the legacy debug-profile xtask cache failed for {} with status {status}",
+            workspace.path.display()
+        ));
+    }
+
+    Ok(())
+}
+
 fn clean_xtask_caches(git_root: &Path, toolchain: Option<ToolchainOverride>) -> Result<(), String> {
     let workspaces = if let Some(xtask) = is_workspace(git_root)? {
         vec![Workspace {
@@ -1156,23 +1194,16 @@ fn run_help_all(subrepos: &[Workspace]) -> Result<ExitCode, String> {
     Ok(ExitCode::from(first_failure.unwrap_or(0)))
 }
 
-fn run_help_one(ws: &Workspace) -> Result<u8, String> {
-    let is_subrepo = ws.dir_name != "root";
-    let target_dir = xtask_target_dir(ws)?;
-
-    if is_subrepo {
-        emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
-    }
-
-    eprintln!("🔧 Preparing xtask:{}...", ws.dir_name);
-    eprintln!("📦 Persistent cache: {}", target_dir.display());
-
+fn xtask_run_command(ws: &Workspace, target_dir: &Path) -> Command {
     let mut cmd = Command::new("cargo");
     if let Some(toolchain) = ws.toolchain {
         cmd.arg(toolchain.as_rustup_arg());
     }
     apply_toolchain_env(&mut cmd, ws.toolchain);
-    cmd.arg("run").arg("--target-dir").arg(target_dir);
+    cmd.arg("run")
+        .arg("--release")
+        .arg("--target-dir")
+        .arg(target_dir);
 
     match &ws.xtask {
         XtaskInvocation::WorkspaceMember { package } => {
@@ -1185,14 +1216,31 @@ fn run_help_one(ws: &Workspace) -> Result<u8, String> {
 
     cmd.arg("--bin")
         .arg(&ws.xtask_bin)
-        .arg("--")
-        .arg("--help")
         .env("XTASK_CLI", "1")
         .current_dir(&ws.path);
 
-    if is_subrepo {
+    if ws.dir_name != "root" {
         cmd.env("XTASK_MONOREPO", "1");
     }
+
+    cmd
+}
+
+fn run_help_one(ws: &Workspace) -> Result<u8, String> {
+    let is_subrepo = ws.dir_name != "root";
+    let target_dir = xtask_target_dir(ws)?;
+
+    if is_subrepo {
+        emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
+    }
+
+    clean_legacy_dev_target(ws, &target_dir)?;
+
+    eprintln!("🔧 Preparing xtask:{}...", ws.dir_name);
+    eprintln!("📦 Persistent cache: {}", target_dir.display());
+
+    let mut cmd = xtask_run_command(ws, &target_dir);
+    cmd.arg("--").arg("--help").current_dir(&ws.path);
 
     let status = cmd.status().map_err(|e| {
         format!(
@@ -1241,35 +1289,13 @@ fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Resul
 
     sync_workspace_dependencies(git_root, std::slice::from_ref(ws))?;
 
+    clean_legacy_dev_target(ws, &target_dir)?;
+
     eprintln!("🔧 Preparing xtask:{}...", ws.dir_name);
     eprintln!("📦 Persistent cache: {}", target_dir.display());
 
-    let mut cmd = Command::new("cargo");
-    if let Some(toolchain) = ws.toolchain {
-        cmd.arg(toolchain.as_rustup_arg());
-    }
-    apply_toolchain_env(&mut cmd, ws.toolchain);
-    cmd.arg("run").arg("--target-dir").arg(target_dir);
-
-    match &ws.xtask {
-        XtaskInvocation::WorkspaceMember { package } => {
-            cmd.arg("--package").arg(package);
-        }
-        XtaskInvocation::ManifestPath { manifest_path, .. } => {
-            cmd.arg("--manifest-path").arg(manifest_path);
-        }
-    }
-
-    cmd.arg("--bin")
-        .arg(&ws.xtask_bin)
-        .arg("--")
-        .args(args)
-        .env("XTASK_CLI", "1")
-        .current_dir(&ws.path);
-
-    if is_subrepo {
-        cmd.env("XTASK_MONOREPO", "1");
-    }
+    let mut cmd = xtask_run_command(ws, &target_dir);
+    cmd.arg("--").args(args).current_dir(&ws.path);
 
     let status = cmd
         .status()
@@ -1388,6 +1414,7 @@ fn show_xtask_cli_help(
     println!("PERSISTENT XTASK CACHE");
     println!("----------------------");
     println!("  Repository-local xtasks always compile into an external Cargo target.");
+    println!("  Cargo's release profile keeps each persistent build compact.");
     println!("  Layout:");
     println!("    ~/.cache/xtask/targets/v1/<clone-parent>/<repository>/");
     println!("      [<workspace>/]<xtask-package>/<toolchain>");

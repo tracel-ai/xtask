@@ -92,6 +92,12 @@ Repository-local xtasks always compile into an external Cargo target directory:
   `+nightly` is used. `default` means no explicit Rust toolchain override; it is
   not the Cargo build profile.
 
+The wrapper runs the repository-local xtask with Cargo's release profile. This
+keeps persistent builds compact by avoiding the dev profile's incremental
+artifact cache. When upgrading from a wrapper version that used the dev profile,
+the wrapper removes that target's legacy `debug` directory before compiling the
+release build.
+
 For example:
 
 ```text
@@ -117,6 +123,7 @@ discovered subrepo cache; they do not accept a `:<subrepo>` selector.
 - Sets `XTASK_MONOREPO=1` when running inside a selected monorepo subrepo.
 - Passes the persistent target from the preceding section to Cargo with
   `--target-dir`.
+- Compiles and runs the repository-local xtask with Cargo's release profile.
 - If a monorepo has `Dependencies.toml` at the git root, synchronizes matching
   dependency declarations into selected subrepo `Cargo.toml` files before
   executing commands. See "Dependency synchronization" below before assuming

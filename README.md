@@ -35,11 +35,15 @@ cargo install tracel-xtask-cli
 
 #### Persistent xtask build cache
 
-The installed CLI compiles and runs the repository-local xtask with Cargo. It always keeps that
-build in a repository- and toolchain-specific Cargo target directory under
+The installed CLI compiles and runs the repository-local xtask with Cargo's release profile. It
+always keeps that build in a repository- and toolchain-specific Cargo target directory under
 `~/.cache/xtask/targets/v1/<clone-parent>/<repository>/[<workspace>/]<xtask-package>/<toolchain>`,
 outside the repository's `target` directory. Cargo still rebuilds the xtask when its inputs change,
 but an ordinary project `cargo clean` does not remove the cached build.
+
+The release profile keeps each persistent build compact by avoiding the dev profile's incremental
+artifact cache. After upgrading from a CLI version that used the dev profile, the first invocation
+removes that cache's legacy `debug` directory before compiling the release build.
 
 `<workspace>` is omitted for a standard repository and contains the workspace-relative subrepo
 path in a monorepo. `<toolchain>` is `default` for the normally selected Rust toolchain and
