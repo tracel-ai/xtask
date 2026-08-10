@@ -1,7 +1,6 @@
-/// Sync dependency specs from a monorepo “source of truth” Cargo.toml into subrepo Cargo.toml
-/// files, updating only dependencies that are explicitly declared in each subrepo.
+/// Sync dependency specs between a root `Dependencies.toml` and subrepo `Cargo.toml` files.
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     fs,
     path::{Path, PathBuf},
@@ -18,6 +17,8 @@ pub struct SyncReport {
     pub unchanged_manifests: Vec<PathBuf>,
     pub missing_manifests: Vec<PathBuf>,
     pub updated_dependencies: usize,
+    pub added_canonical_dependencies: Vec<String>,
+    pub conflicting_import_dependencies: Vec<(PathBuf, String, String)>,
     pub missing_canonical_dependencies: Vec<(PathBuf, String, String)>,
 }
 
@@ -49,15 +50,54 @@ impl DepSpec {
     }
 }
 
+#[derive(Debug)]
+struct ImportCandidate {
+    name: String,
+    spec: DepSpec,
+    manifest_path: PathBuf,
+    table_path: String,
+}
+
+struct ImportDiscovery<'a> {
+    root_dir: &'a Path,
+    canonical_names: &'a HashSet<String>,
+    candidates: Vec<ImportCandidate>,
+    candidate_positions: HashMap<String, usize>,
+    report: &'a mut SyncReport,
+}
+
 /// Sync canonical fields into all subrepos provided, writing changes to disk.
 pub fn sync_subrepos(root_manifest_path: &Path, subrepo_roots: &[PathBuf]) -> Result<SyncReport> {
-    let canonical = read_canonical_deps(root_manifest_path)?;
+    sync_subrepos_inner(root_manifest_path, subrepo_roots, false)
+}
+
+/// Import missing dependency source specs, then sync canonical fields into all subrepos.
+pub fn sync_subrepos_two_way(
+    root_manifest_path: &Path,
+    subrepo_roots: &[PathBuf],
+) -> Result<SyncReport> {
+    sync_subrepos_inner(root_manifest_path, subrepo_roots, true)
+}
+
+fn sync_subrepos_inner(
+    root_manifest_path: &Path,
+    subrepo_roots: &[PathBuf],
+    import_missing: bool,
+) -> Result<SyncReport> {
+    let mut report = SyncReport::default();
 
     let root_dir = root_manifest_path
         .parent()
         .ok_or_else(|| "root manifest should have a parent directory".to_string())?;
 
-    let mut report = SyncReport::default();
+    if import_missing {
+        let canonical_names = read_canonical_dep_names(root_manifest_path)?;
+        let candidates =
+            discover_import_candidates(subrepo_roots, root_dir, &canonical_names, &mut report)?;
+        import_candidates(root_manifest_path, candidates, &mut report)?;
+    }
+
+    let canonical = read_canonical_deps(root_manifest_path)?;
 
     for subrepo_root in subrepo_roots {
         let manifest_path = subrepo_root.join("Cargo.toml");
@@ -86,6 +126,215 @@ pub fn sync_subrepos(root_manifest_path: &Path, subrepo_roots: &[PathBuf]) -> Re
     }
 
     Ok(report)
+}
+
+/// Return all dependency names already declared in root `[workspace.dependencies]`.
+fn read_canonical_dep_names(root_manifest_path: &Path) -> Result<HashSet<String>> {
+    let contents = fs::read_to_string(root_manifest_path)
+        .map_err(|e| format!("failed to read {}: {e}", root_manifest_path.display()))?;
+
+    let doc = contents
+        .parse::<DocumentMut>()
+        .map_err(|e| format!("failed to parse TOML {}: {e}", root_manifest_path.display()))?;
+
+    let ws_deps = doc
+        .as_table()
+        .get("workspace")
+        .and_then(Item::as_table)
+        .and_then(|t| t.get("dependencies"))
+        .and_then(Item::as_table)
+        .ok_or_else(|| {
+            format!(
+                "root manifest {} must contain [workspace.dependencies]",
+                root_manifest_path.display()
+            )
+        })?;
+
+    Ok(ws_deps.iter().map(|(name, _)| name.to_string()).collect())
+}
+
+/// Discover specs that can be imported from subrepo manifests.
+fn discover_import_candidates(
+    subrepo_roots: &[PathBuf],
+    root_dir: &Path,
+    canonical_names: &HashSet<String>,
+    report: &mut SyncReport,
+) -> Result<Vec<ImportCandidate>> {
+    let mut discovery = ImportDiscovery {
+        root_dir,
+        canonical_names,
+        candidates: Vec::new(),
+        candidate_positions: HashMap::new(),
+        report,
+    };
+
+    for subrepo_root in subrepo_roots {
+        let manifest_path = subrepo_root.join("Cargo.toml");
+        if !manifest_path.exists() {
+            continue;
+        }
+
+        let contents = fs::read_to_string(&manifest_path)
+            .map_err(|e| format!("failed to read {}: {e}", manifest_path.display()))?;
+        let doc = contents
+            .parse::<DocumentMut>()
+            .map_err(|e| format!("failed to parse TOML {}: {e}", manifest_path.display()))?;
+        let manifest_dir = manifest_path.parent().ok_or_else(|| {
+            format!(
+                "manifest {} should have a parent directory",
+                manifest_path.display()
+            )
+        })?;
+
+        discovery.collect_manifest(doc.as_table(), &manifest_path, manifest_dir);
+    }
+
+    Ok(discovery.candidates)
+}
+
+impl ImportDiscovery<'_> {
+    fn collect_manifest(&mut self, root: &Table, manifest_path: &Path, manifest_dir: &Path) {
+        if let Some(workspace) = root.get("workspace").and_then(Item::as_table) {
+            self.collect_dep_table(
+                workspace,
+                "dependencies",
+                "workspace",
+                manifest_path,
+                manifest_dir,
+            );
+        }
+
+        for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
+            self.collect_dep_table(root, table_name, "", manifest_path, manifest_dir);
+        }
+
+        let Some(targets) = root.get("target").and_then(Item::as_table) else {
+            return;
+        };
+
+        for (target_name, target_item) in targets.iter() {
+            let Some(target) = target_item.as_table() else {
+                continue;
+            };
+            let prefix = format!("target.{target_name}");
+            for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
+                self.collect_dep_table(target, table_name, &prefix, manifest_path, manifest_dir);
+            }
+        }
+    }
+
+    fn collect_dep_table(
+        &mut self,
+        root: &Table,
+        table_name: &str,
+        prefix: &str,
+        manifest_path: &Path,
+        manifest_dir: &Path,
+    ) {
+        let Some(deps_table) = root.get(table_name).and_then(Item::as_table_like) else {
+            return;
+        };
+        let table_path = if prefix.is_empty() {
+            table_name.to_string()
+        } else {
+            format!("{prefix}.{table_name}")
+        };
+
+        for (name, item) in deps_table.iter() {
+            if self.canonical_names.contains(name) {
+                continue;
+            }
+
+            let Some(mut spec) = dep_spec_from_item(item) else {
+                continue;
+            };
+
+            // Features are local policy and must never be inferred into Dependencies.toml.
+            spec.features = None;
+            spec.default_features = None;
+            if let Some(path) = spec.path.take() {
+                spec.path = Some(rebase_path_for_root(&path, manifest_dir, self.root_dir));
+            }
+
+            if spec.version.is_none() && !canon_requires_inline_for_source(&spec) {
+                continue;
+            }
+
+            if let Some(position) = self.candidate_positions.get(name).copied() {
+                if self.candidates[position].spec != spec {
+                    self.report.conflicting_import_dependencies.push((
+                        manifest_path.to_path_buf(),
+                        table_path.clone(),
+                        name.to_string(),
+                    ));
+                }
+                continue;
+            }
+
+            self.candidate_positions
+                .insert(name.to_string(), self.candidates.len());
+            self.candidates.push(ImportCandidate {
+                name: name.to_string(),
+                spec,
+                manifest_path: manifest_path.to_path_buf(),
+                table_path: table_path.clone(),
+            });
+        }
+    }
+}
+
+/// Append discovered specs to root `[workspace.dependencies]`, preserving root formatting.
+fn import_candidates(
+    root_manifest_path: &Path,
+    candidates: Vec<ImportCandidate>,
+    report: &mut SyncReport,
+) -> Result<()> {
+    if candidates.is_empty() {
+        return Ok(());
+    }
+
+    let before = fs::read_to_string(root_manifest_path)
+        .map_err(|e| format!("failed to read {}: {e}", root_manifest_path.display()))?;
+    let mut doc = before
+        .parse::<DocumentMut>()
+        .map_err(|e| format!("failed to parse TOML {}: {e}", root_manifest_path.display()))?;
+    let ws_deps = doc
+        .as_table_mut()
+        .get_mut("workspace")
+        .and_then(Item::as_table_mut)
+        .and_then(|workspace| workspace.get_mut("dependencies"))
+        .and_then(Item::as_table_like_mut)
+        .ok_or_else(|| {
+            format!(
+                "root manifest {} must contain [workspace.dependencies]",
+                root_manifest_path.display()
+            )
+        })?;
+
+    for candidate in candidates {
+        eprintln!(
+            "  + {}: {} (from {} [{}])",
+            candidate.name,
+            fmt_dep_spec(&candidate.spec),
+            candidate.manifest_path.display(),
+            candidate.table_path,
+        );
+        ws_deps.insert(&candidate.name, dep_spec_to_item(&candidate.spec));
+        report.added_canonical_dependencies.push(candidate.name);
+    }
+
+    fs::write(root_manifest_path, doc.to_string())
+        .map_err(|e| format!("failed to write {}: {e}", root_manifest_path.display()))?;
+    Ok(())
+}
+
+/// Render only the version and source-identifying keys of a dependency spec.
+fn dep_spec_to_item(spec: &DepSpec) -> Item {
+    if spec.version.is_some() && !canon_requires_inline_for_source(spec) {
+        return value(spec.version.as_deref().unwrap());
+    }
+
+    Item::Value(Value::InlineTable(to_inline_table(spec, None)))
 }
 
 /// Sync a single Cargo.toml by applying canonical fields to dependency entries.
@@ -709,8 +958,49 @@ fn rebase_path_for_subrepo(canonical_path: &str, root_prefix: Option<&Path>) -> 
         return canonical_path.to_string();
     }
 
-    let rebased = prefix.join(p);
+    let rebased = normalize_relative_path(&prefix.join(p));
     rebased.to_string_lossy().replace('\\', "/")
+}
+
+/// Rebase a subrepo-relative path so it is relative to `Dependencies.toml`.
+fn rebase_path_for_root(subrepo_path: &str, manifest_dir: &Path, root_dir: &Path) -> String {
+    let path = Path::new(subrepo_path);
+    if path.is_absolute() {
+        return subrepo_path.to_string();
+    }
+
+    let Ok(subrepo_prefix) = manifest_dir.strip_prefix(root_dir) else {
+        return subrepo_path.to_string();
+    };
+    let rebased = normalize_relative_path(&subrepo_prefix.join(path));
+    rebased.to_string_lossy().replace('\\', "/")
+}
+
+/// Lexically normalize `.` and `..` without requiring the dependency path to exist.
+fn normalize_relative_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                let can_pop = normalized
+                    .file_name()
+                    .is_some_and(|name| name != std::ffi::OsStr::new(".."));
+                if can_pop {
+                    normalized.pop();
+                } else {
+                    normalized.push("..");
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+
+    if normalized.as_os_str().is_empty() {
+        normalized.push(".");
+    }
+    normalized
 }
 
 /// Format dependencies spec for logging

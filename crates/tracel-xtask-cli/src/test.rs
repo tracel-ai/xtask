@@ -293,6 +293,7 @@ fn skill_text_contains_agent_operating_cues() {
     assert!(text.contains("stag2"));
     assert!(text.contains("dotenvy::from_path"));
     assert!(text.contains("Dependency synchronization"));
+    assert!(text.contains("imports dependencies missing from root"));
     assert!(text.contains("does not overwrite or remove the feature selection"));
     assert!(text.contains("Agent workflow"));
     assert!(text.contains("Do not assume a repository is standard or monorepo"));
@@ -332,6 +333,160 @@ fn sync_all_dependencies_updates_every_monorepo_subrepo() {
         assert!(manifest.contains("version = \"2.0.0\""));
         assert_lockfile_updated_without_building(&repository.path().join(subrepo));
     }
+}
+
+#[test]
+fn sync_all_dependencies_imports_missing_specs_without_feature_policy() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    create_test_workspace(repository.path(), "xtask");
+    create_test_dependencies_manifest(repository.path());
+
+    let manifest_path = repository.path().join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path).expect("manifest should be readable");
+    fs::write(
+        &manifest_path,
+        manifest.replace(
+            "[workspace.dependencies]\n",
+            r#"[workspace.dependencies]
+imported-dependency = { version = "3.2.1", path = "deps/imported-dependency", features = ["extra"], default-features = false }
+"#,
+        ),
+    )
+    .expect("manifest should be updated");
+    fs::create_dir_all(repository.path().join("deps/imported-dependency/src"))
+        .expect("imported dependency source directory should be created");
+    fs::write(
+        repository
+            .path()
+            .join("deps/imported-dependency/Cargo.toml"),
+        r#"[package]
+name = "imported-dependency"
+version = "3.2.1"
+edition = "2024"
+
+[features]
+extra = []
+"#,
+    )
+    .expect("imported dependency manifest should be written");
+    fs::write(
+        repository
+            .path()
+            .join("deps/imported-dependency/src/lib.rs"),
+        "",
+    )
+    .expect("imported dependency source should be written");
+
+    sync_all_dependencies(repository.path()).expect("dependency sync should succeed");
+
+    let dependencies = fs::read_to_string(repository.path().join("Dependencies.toml"))
+        .expect("dependencies manifest should be readable")
+        .parse::<toml_edit::DocumentMut>()
+        .expect("dependencies manifest should be valid TOML");
+    let imported = dependencies["workspace"]["dependencies"]["imported-dependency"]
+        .as_inline_table()
+        .expect("path dependency should use an inline table");
+    assert_eq!(
+        imported.get("version").and_then(|value| value.as_str()),
+        Some("3.2.1")
+    );
+    assert_eq!(
+        imported.get("path").and_then(|value| value.as_str()),
+        Some("deps/imported-dependency")
+    );
+    assert!(imported.get("features").is_none());
+    assert!(imported.get("default-features").is_none());
+}
+
+#[test]
+fn two_way_sync_rebases_imported_subrepo_paths_to_the_repository_root() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    create_test_dependencies_manifest(repository.path());
+    let backend = repository.path().join("backend");
+    create_test_workspace(&backend, "xtask-backend");
+
+    let manifest_path = backend.join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path).expect("manifest should be readable");
+    fs::write(
+        &manifest_path,
+        manifest.replace(
+            "[workspace.dependencies]\n",
+            r#"[workspace.dependencies]
+local-dependency = { path = "../shared/local-dependency", features = ["local-feature"] }
+version-only-dependency = { version = "4.5.6", features = ["derive"] }
+"#,
+        ),
+    )
+    .expect("manifest should be updated");
+
+    let report = deps::sync_subrepos_two_way(
+        &repository.path().join("Dependencies.toml"),
+        std::slice::from_ref(&backend),
+    )
+    .expect("two-way dependency sync should succeed");
+
+    assert_eq!(
+        report.added_canonical_dependencies,
+        vec!["local-dependency", "version-only-dependency"]
+    );
+    let dependencies = fs::read_to_string(repository.path().join("Dependencies.toml"))
+        .expect("dependencies manifest should be readable")
+        .parse::<toml_edit::DocumentMut>()
+        .expect("dependencies manifest should be valid TOML");
+    let imported = dependencies["workspace"]["dependencies"]["local-dependency"]
+        .as_inline_table()
+        .expect("path dependency should use an inline table");
+    assert_eq!(
+        imported.get("path").and_then(|value| value.as_str()),
+        Some("shared/local-dependency")
+    );
+    assert!(imported.get("features").is_none());
+    assert_eq!(
+        dependencies["workspace"]["dependencies"]["version-only-dependency"].as_str(),
+        Some("4.5.6")
+    );
+
+    let synced_subrepo = fs::read_to_string(&manifest_path)
+        .expect("synced subrepo manifest should be readable")
+        .parse::<toml_edit::DocumentMut>()
+        .expect("synced subrepo manifest should be valid TOML");
+    let local_spec = synced_subrepo["workspace"]["dependencies"]["local-dependency"]
+        .as_inline_table()
+        .expect("local path dependency should stay inline");
+    let version_spec = synced_subrepo["workspace"]["dependencies"]["version-only-dependency"]
+        .as_inline_table()
+        .expect("local version dependency should stay inline");
+    assert!(local_spec.get("features").is_some());
+    assert!(version_spec.get("features").is_some());
+}
+
+#[test]
+fn automatic_one_way_sync_does_not_import_missing_dependencies() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    create_test_dependencies_manifest(repository.path());
+    create_test_workspace(repository.path(), "xtask");
+
+    let manifest_path = repository.path().join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path).expect("manifest should be readable");
+    fs::write(
+        &manifest_path,
+        manifest.replace(
+            "[workspace.dependencies]\n",
+            "[workspace.dependencies]\nlocal-only = \"1.2.3\"\n",
+        ),
+    )
+    .expect("manifest should be updated");
+
+    let report = deps::sync_subrepos(
+        &repository.path().join("Dependencies.toml"),
+        &[repository.path().to_path_buf()],
+    )
+    .expect("one-way dependency sync should succeed");
+
+    assert!(report.added_canonical_dependencies.is_empty());
+    let dependencies = fs::read_to_string(repository.path().join("Dependencies.toml"))
+        .expect("dependencies manifest should be readable");
+    assert!(!dependencies.contains("local-only"));
 }
 
 #[test]

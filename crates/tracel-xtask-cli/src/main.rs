@@ -468,23 +468,37 @@ fn run(
     }
 }
 
-/// Sync dependency versions from the root fake Dependencies.toml.
+/// Sync dependency specs with the root fake Dependencies.toml.
 ///
 /// Returns `None` when the repository does not provide a Dependencies.toml.
 fn sync_dependencies(
     git_root: &Path,
     repository_roots: &[PathBuf],
+    import_missing: bool,
 ) -> Result<Option<deps::SyncReport>, String> {
     let deps_toml = git_root.join("Dependencies.toml");
     if !deps_toml.exists() {
         return Ok(None);
     }
+    let direction = if import_missing { "with" } else { "from" };
     eprintln!(
-        "🔗 Syncing dependencies from {}...",
+        "🔗 Syncing dependencies {direction} {}...",
         deps_toml.file_name().unwrap().to_string_lossy()
     );
-    let report = deps::sync_subrepos(&deps_toml, repository_roots)
-        .map_err(|e| format!("dependency sync should succeed: {e}"))?;
+    let report = if import_missing {
+        deps::sync_subrepos_two_way(&deps_toml, repository_roots)
+    } else {
+        deps::sync_subrepos(&deps_toml, repository_roots)
+    }
+    .map_err(|e| format!("dependency sync should succeed: {e}"))?;
+    for (manifest, table_path, dep) in &report.conflicting_import_dependencies {
+        eprintln!(
+            "warning: {} declares dependency '{}' in [{}] with a different source spec; using the first declaration imported into root [workspace.dependencies]",
+            manifest.display(),
+            dep,
+            table_path,
+        );
+    }
     for (manifest, table_path, dep) in &report.missing_canonical_dependencies {
         eprintln!(
             "warning: {} declares dependency '{}' in [{}] but it is missing from root [workspace.dependencies]",
@@ -502,7 +516,7 @@ fn sync_workspace_dependencies(git_root: &Path, workspaces: &[Workspace]) -> Res
         .iter()
         .map(|workspace| workspace.path.clone())
         .collect::<Vec<_>>();
-    sync_dependencies(git_root, &repository_roots).map(|_| ())
+    sync_dependencies(git_root, &repository_roots, false).map(|_| ())
 }
 
 /// Update each repository lockfile without compiling the workspace.
@@ -554,7 +568,7 @@ fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
             .collect()
     };
 
-    let Some(report) = sync_dependencies(git_root, &repository_roots)? else {
+    let Some(report) = sync_dependencies(git_root, &repository_roots, true)? else {
         eprintln!(
             "No Dependencies.toml found at git root: {}",
             git_root.display()
@@ -565,11 +579,12 @@ fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
     update_lockfiles(&repository_roots)?;
 
     eprintln!(
-        "✅ Dependency sync complete: {} dependencies updated in {} manifests, {} Cargo.lock files refreshed, {} warnings.",
+        "✅ Dependency sync complete: {} dependencies imported, {} dependencies updated in {} manifests, {} Cargo.lock files refreshed, {} warnings.",
+        report.added_canonical_dependencies.len(),
         report.updated_dependencies,
         report.changed_manifests.len(),
         repository_roots.len(),
-        report.missing_canonical_dependencies.len()
+        report.missing_canonical_dependencies.len() + report.conflicting_import_dependencies.len()
     );
     Ok(())
 }
@@ -1355,7 +1370,7 @@ fn show_xtask_cli_help(
     println!("                In a monorepo, cleans every discovered subrepo cache.");
     println!("                Use `+n +clean` to clean the nightly cache instead.");
     println!("  - `+sync`     Syncs dependencies in the root repo or every subrepo");
-    println!("                and updates Cargo.lock without compiling the workspace.");
+    println!("                in both directions, then updates Cargo.lock without compiling.");
     println!("  - `+update`   Updates the installed CLI with `cargo install tracel-xtask-cli`.");
     match toolchain {
         Some(toolchain) => {
@@ -1509,8 +1524,8 @@ fn show_xtask_cli_help(
     println!("      directory within the monorepo.");
     println!();
     println!("  {cli_name} +sync");
-    println!("      Sync `Dependencies.toml` into every subrepo without compiling or running");
-    println!("      any repository-local xtask command.");
+    println!("      Sync `Dependencies.toml` with every subrepo in both directions without");
+    println!("      compiling or running any repository-local xtask command.");
     println!();
     println!("  {cli_name} +clean");
     println!("      Clean the default persistent xtask target for every discovered subrepo.");

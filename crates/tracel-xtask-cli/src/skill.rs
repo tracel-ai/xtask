@@ -247,6 +247,9 @@ Important sync rules:
 - `xtask +sync` applies these rules to the whole repository and exits without
   compiling or running any repository-local xtask command. It refreshes each
   affected workspace's `Cargo.lock` with `cargo update --workspace`.
+- `xtask +sync` also imports dependencies missing from root
+  `[workspace.dependencies]`. It copies only version and source-identifying
+  fields; it never imports `features` or `default-features`.
 - Sync only touches dependencies already declared in a subrepo manifest; it does
   not add every root dependency everywhere.
 - It checks `[workspace.dependencies]`, top-level `dependencies`,

@@ -346,6 +346,12 @@ and update each workspace's `Cargo.lock` without compiling or running any reposi
 xtask +sync
 ```
 
+This explicit sync is two-way: dependencies used by a workspace but missing from
+root `Dependencies.toml` are added to its `[workspace.dependencies]`. Only their
+version and source-identifying fields (`path`, `git`, `tag`, `rev`, `branch`, and
+`package`) are imported. `features` and `default-features` remain local and are
+not inferred into the root manifest.
+
 ## Anatomy of a base command
 
 We use the derive API of clap which is based on structs, enums and attribute proc macros. Each base command is a
