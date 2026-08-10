@@ -85,6 +85,7 @@ fn assert_lockfile_updated_without_building(workspace_root: &Path) {
 
 fn workspace(name: &str) -> Workspace {
     Workspace {
+        git_root: PathBuf::from("repository"),
         path: PathBuf::from(name),
         dir_name: name.to_string(),
         xtask_bin: format!("xtask-{name}"),
@@ -115,6 +116,11 @@ fn sync_invocation_is_detected_as_a_wrapper_special_command() {
 }
 
 #[test]
+fn clean_invocation_is_detected_as_a_wrapper_special_command() {
+    assert!(is_clean_invocation(&[OsString::from("+clean")]));
+}
+
+#[test]
 fn skill_invocation_must_be_the_first_argument() {
     assert!(!is_skill_invocation(&[
         OsString::from("check"),
@@ -139,11 +145,133 @@ fn sync_invocation_must_be_the_first_argument() {
 }
 
 #[test]
+fn clean_invocation_must_be_the_first_argument() {
+    assert!(!is_clean_invocation(&[
+        OsString::from("check"),
+        OsString::from("+clean")
+    ]));
+}
+
+#[test]
+fn persistent_target_directory_is_external_and_stable() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    let cache = tempfile::tempdir().expect("temporary cache should be created");
+    let workspace_path = repository.path().to_path_buf();
+    let mut workspace = workspace("root");
+    workspace.git_root = repository.path().to_path_buf();
+    workspace.path = workspace_path.clone();
+    let repository_identity = repository_identity(repository.path());
+
+    let first = persistent_target_dir_under(cache.path(), &repository_identity, &workspace);
+    let second = persistent_target_dir_under(cache.path(), &repository_identity, &workspace);
+
+    assert_eq!(first, second);
+    assert_eq!(
+        first,
+        cache
+            .path()
+            .join("v1")
+            .join(&repository_identity.parent)
+            .join(&repository_identity.name)
+            .join("xtask")
+            .join("default")
+    );
+    assert!(!first.starts_with(&workspace_path));
+}
+
+#[test]
+fn persistent_target_directory_isolated_by_workspace_and_toolchain() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    let cache = tempfile::tempdir().expect("temporary cache should be created");
+    let mut backend = workspace("backend");
+    backend.git_root = repository.path().to_path_buf();
+    backend.path = repository.path().join("backend");
+    fs::create_dir_all(&backend.path).expect("backend workspace should be created");
+
+    let mut frontend = workspace("frontend");
+    frontend.git_root = repository.path().to_path_buf();
+    frontend.path = repository.path().join("frontend");
+    fs::create_dir_all(&frontend.path).expect("frontend workspace should be created");
+
+    let mut nightly_backend = backend.clone();
+    nightly_backend.toolchain = Some(ToolchainOverride::Nightly);
+    let repository_identity = repository_identity(repository.path());
+
+    let backend_target = persistent_target_dir_under(cache.path(), &repository_identity, &backend);
+    let frontend_target =
+        persistent_target_dir_under(cache.path(), &repository_identity, &frontend);
+    let nightly_target =
+        persistent_target_dir_under(cache.path(), &repository_identity, &nightly_backend);
+
+    assert_ne!(backend_target, frontend_target);
+    assert_ne!(backend_target, nightly_target);
+    assert!(backend_target.ends_with(Path::new("backend").join("xtask").join("default")));
+    assert!(frontend_target.ends_with(Path::new("frontend").join("xtask").join("default")));
+    assert_eq!(nightly_target.file_name(), Some(OsStr::new("nightly")));
+}
+
+#[test]
+fn repository_identity_uses_clone_parent_and_directory_names() {
+    let root = tempfile::tempdir().expect("temporary root should be created");
+    let git_root = root.path().join("namespace/repository");
+    fs::create_dir_all(&git_root).expect("git root should be created");
+
+    let identity = repository_identity(&git_root);
+
+    assert_eq!(identity.parent, "namespace");
+    assert_eq!(identity.name, "repository");
+}
+
+#[test]
+fn clean_xtask_target_runs_cargo_clean_for_external_directory() {
+    let repository = tempfile::tempdir().expect("temporary repository should be created");
+    let target_root = tempfile::tempdir().expect("temporary target root should be created");
+    let target = target_root.path().join("cargo-target");
+    fs::create_dir_all(repository.path().join("src"))
+        .expect("package source directory should be created");
+    fs::write(
+        repository.path().join("Cargo.toml"),
+        r#"[package]
+name = "clean-test"
+version = "0.1.0"
+edition = "2024"
+"#,
+    )
+    .expect("package manifest should be written");
+    fs::write(repository.path().join("src/main.rs"), "fn main() {}\n")
+        .expect("package source should be written");
+    let build_status = Command::new("cargo")
+        .arg("check")
+        .arg("--quiet")
+        .arg("--target-dir")
+        .arg(&target)
+        .current_dir(repository.path())
+        .status()
+        .expect("cargo check should execute");
+    assert!(build_status.success());
+    let artifact = target.join("debug/cached-xtask");
+    fs::create_dir_all(artifact.parent().expect("artifact should have a parent"))
+        .expect("target profile directory should be created");
+    fs::write(&artifact, "cached xtask").expect("cached artifact should be written");
+    let mut workspace = workspace("root");
+    workspace.path = repository.path().to_path_buf();
+
+    clean_xtask_target(&workspace, &target).expect("xtask cache clean should succeed");
+
+    assert!(!artifact.exists());
+}
+
+#[test]
 fn skill_text_contains_agent_operating_cues() {
     let text = skill::text();
 
     assert!(text.contains("Tracel xtask agent skill"));
     assert!(text.contains("xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]"));
+    assert!(text.contains("xtask [+nightly|+n] +clean"));
+    assert!(text.contains("`+clean` runs `cargo clean`"));
+    assert!(text.contains("Always keeps repository-local xtask builds"));
+    assert!(text.contains("<clone-parent>/<repository>"));
+    assert!(text.contains("not remove the compiled xtask"));
     assert!(text.contains("xtask +update"));
     assert!(text.contains("xtask +sync"));
     assert!(text.contains("without running a repository-local xtask command"));

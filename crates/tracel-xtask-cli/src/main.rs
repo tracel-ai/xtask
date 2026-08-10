@@ -83,6 +83,7 @@ impl XtaskInvocation {
 
 #[derive(Debug, Clone)]
 struct Workspace {
+    git_root: PathBuf,
     path: PathBuf,
     dir_name: String,
     xtask_bin: String,
@@ -96,6 +97,96 @@ impl Workspace {
         self
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RepositoryIdentity {
+    parent: String,
+    name: String,
+}
+
+fn repository_identity(git_root: &Path) -> RepositoryIdentity {
+    let canonical_git_root = fs::canonicalize(git_root).unwrap_or_else(|_| git_root.to_path_buf());
+    let name = canonical_git_root
+        .file_name()
+        .map(|name| cache_path_component(&name.to_string_lossy()))
+        .unwrap_or_else(|| "repository".to_string());
+    let parent = canonical_git_root
+        .parent()
+        .and_then(Path::file_name)
+        .map(|name| cache_path_component(&name.to_string_lossy()))
+        .unwrap_or_else(|| "local".to_string());
+
+    RepositoryIdentity { parent, name }
+}
+
+fn cache_path_component(value: &str) -> String {
+    let component = value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    if component.is_empty() {
+        "xtask".to_string()
+    } else {
+        component
+    }
+}
+
+fn persistent_target_dir_under(
+    cache_root: &Path,
+    repository: &RepositoryIdentity,
+    workspace: &Workspace,
+) -> PathBuf {
+    let package = cache_path_component(workspace.xtask.package_name());
+    let toolchain = workspace
+        .toolchain
+        .map(ToolchainOverride::display_name)
+        .unwrap_or("default");
+    let canonical_git_root =
+        fs::canonicalize(&workspace.git_root).unwrap_or_else(|_| workspace.git_root.clone());
+    let canonical_workspace =
+        fs::canonicalize(&workspace.path).unwrap_or_else(|_| workspace.path.clone());
+    let relative_workspace = canonical_workspace.strip_prefix(canonical_git_root).ok();
+    let mut target_dir = cache_root
+        .join("v1")
+        .join(&repository.parent)
+        .join(&repository.name);
+
+    if let Some(relative_workspace) = relative_workspace {
+        for component in relative_workspace.components() {
+            if let std::path::Component::Normal(component) = component {
+                target_dir.push(cache_path_component(&component.to_string_lossy()));
+            }
+        }
+    } else if workspace.dir_name != "root" {
+        target_dir.push(cache_path_component(&workspace.dir_name));
+    }
+
+    target_dir.join(package).join(toolchain)
+}
+
+fn persistent_target_dir(workspace: &Workspace) -> Result<PathBuf, String> {
+    let home = home::home_dir()
+        .ok_or_else(|| "failed to resolve the home directory for the xtask cache".to_string())?;
+    let cache_root = home.join(".cache").join("xtask").join("targets");
+    let repository = repository_identity(&workspace.git_root);
+    Ok(persistent_target_dir_under(
+        &cache_root,
+        &repository,
+        workspace,
+    ))
+}
+
+fn xtask_target_dir(workspace: &Workspace) -> Result<PathBuf, String> {
+    persistent_target_dir(workspace)
+}
+
 #[derive(Debug, Clone)]
 struct DispatchSummary {
     entries: Vec<SubrepoExecutionResult>,
@@ -250,6 +341,11 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
+    if is_clean_invocation(&args) && args.len() > 1 {
+        eprintln!("xtask +clean does not accept additional arguments.");
+        return ExitCode::from(1);
+    }
+
     let git_root = match git_repo_root()
         .map_err(|e| format!("xtask should run inside a git repository: {e}"))
     {
@@ -262,6 +358,16 @@ fn main() -> ExitCode {
 
     if is_sync_invocation(&args) {
         return match sync_all_dependencies(&git_root) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("{err}");
+                ExitCode::from(1)
+            }
+        };
+    }
+
+    if is_clean_invocation(&args) {
+        return match clean_xtask_caches(&git_root, toolchain) {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => {
                 eprintln!("{err}");
@@ -332,6 +438,7 @@ fn run(
         // Standard repo -> execute at git root
         let xtask_bin = xtask.package_name().to_string();
         let ws = Workspace {
+            git_root: git_root.to_path_buf(),
             path: git_root.to_path_buf(),
             dir_name: "root".to_string(),
             xtask_bin,
@@ -467,6 +574,66 @@ fn sync_all_dependencies(git_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn clean_xtask_target(workspace: &Workspace, target_dir: &Path) -> Result<(), String> {
+    eprintln!("🧹 Cleaning xtask cache: {}", target_dir.display());
+
+    let status = Command::new("cargo")
+        .arg("clean")
+        .arg("--target-dir")
+        .arg(target_dir)
+        .current_dir(&workspace.path)
+        .status()
+        .map_err(|e| {
+            format!(
+                "failed to execute cargo clean for {}: {e}",
+                workspace.path.display()
+            )
+        })?;
+
+    if !status.success() {
+        return Err(format!(
+            "cargo clean failed for {} with status {status}",
+            workspace.path.display()
+        ));
+    }
+
+    Ok(())
+}
+
+fn clean_xtask_caches(git_root: &Path, toolchain: Option<ToolchainOverride>) -> Result<(), String> {
+    let workspaces = if let Some(xtask) = is_workspace(git_root)? {
+        vec![Workspace {
+            git_root: git_root.to_path_buf(),
+            path: git_root.to_path_buf(),
+            dir_name: "root".to_string(),
+            xtask_bin: xtask.package_name().to_string(),
+            xtask,
+            toolchain,
+        }]
+    } else {
+        let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
+        if subrepos.is_empty() {
+            return Err(format!(
+                "No xtask workspaces found under git root: {}",
+                git_root.display()
+            ));
+        }
+        subrepos
+    };
+
+    for workspace in &workspaces {
+        let target_dir = xtask_target_dir(workspace)?;
+        clean_xtask_target(workspace, &target_dir)?;
+    }
+
+    eprintln!(
+        "✅ Cleaned {} persistent xtask cache{}.",
+        workspaces.len(),
+        if workspaces.len() == 1 { "" } else { "s" }
+    );
+    Ok(())
+}
+
 fn confirm_dispatch_all() -> Result<bool, String> {
     eprintln!(
         "⚠️ This will run the command in all subrepos (to suppress this prompt use the ':all' selector)"
@@ -496,6 +663,10 @@ fn is_update_invocation(args: &[OsString]) -> bool {
 
 fn is_sync_invocation(args: &[OsString]) -> bool {
     args.first() == Some(&OsString::from("+sync"))
+}
+
+fn is_clean_invocation(args: &[OsString]) -> bool {
+    args.first() == Some(&OsString::from("+clean"))
 }
 
 fn is_transparent_help_invocation(args: &[OsString]) -> bool {
@@ -721,6 +892,7 @@ fn find_subrepo_workspace_root(
 
             return Ok(Some(
                 Workspace {
+                    git_root: git_root.to_path_buf(),
                     path: cur,
                     dir_name: subrepo,
                     xtask_bin,
@@ -764,6 +936,7 @@ fn list_subrepo_workspaces(
 
             subrepos.push(
                 Workspace {
+                    git_root: git_root.to_path_buf(),
                     path,
                     dir_name: dir_name.clone(),
                     xtask_bin,
@@ -921,6 +1094,7 @@ fn show_all_help(
         if let Some(xtask) = root_xtask {
             // Standard repo: help at git root
             let ws = Workspace {
+                git_root: git_root.to_path_buf(),
                 path: git_root.to_path_buf(),
                 dir_name: "root".to_string(),
                 xtask_bin: xtask.package_name().to_string(),
@@ -969,17 +1143,14 @@ fn run_help_all(subrepos: &[Workspace]) -> Result<ExitCode, String> {
 
 fn run_help_one(ws: &Workspace) -> Result<u8, String> {
     let is_subrepo = ws.dir_name != "root";
-    let target_dir: &Path = if is_subrepo {
-        Path::new("../target/xtask")
-    } else {
-        Path::new("target/xtask")
-    };
+    let target_dir = xtask_target_dir(ws)?;
 
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
     }
 
-    eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
+    eprintln!("🔧 Preparing xtask:{}...", ws.dir_name);
+    eprintln!("📦 Persistent cache: {}", target_dir.display());
 
     let mut cmd = Command::new("cargo");
     if let Some(toolchain) = ws.toolchain {
@@ -1047,8 +1218,7 @@ fn exec_cargo_xtask_all(
 fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Result<u8, String> {
     let is_subrepo = ws.dir_name != "root";
 
-    let target_path = format!("target/{}", ws.xtask.package_name());
-    let target_dir = Path::new(&target_path);
+    let target_dir = xtask_target_dir(ws)?;
 
     if is_subrepo {
         emojis::print_run_header(&emojis::format_repo_label(&ws.dir_name));
@@ -1056,7 +1226,8 @@ fn exec_cargo_xtask(git_root: &Path, ws: &Workspace, args: &[OsString]) -> Resul
 
     sync_workspace_dependencies(git_root, std::slice::from_ref(ws))?;
 
-    eprintln!("🔧 Compiling xtask:{}...", ws.dir_name);
+    eprintln!("🔧 Preparing xtask:{}...", ws.dir_name);
+    eprintln!("📦 Persistent cache: {}", target_dir.display());
 
     let mut cmd = Command::new("cargo");
     if let Some(toolchain) = ws.toolchain {
@@ -1159,6 +1330,7 @@ fn show_xtask_cli_help(
     println!("USAGE");
     println!("-----");
     println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
+    println!("  {cli_name} [+nightly|+n] +clean");
     println!("  {cli_name} +skill");
     println!("  {cli_name} +sync");
     println!("  {cli_name} +update");
@@ -1179,6 +1351,9 @@ fn show_xtask_cli_help(
     println!("----------------");
     println!("  - `+nightly`  Runs the underlying xtask with `cargo +nightly run ...`.");
     println!("  - `+n`        Short alias for `+nightly`.");
+    println!("  - `+clean`    Runs `cargo clean` for the default persistent xtask cache.");
+    println!("                In a monorepo, cleans every discovered subrepo cache.");
+    println!("                Use `+n +clean` to clean the nightly cache instead.");
     println!("  - `+sync`     Syncs dependencies in the root repo or every subrepo");
     println!("                and updates Cargo.lock without compiling the workspace.");
     println!("  - `+update`   Updates the installed CLI with `cargo install tracel-xtask-cli`.");
@@ -1195,12 +1370,25 @@ fn show_xtask_cli_help(
     }
     println!();
 
+    println!("PERSISTENT XTASK CACHE");
+    println!("----------------------");
+    println!("  Repository-local xtasks always compile into an external Cargo target.");
+    println!("  Layout:");
+    println!("    ~/.cache/xtask/targets/v1/<clone-parent>/<repository>/");
+    println!("      [<workspace>/]<xtask-package>/<toolchain>");
+    println!("  `<workspace>` is present only for monorepo subrepos.");
+    println!("  `<toolchain>` is `default` normally and `nightly` with `+n`.");
+    println!("  An ordinary project `cargo clean` does not remove this external target.");
+    println!("  Use `+clean` or `+n +clean` to remove the corresponding cached build.");
+    println!();
+
     println!("HELP");
     println!("----");
     println!("  - `{cli_name}`                   Shows this screen.");
     println!("  - `{cli_name} --help`            Shows underlying xtask help (transparent mode).");
     println!("  - `{cli_name} <command> --help`  Shows help of <command>.");
     println!("  - `{cli_name} +skill`            Prints agent-oriented instructions for xtask.");
+    println!("  - `{cli_name} +clean`            Cleans the persistent xtask cache.");
     println!(
         "  - `{cli_name} +sync`             Syncs dependencies without running an xtask command."
     );
@@ -1237,7 +1425,12 @@ fn show_xtask_cli_help(
         println!("  {cli_name} +nightly test --miri");
         println!("      Run the `test` xtask command through the nightly toolchain.");
         println!();
-
+        println!("  {cli_name} +clean");
+        println!("      Clean the default persistent xtask target with `cargo clean`.");
+        println!();
+        println!("  {cli_name} +n +clean");
+        println!("      Clean the nightly persistent xtask target.");
+        println!();
         cli_help_fooder();
         return Ok(ExitCode::SUCCESS);
     }
@@ -1318,6 +1511,12 @@ fn show_xtask_cli_help(
     println!("  {cli_name} +sync");
     println!("      Sync `Dependencies.toml` into every subrepo without compiling or running");
     println!("      any repository-local xtask command.");
+    println!();
+    println!("  {cli_name} +clean");
+    println!("      Clean the default persistent xtask target for every discovered subrepo.");
+    println!();
+    println!("  {cli_name} +n +clean");
+    println!("      Clean the nightly persistent xtask target for every discovered subrepo.");
     println!();
 
     println!("NOTES");

@@ -33,6 +33,40 @@ extended using handy proc macros and by following some patterns described in thi
 cargo install tracel-xtask-cli
 ```
 
+#### Persistent xtask build cache
+
+The installed CLI compiles and runs the repository-local xtask with Cargo. It always keeps that
+build in a repository- and toolchain-specific Cargo target directory under
+`~/.cache/xtask/targets/v1/<clone-parent>/<repository>/[<workspace>/]<xtask-package>/<toolchain>`,
+outside the repository's `target` directory. Cargo still rebuilds the xtask when its inputs change,
+but an ordinary project `cargo clean` does not remove the cached build.
+
+`<workspace>` is omitted for a standard repository and contains the workspace-relative subrepo
+path in a monorepo. `<toolchain>` is `default` for the normally selected Rust toolchain and
+`nightly` when xtask is invoked with `+nightly` or `+n`.
+
+```text
+# Standard repository
+~/.cache/xtask/targets/v1/<clone-parent>/<repository>/<xtask-package>/default
+
+# Monorepo subrepo
+~/.cache/xtask/targets/v1/<clone-parent>/<repository>/<workspace>/<xtask-package>/default
+```
+
+To discard a persistent build, use the wrapper's `+clean` special command:
+
+```bash
+# Clean the default-toolchain xtask cache
+xtask +clean
+
+# Clean the nightly xtask cache
+xtask +n +clean
+```
+
+Both forms execute `cargo clean --target-dir <external-target>`. In a standard repository they
+clean the root xtask cache. In a monorepo they clean the corresponding cache for every discovered
+subrepo. `+clean` does not accept additional arguments or selectors.
+
 ### Setting Up a Cargo Workspace with an xtask binary crate
 
 #### Using the CLI

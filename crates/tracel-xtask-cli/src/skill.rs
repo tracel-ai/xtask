@@ -17,6 +17,7 @@ crate as the project-specific implementation.
 
 ```text
 xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]
+xtask [+nightly|+n] +clean
 xtask +skill
 xtask +sync
 xtask +update
@@ -25,6 +26,10 @@ xtask +update
 - `xtask` with no arguments prints wrapper help.
 - `xtask --help` forwards to the underlying repository xtask help.
 - `xtask <command> --help` forwards command help to the selected xtask crate.
+- `+clean` runs `cargo clean` against the selected persistent xtask target
+  directory. In a standard repository it cleans the root xtask cache; in a
+  monorepo it cleans every discovered subrepo's cache. Use `+n +clean` to clean
+  the nightly cache variant.
 - `+skill` is handled by the wrapper and prints this agent guide.
 - `+sync` is handled by the wrapper and applies dependency synchronization to
   the root workspace in a standard repository or to every subrepo in a
@@ -62,8 +67,12 @@ Monorepo:
 
 - Sets `XTASK_CLI=1` for the repository-local xtask process.
 - Sets `XTASK_MONOREPO=1` when running inside a selected monorepo subrepo.
-- Uses a deterministic target directory under `target/` to keep wrapper builds
-  isolated from normal project builds.
+- Always keeps repository-local xtask builds in a repository- and
+  toolchain-specific Cargo target directory under
+  `~/.cache/xtask/targets/v1/<clone-parent>/<repository>/[<workspace>/]<xtask-package>/<toolchain>`.
+  Because that directory is outside the repository, an ordinary project
+  `cargo clean` does not remove the compiled xtask. Cargo still checks whether
+  its inputs changed before use.
 - If a monorepo has `Dependencies.toml` at the git root, synchronizes matching
   dependency declarations into selected subrepo `Cargo.toml` files before
   executing commands. See "Dependency synchronization" below before assuming
@@ -215,18 +224,20 @@ Important sync rules:
 
 1. Run `xtask +skill` if you need this guide.
 2. Run `xtask` to understand wrapper context and subrepo discovery.
-3. Run `xtask --help` or `xtask :<subrepo> --help` to see project commands.
-4. Prefer explicit selectors in monorepos:
+3. Run `xtask +clean` only when the persistent repository xtask build should be
+   discarded.
+4. Run `xtask --help` or `xtask :<subrepo> --help` to see project commands.
+5. Prefer explicit selectors in monorepos:
    - `xtask :api check all`
    - `xtask :frontend test all`
    - `xtask :all check all`
-5. Use `+n` for commands that require nightly:
+6. Use `+n` for commands that require nightly:
    - `xtask +n test unit --miri`
    - `xtask +n test --miri`
    - `xtask +n vulnerabilities all`
-6. Be aware that `fix`, dependency sync, generated docs, coverage, and
+7. Be aware that `fix`, dependency sync, generated docs, coverage, and
    deployment commands may modify files or external state.
-7. For CI-like validation, prefer focused commands first, then broaden:
+8. For CI-like validation, prefer focused commands first, then broaden:
    - `xtask check format`
    - `xtask check lint`
    - `xtask test unit`

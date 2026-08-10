@@ -15,6 +15,7 @@ name = "xtask"
 path = "src/main.rs"
 
 [dependencies]
+home.workspace = true
 toml_edit = "0.24.0"
 
 [dev-dependencies]
