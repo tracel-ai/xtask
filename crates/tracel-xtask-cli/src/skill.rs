@@ -134,12 +134,18 @@ discovered subrepo cache; they do not accept a `:<subrepo>` selector.
 ## Repository-local xtask model
 
 A repository-local xtask crate usually depends on `tracel-xtask` and has a
-small `main.rs`:
+small `main.rs`. In v5, base commands are selected through dependency features:
+
+```toml
+[dependencies]
+strum = { version = "0.27.1", features = ["derive"] }
+tracel-xtask = { version = "5", features = ["build", "check", "fix", "test"] }
+```
 
 ```rust
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(Build, Check, Fix, Test)]
+#[macros::base_commands]
 enum Command {}
 
 fn main() -> anyhow::Result<()> {
@@ -149,9 +155,16 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
+Default features enable no base commands. Enable only the command features the
+repository uses; the macro detects them and generates the matching variants and
+dispatcher. `all` enables all base commands, while `utils-all` and individual
+`utils-*` passthrough features are for utilities used by custom commands.
+
 Projects can add custom commands by adding variants to `Command`, defining a
 command argument struct with the macros from `tracel_xtask::prelude::macros`,
 and dispatching those variants before falling back to `dispatch_base_commands`.
+Enable the corresponding command feature when importing or extending a base
+command; optional prelude exports are feature-gated as well.
 
 ## Common base commands
 

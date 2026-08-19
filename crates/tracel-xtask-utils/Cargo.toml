@@ -12,7 +12,7 @@ rust-version = "1.85"
 version.workspace = true
 
 [features]
-default = ["all"]
+default = []
 # all modules
 all = [
   "aws",
@@ -34,15 +34,37 @@ all = [
 ]
 
 aws = [
+  "aws-asg-instance-picker",
+  "aws-cli",
+  "aws-ec2-tag-instance-picker",
+  "aws-images",
+  "aws-instance-logs",
+  "aws-instance-system-log",
+  "aws-naming",
+  "aws-regions",
+]
+aws-asg-instance-picker = [
+  "aws-cli",
+  "dep:inquire",
+  "dep:owo-colors",
+  "dep:serde",
+  "dep:time",
+]
+aws-cli = ["process", "dep:serde_json"]
+aws-ec2-tag-instance-picker = [
   "process",
-  "dep:anyhow",
   "dep:inquire",
   "dep:owo-colors",
   "dep:serde",
   "dep:serde_json",
   "dep:time",
 ]
-cargo = ["logging", "dep:anyhow", "dep:regex"]
+aws-images = ["process", "spinner", "dep:serde", "dep:serde_json"]
+aws-instance-logs = ["aws-cli", "dep:serde"]
+aws-instance-system-log = ["aws-cli", "dep:serde"]
+aws-naming = ["aws-regions", "environment"]
+aws-regions = ["dep:strum"]
+cargo = ["process"]
 clap = ["dep:clap"]
 cleanup = ["logging", "dep:ctrlc"]
 environment = [
@@ -53,30 +75,33 @@ environment = [
   "dep:strum",
 ]
 gcp = [
+  "gcp-cli",
+  "gcp-naming",
+  "gcp-regions",
+]
+gcp-cli = [
+  "clap",
   "process",
-  "dep:anyhow",
-  "dep:inquire",
-  "dep:owo-colors",
   "dep:serde",
   "dep:serde_json",
-  "dep:time",
 ]
+gcp-naming = ["environment", "gcp-regions"]
+gcp-regions = ["dep:strum"]
 git = ["dep:anyhow"]
-helpers = ["logging", "dep:anyhow", "process"]
+helpers = ["process"]
 logging = ["dep:log", "dep:env_logger"]
 process = [
   "logging",
   "dep:anyhow",
   "dep:rand",
   "dep:regex",
-  "dep:log",]
+]
 prompt = []
-rustup = ["logging", "dep:anyhow", "process"]
+rustup = ["process"]
 spinner = []
 terraform = [
   "environment",
   "process",
-  "dep:anyhow",
   "dep:home",
   "dep:serde",
   "dep:toml",

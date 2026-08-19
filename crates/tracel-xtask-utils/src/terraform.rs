@@ -104,7 +104,7 @@ pub fn read_locked_version(repo_root: &Path) -> anyhow::Result<Option<String>> {
 }
 
 /// Latest Terraform version via HashCorp checkpoint API.
-/// see https://checkpoint-api.hashicorp.com
+/// See <https://checkpoint-api.hashicorp.com>.
 pub fn fetch_latest_version(agent: &ureq::Agent) -> anyhow::Result<String> {
     let url = "https://checkpoint-api.hashicorp.com/v1/check/terraform";
     let mut res = agent

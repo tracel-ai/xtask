@@ -1,8 +1,10 @@
 pub mod commands;
 pub mod context;
 mod versions;
-// re-export for backward compabitlity
+// Re-export utility macros for backward compatibility when requested.
+#[cfg(feature = "utils-cleanup")]
 pub use crate::utils::handle_cleanup;
+#[cfg(feature = "utils-cleanup")]
 pub use crate::utils::register_cleanup;
 pub use tracel_xtask_utils as utils;
 
@@ -10,10 +12,13 @@ pub use tracel_xtask_utils as utils;
 pub mod prelude {
     pub use anyhow;
     pub use clap;
-    pub use derive_more;
-    pub use env_logger;
-    pub use rand;
+    #[cfg(any(
+        feature = "aws-container",
+        feature = "aws-secrets",
+        feature = "gcp-secrets"
+    ))]
     pub use serde_json;
+    #[cfg(any(feature = "infra", feature = "publish"))]
     pub use ureq;
 
     pub mod macros {
@@ -27,99 +32,204 @@ pub mod prelude {
     pub use crate::XtaskArgs;
     pub use crate::commands as base_commands;
     pub use crate::commands::Target;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerBuildSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerHostSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerListSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerLogsSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerPromoteSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerPullSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerPushSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerRollbackSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerRolloutSubCmdArgs;
+    #[cfg(feature = "aws-container")]
     pub use crate::commands::aws_container::AwsContainerSubCommand;
+    #[cfg(feature = "aws-secrets")]
     pub use crate::commands::aws_secrets::AwsSecretsCmdArgs;
+    #[cfg(feature = "aws-secrets")]
     pub use crate::commands::aws_secrets::AwsSecretsSubCommand;
+    #[cfg(feature = "build")]
     pub use crate::commands::build::BuildCmdArgs;
+    #[cfg(feature = "bump")]
     pub use crate::commands::bump::BumpCmdArgs;
+    #[cfg(feature = "bump")]
     pub use crate::commands::bump::BumpSubCommand;
+    #[cfg(feature = "check")]
     pub use crate::commands::check::CheckCmdArgs;
+    #[cfg(feature = "check")]
     pub use crate::commands::check::CheckSubCommand;
+    #[cfg(feature = "clean")]
     pub use crate::commands::clean::CleanCmdArgs;
+    #[cfg(feature = "compile")]
     pub use crate::commands::compile::CompileCmdArgs;
+    #[cfg(feature = "coverage")]
     pub use crate::commands::coverage::CoverageCmdArgs;
+    #[cfg(feature = "dependencies")]
     pub use crate::commands::dependencies::DependenciesCmdArgs;
+    #[cfg(feature = "dependencies")]
     pub use crate::commands::dependencies::DependenciesSubCommand;
+    #[cfg(feature = "doc")]
     pub use crate::commands::doc::DocCmdArgs;
+    #[cfg(feature = "doc")]
     pub use crate::commands::doc::DocSubCommand;
+    #[cfg(feature = "docker-compose")]
     pub use crate::commands::docker_compose::DockerComposeCmdArgs;
+    #[cfg(feature = "docker-compose")]
     pub use crate::commands::docker_compose::DockerComposeSubCommand;
+    #[cfg(feature = "fix")]
     pub use crate::commands::fix::FixCmdArgs;
+    #[cfg(feature = "fix")]
     pub use crate::commands::fix::FixSubCommand;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerBuildSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerListSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerPromoteSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerPullSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerPushSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerRollbackSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerRolloutSubCmdArgs;
+    #[cfg(feature = "gcp-container")]
     pub use crate::commands::gcp_container::GcpContainerSubCommand;
+    #[cfg(feature = "host")]
     pub use crate::commands::host::HostCmdArgs;
+    #[cfg(feature = "host")]
     pub use crate::commands::host::HostConnectSubCmdArgs;
+    #[cfg(feature = "host")]
     pub use crate::commands::host::HostPrivateIpSubCmdArgs;
+    #[cfg(feature = "host")]
     pub use crate::commands::host::HostSubCommand;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageBuildSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageCleanSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageHostSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageListSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImagePromoteSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageRollbackSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageRolloutSubCmdArgs;
+    #[cfg(feature = "image")]
     pub use crate::commands::image::ImageSubCommand;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraApplySubCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraDestroySubCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraOutputSubCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraProvidersSubCmdArgs;
+    #[cfg(feature = "infra")]
     pub use crate::commands::infra::InfraSubCommand;
+    #[cfg(feature = "publish")]
     pub use crate::commands::publish::PublishCmdArgs;
+    #[cfg(feature = "test")]
     pub use crate::commands::test::MiriMode;
+    #[cfg(feature = "test")]
     pub use crate::commands::test::TestCmdArgs;
+    #[cfg(feature = "test")]
     pub use crate::commands::test::TestSubCommand;
+    #[cfg(feature = "validate")]
     pub use crate::commands::validate::ValidateCmdArgs;
+    #[cfg(feature = "vulnerabilities")]
     pub use crate::commands::vulnerabilities::VulnerabilitiesCmdArgs;
+    #[cfg(feature = "vulnerabilities")]
     pub use crate::commands::vulnerabilities::VulnerabilitiesSubCommand;
     pub use crate::context::Context;
+    #[cfg(feature = "utils-cleanup")]
     pub use crate::handle_cleanup;
     pub use crate::init_xtask;
     pub use crate::parse_args;
+    #[cfg(feature = "utils-cleanup")]
     pub use crate::register_cleanup;
     pub use crate::utils as base_utils;
+    #[cfg(any(
+        feature = "aws-container",
+        feature = "aws-secrets",
+        feature = "host",
+        feature = "image",
+        feature = "utils-aws",
+        feature = "utils-aws-asg-instance-picker",
+        feature = "utils-aws-cli",
+        feature = "utils-aws-ec2-tag-instance-picker",
+        feature = "utils-aws-images",
+        feature = "utils-aws-instance-logs",
+        feature = "utils-aws-instance-system-log",
+        feature = "utils-aws-naming",
+        feature = "utils-aws-regions"
+    ))]
     pub use crate::utils::aws;
+    #[cfg(feature = "utils-helpers")]
     pub use crate::utils::build_helpers;
+    #[cfg(feature = "utils-cargo")]
     pub use crate::utils::cargo::ensure_cargo_crate_is_installed;
+    #[cfg(feature = "utils-cleanup")]
     pub use crate::utils::cleanup::CLEANUP_HANDLER;
     pub use crate::utils::endgroup;
     pub use crate::utils::environment::Environment;
     pub use crate::utils::environment::EnvironmentIndex;
     pub use crate::utils::environment::EnvironmentName;
     pub use crate::utils::environment::ExplicitIndex;
+    #[cfg(any(
+        feature = "gcp-container",
+        feature = "gcp-secrets",
+        feature = "utils-gcp",
+        feature = "utils-gcp-cli",
+        feature = "utils-gcp-naming",
+        feature = "utils-gcp-regions"
+    ))]
+    pub use crate::utils::gcp;
     pub use crate::utils::git;
     pub use crate::utils::group;
     pub use crate::utils::group_info;
+    #[cfg(feature = "utils-process")]
     pub use crate::utils::process;
+    #[cfg(feature = "utils-process")]
     pub use crate::utils::process::random_port;
+    #[cfg(feature = "utils-process")]
     pub use crate::utils::process::run_process;
+    #[cfg(feature = "utils-process")]
     pub use crate::utils::process::run_process_for_package;
+    #[cfg(feature = "utils-process")]
     pub use crate::utils::process::run_process_for_workspace;
+    #[cfg(feature = "utils-prompt")]
     pub use crate::utils::prompt::ask_once;
+    #[cfg(feature = "utils-rustup")]
     pub use crate::utils::rustup::is_current_toolchain_nightly;
+    #[cfg(feature = "utils-rustup")]
     pub use crate::utils::rustup::rustup_add_component;
+    #[cfg(feature = "utils-rustup")]
     pub use crate::utils::rustup::rustup_add_target;
+    #[cfg(feature = "utils-rustup")]
     pub use crate::utils::rustup::rustup_get_installed_targets;
+    #[cfg(feature = "utils-terraform")]
     pub use crate::utils::terraform;
+    #[cfg(feature = "utils-time")]
     pub use crate::utils::time::format_duration;
     // does not re-export strum has it is incompatible with strum macros expansions
 }
@@ -131,7 +241,6 @@ use crate::utils::{
     environment::{Environment, EnvironmentName},
     group_info,
     logging::init_logger,
-    rustup::is_current_toolchain_nightly,
 };
 use clap::{CommandFactory as _, FromArgMatches as _};
 
@@ -207,6 +316,23 @@ fn add_command_prefix() -> &'static str {
     } else {
         "⚡️"
     }
+}
+
+fn is_current_toolchain_nightly() -> bool {
+    if let Ok(toolchain) = std::env::var("RUSTUP_TOOLCHAIN") {
+        let toolchain = toolchain.trim();
+        if toolchain == "nightly" || toolchain.starts_with("nightly-") {
+            return true;
+        }
+    }
+
+    std::process::Command::new("rustup")
+        .args(["show", "active-toolchain"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        .is_some_and(|toolchain| toolchain == "nightly" || toolchain.starts_with("nightly-"))
 }
 
 fn add_help_prefix(cmd: &mut clap::Command) {

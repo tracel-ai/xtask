@@ -1,27 +1,6 @@
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    AwsContainer,
-    AwsSecrets,
-    Build,
-    Bump,
-    Check,
-    Clean,
-    Compile,
-    Coverage,
-    Dependencies,
-    Doc,
-    DockerCompose,
-    Fix,
-    GcpContainer,
-    GcpSecrets,
-    Host,
-    Infra,
-    Publish,
-    Test,
-    Validate,
-    Vulnerabilities
-)]
+#[macros::base_commands]
 enum Command {}
 
 fn main() -> anyhow::Result<()> {

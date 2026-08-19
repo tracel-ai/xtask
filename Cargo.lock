@@ -100,6 +100,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "benchmark-consumer"
+version = "0.0.0"
+dependencies = [
+ "strum",
+ "tracel-xtask",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -395,7 +403,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn",
- "unicode-xid",
 ]
 
 [[package]]
@@ -698,12 +705,6 @@ name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
-
-[[package]]
-name = "humantime"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "icu_collections"
@@ -1734,20 +1735,11 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tracel-xtask"
-version = "4.19.7"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "clap",
- "ctrlc",
- "derive_more",
- "dotenvy",
- "env_logger",
- "home",
- "humantime",
- "inquire",
  "log",
- "owo-colors",
- "rand",
  "regex",
  "rstest",
  "serde",
@@ -1755,12 +1747,9 @@ dependencies = [
  "serial_test",
  "strum",
  "tempfile",
- "time",
- "toml",
  "tracel-xtask-macros",
  "tracel-xtask-utils",
  "ureq",
- "zip",
 ]
 
 [[package]]
@@ -1774,9 +1763,8 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-macros"
-version = "4.19.7"
+version = "5.0.0"
 dependencies = [
- "heck",
  "proc-macro2",
  "quote",
  "syn",
@@ -1784,7 +1772,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-utils"
-version = "4.19.7"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2217,8 +2205,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "xtask-feature-tests"
+version = "5.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "strum",
+ "tracel-xtask",
+]
+
+[[package]]
 name = "xtask-tests"
-version = "4.19.7"
+version = "5.0.0"
 dependencies = [
  "dotenvy",
  "log",

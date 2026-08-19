@@ -1,7 +1,6 @@
 extern crate proc_macro;
-use heck::ToSnakeCase;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use std::collections::HashMap;
 use syn::{
     ItemEnum, ItemStruct, Meta, Path, Variant, parse_macro_input, punctuated::Punctuated,
@@ -159,214 +158,265 @@ fn strip_alias_attributes(variants: &Punctuated<Variant, Comma>) -> Punctuated<V
 // Commands
 // ========
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CommandHandler {
+    Standard,
+    Fix,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CommandMetadata {
+    feature: &'static str,
+    enabled: bool,
+    variant: &'static str,
+    module: &'static str,
+    args_type: &'static str,
+    doc: &'static str,
+    alias: Option<&'static str>,
+    handler: CommandHandler,
+}
+
+macro_rules! command {
+    ($feature:literal, $variant:literal, $module:literal, $args_type:literal, $doc:literal) => {
+        command!(
+            $feature,
+            $variant,
+            $module,
+            $args_type,
+            $doc,
+            None,
+            CommandHandler::Standard
+        )
+    };
+    (
+        $feature:literal,
+        $variant:literal,
+        $module:literal,
+        $args_type:literal,
+        $doc:literal,
+        $alias:expr,
+        $handler:expr
+    ) => {
+        CommandMetadata {
+            feature: $feature,
+            enabled: cfg!(feature = $feature),
+            variant: $variant,
+            module: $module,
+            args_type: $args_type,
+            doc: $doc,
+            alias: $alias,
+            handler: $handler,
+        }
+    };
+}
+
+// Keep this table in canonical alphabetical command order. Both the generated enum variants and
+// their dispatch arms are derived from it so that the two expansions cannot diverge.
+const COMMANDS: &[CommandMetadata] = &[
+    command!(
+        "aws-container",
+        "AwsContainer",
+        "aws_container",
+        "AwsContainerCmdArgs",
+        "Manage AWS containers lifecycle, from build to deployment.",
+        Some("container"),
+        CommandHandler::Standard
+    ),
+    command!(
+        "aws-secrets",
+        "AwsSecrets",
+        "aws_secrets",
+        "AwsSecretsCmdArgs",
+        "Manage secrets through AWS secrets manager.",
+        Some("secrets"),
+        CommandHandler::Standard
+    ),
+    command!("build", "Build", "build", "BuildCmdArgs", "Build the code."),
+    command!(
+        "bump",
+        "Bump",
+        "bump",
+        "BumpCmdArgs",
+        "Bump the version of all crates to be published."
+    ),
+    command!(
+        "check",
+        "Check",
+        "check",
+        "CheckCmdArgs",
+        "Run checks without fixing the issues (use the 'fix' command to auto-fix issues)."
+    ),
+    command!(
+        "clean",
+        "Clean",
+        "clean",
+        "CleanCmdArgs",
+        "Clean target directory."
+    ),
+    command!(
+        "compile",
+        "Compile",
+        "compile",
+        "CompileCmdArgs",
+        "Compile check the code (does not write binaries to disk)."
+    ),
+    command!(
+        "coverage",
+        "Coverage",
+        "coverage",
+        "CoverageCmdArgs",
+        "Install and run coverage tools."
+    ),
+    command!(
+        "dependencies",
+        "Dependencies",
+        "dependencies",
+        "DependenciesCmdArgs",
+        "Run the specified dependencies check locally."
+    ),
+    command!("doc", "Doc", "doc", "DocCmdArgs", "Build documentation."),
+    command!(
+        "docker-compose",
+        "DockerCompose",
+        "docker_compose",
+        "DockerComposeCmdArgs",
+        "Manage docker compose stacks."
+    ),
+    command!(
+        "fix",
+        "Fix",
+        "fix",
+        "FixCmdArgs",
+        "Fix issues found with the 'check' command.",
+        None,
+        CommandHandler::Fix
+    ),
+    command!(
+        "gcp-container",
+        "GcpContainer",
+        "gcp_container",
+        "GcpContainerCmdArgs",
+        "Manage GCP containers lifecycle, from build to deployment."
+    ),
+    command!(
+        "gcp-secrets",
+        "GcpSecrets",
+        "gcp_secrets",
+        "GcpSecretsCmdArgs",
+        "Manage secrets through GCP secrets manager."
+    ),
+    command!(
+        "host",
+        "Host",
+        "host",
+        "HostCmdArgs",
+        "Commands related to an host like connecting, getting info, etc..."
+    ),
+    command!(
+        "image",
+        "Image",
+        "image",
+        "ImageCmdArgs",
+        "Manage virtual machine images lifecycle, from build to deployment."
+    ),
+    command!(
+        "infra",
+        "Infra",
+        "infra",
+        "InfraCmdArgs",
+        "Infrastructure management with terraform."
+    ),
+    command!(
+        "publish",
+        "Publish",
+        "publish",
+        "PublishCmdArgs",
+        "Publish a crate to crates.io."
+    ),
+    command!("test", "Test", "test", "TestCmdArgs", "Runs tests."),
+    command!(
+        "validate",
+        "Validate",
+        "validate",
+        "ValidateCmdArgs",
+        "Validate the code base by running all the relevant checks and tests."
+    ),
+    command!(
+        "vulnerabilities",
+        "Vulnerabilities",
+        "vulnerabilities",
+        "VulnerabilitiesCmdArgs",
+        "Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'."
+    ),
+];
+
+fn generate_command_variant(command: &CommandMetadata) -> proc_macro2::TokenStream {
+    let variant = format_ident!("{}", command.variant);
+    let module = format_ident!("{}", command.module);
+    let args_type = format_ident!("{}", command.args_type);
+    let doc = command.doc;
+    let alias = command.alias.map(|alias| {
+        quote! {
+            #[command(alias = #alias)]
+        }
+    });
+
+    quote! {
+        #alias
+        #[doc = #doc]
+        #variant(tracel_xtask::commands::#module::#args_type)
+    }
+}
+
 fn generate_dispatch_function(
     enum_ident: &syn::Ident,
-    args: &Punctuated<Meta, Comma>,
-) -> TokenStream {
-    let arms: Vec<proc_macro2::TokenStream> = args.iter().map(|meta| {
-        let cmd_ident = meta.path().get_ident().unwrap();
-        let cmd_ident_string = cmd_ident.to_string();
-        let module_ident = syn::Ident::new(cmd_ident_string.to_snake_case().as_str(), cmd_ident.span());
-        match cmd_ident_string.as_str() {
-            "Fix" => quote! {
-                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, env, args.context, None),
+    commands: &[&CommandMetadata],
+) -> proc_macro2::TokenStream {
+    let arms = commands.iter().map(|command| {
+        let variant = format_ident!("{}", command.variant);
+        let module = format_ident!("{}", command.module);
+        match command.handler {
+            CommandHandler::Fix => quote! {
+                #enum_ident::#variant(cmd_args) => base_commands::#module::handle_command(cmd_args, env, args.context, None),
             },
-            _ => quote! {
-                #enum_ident::#cmd_ident(cmd_args) => base_commands::#module_ident::handle_command(cmd_args, env, args.context),
-            }
+            CommandHandler::Standard => quote! {
+                #enum_ident::#variant(cmd_args) => base_commands::#module::handle_command(cmd_args, env, args.context),
+            },
         }
-    }).collect();
-    let func = quote! {
-        fn dispatch_base_commands(args: XtaskArgs<Command>, env: Environment) -> anyhow::Result<()> {
+    });
+    quote! {
+        fn dispatch_base_commands(args: XtaskArgs<#enum_ident>, env: Environment) -> anyhow::Result<()> {
             match args.command {
                 #(#arms)*
                 _ => Err(anyhow::anyhow!("Unknown command")),
             }
         }
-    };
-    TokenStream::from(func)
+    }
 }
 
 #[proc_macro_attribute]
 pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
-    let item = parse_macro_input!(input as ItemEnum);
-    let args = parse_macro_input!(args with Punctuated::<Meta, Comma>::parse_terminated);
-
-    // Supported commands and their quoted expansions
-    let mut variant_map: HashMap<&str, proc_macro2::TokenStream> = HashMap::new();
-    variant_map.insert(
-        "AwsContainer",
-        quote! {
-            #[command(alias = "container")]
-            #[doc = r"Manage AWS containers lifecycle, from build to deployment."]
-            AwsContainer(tracel_xtask::commands::aws_container::AwsContainerCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "AwsSecrets",
-        quote! {
-            #[command(alias = "secrets")]
-            #[doc = r"Manage secrets through AWS secrets manager."]
-            AwsSecrets(tracel_xtask::commands::aws_secrets::AwsSecretsCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Build",
-        quote! {
-            #[doc = r"Build the code."]
-            Build(tracel_xtask::commands::build::BuildCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Bump",
-        quote! {
-            #[doc = r"Bump the version of all crates to be published."]
-            Bump(tracel_xtask::commands::bump::BumpCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Check",
-        quote! {
-            #[doc = r"Run checks without fixing the issues (use the 'fix' command to auto-fix issues)."]
-            Check(tracel_xtask::commands::check::CheckCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Clean",
-        quote! {
-            #[doc = r"Clean target directory."]
-            Clean(tracel_xtask::commands::clean::CleanCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Compile",
-        quote! {
-            #[doc = r"Compile check the code (does not write binaries to disk)."]
-            Compile(tracel_xtask::commands::compile::CompileCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Coverage",
-        quote! {
-            #[doc = r"Install and run coverage tools."]
-            Coverage(tracel_xtask::commands::coverage::CoverageCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Dependencies",
-        quote! {
-            #[doc = r"Run the specified dependencies check locally."]
-            Dependencies(tracel_xtask::commands::dependencies::DependenciesCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Doc",
-        quote! {
-            #[doc = r"Build documentation."]
-            Doc(tracel_xtask::commands::doc::DocCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "DockerCompose",
-        quote! {
-            #[doc = r"Manage docker compose stacks."]
-            DockerCompose(tracel_xtask::commands::docker_compose::DockerComposeCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Fix",
-        quote! {
-            #[doc = r"Fix issues found with the 'check' command."]
-            Fix(tracel_xtask::commands::fix::FixCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "GcpContainer",
-        quote! {
-            #[doc = r"Manage GCP containers lifecycle, from build to deployment."]
-            GcpContainer(tracel_xtask::commands::gcp_container::GcpContainerCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "GcpSecrets",
-        quote! {
-            #[doc = r"Manage secrets through GCP secrets manager."]
-            GcpSecrets(tracel_xtask::commands::gcp_secrets::GcpSecretsCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Host",
-        quote! {
-            #[doc = r"Commands related to an host like connecting, getting info, etc..."]
-            Host(tracel_xtask::commands::host::HostCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Image",
-        quote! {
-            #[doc = r"Manage virtual machine images lifecycle, from build to deployment."]
-            Image(tracel_xtask::commands::image::ImageCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Infra",
-        quote! {
-            #[doc = r"Infrastructure management with terraform."]
-            Infra(tracel_xtask::commands::infra::InfraCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Publish",
-        quote! {
-            #[doc = r"Publish a crate to crates.io."]
-            Publish(tracel_xtask::commands::publish::PublishCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Test",
-        quote! {
-            #[doc = r"Runs tests."]
-            Test(tracel_xtask::commands::test::TestCmdArgs)
-        },
-    );
-    variant_map.insert(
-        "Validate",
-        quote! {
-            #[doc = r"Validate the code base by running all the relevant checks and tests."]
-            Validate(tracel_xtask::commands::validate::ValidateCmdArgs)
-        },
-    );
-    variant_map.insert("Vulnerabilities", quote! {
-        #[doc = r"Run the specified vulnerability check locally. These commands must be called with 'cargo +nightly'."]
-        Vulnerabilities(tracel_xtask::commands::vulnerabilities::VulnerabilitiesCmdArgs)
-    });
-
-    // Generate the corresponding enum variant
-    let mut variants = vec![];
-    for arg in &args {
-        if let Meta::Path(path) = arg {
-            if let Some(ident) = path.get_ident() {
-                let ident_string = ident.to_string();
-                if let Some(variant) = variant_map.get(ident_string.as_str()) {
-                    variants.push(variant.clone());
-                } else {
-                    let err_msg = format!(
-                        "Unknown command: {}\nPossible commands are:\n  {}",
-                        ident_string,
-                        variant_map
-                            .keys()
-                            .cloned()
-                            .collect::<Vec<&str>>()
-                            .join("\n  "),
-                    );
-                    return TokenStream::from(quote! {
-                        compile_error!(#err_msg);
-                    });
-                }
-            }
-        }
+    if !args.is_empty() {
+        return TokenStream::from(quote! {
+            compile_error!("`#[base_commands]` no longer accepts command arguments in v5; enable base commands with `tracel-xtask` Cargo features instead (for example, `features = [\"build\", \"check\"]`).");
+        });
     }
+
+    let item = parse_macro_input!(input as ItemEnum);
+    let enabled_commands = COMMANDS
+        .iter()
+        .filter(|command| command.enabled)
+        .collect::<Vec<_>>();
+
+    if enabled_commands.is_empty() && item.variants.is_empty() {
+        return TokenStream::from(quote! {
+            compile_error!("`#[base_commands]` cannot generate an empty command enum; enable at least one `tracel-xtask` command feature or declare a custom command variant.");
+        });
+    }
+
+    let variants = enabled_commands
+        .iter()
+        .map(|command| generate_command_variant(command));
 
     // Generate the xtask commands enum
     let enum_name = &item.ident;
@@ -378,7 +428,10 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
             #other_variants
         }
     });
-    output.extend(generate_dispatch_function(enum_name, &args));
+    output.extend(TokenStream::from(generate_dispatch_function(
+        enum_name,
+        &enabled_commands,
+    )));
     output
 }
 
@@ -1354,5 +1407,51 @@ fn parse_named_fields(tokens: proc_macro2::TokenStream) -> Result<Vec<syn::Field
     match dummy.fields {
         syn::Fields::Named(fields) => Ok(fields.named.into_iter().collect()),
         _ => unreachable!("dummy struct should always have named fields"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_metadata_is_complete_and_alphabetical() {
+        assert_eq!(COMMANDS.len(), 21);
+
+        let features = COMMANDS
+            .iter()
+            .map(|command| command.feature)
+            .collect::<Vec<_>>();
+        let mut sorted_features = features.clone();
+        sorted_features.sort_unstable();
+        sorted_features.dedup();
+
+        assert_eq!(features, sorted_features);
+    }
+
+    #[test]
+    fn dispatch_uses_the_input_enum_and_fix_signature() {
+        let enum_ident = format_ident!("ProjectCommand");
+        let fix = COMMANDS
+            .iter()
+            .find(|command| command.feature == "fix")
+            .unwrap();
+        let output = generate_dispatch_function(&enum_ident, &[fix]).to_string();
+
+        assert!(output.contains("XtaskArgs < ProjectCommand >"));
+        assert!(output.contains("ProjectCommand :: Fix"));
+        assert!(output.contains("args . context , None"));
+    }
+
+    #[test]
+    fn command_variants_retain_aliases_and_argument_types() {
+        let aws_container = COMMANDS
+            .iter()
+            .find(|command| command.feature == "aws-container")
+            .unwrap();
+        let output = generate_command_variant(aws_container).to_string();
+
+        assert!(output.contains("alias = \"container\""));
+        assert!(output.contains("aws_container :: AwsContainerCmdArgs"));
     }
 }

@@ -15,6 +15,65 @@
 <br/>
 </div>
 
+## Table of Contents
+
+- [Getting Started](#getting-started)
+  - [Install xtask CLI](#install-xtask-cli)
+    - [Persistent xtask build cache](#persistent-xtask-build-cache)
+  - [Setting Up a Cargo Workspace with an xtask binary crate](#setting-up-a-cargo-workspace-with-an-xtask-binary-crate)
+    - [Using the CLI](#using-the-cli)
+    - [Manually](#manually)
+  - [Bootstrap main.rs](#bootstrap-mainrs)
+  - [Feature selection](#feature-selection)
+  - [Migrating from v4 to v5](#migrating-from-v4-to-v5)
+- [Conventions](#conventions)
+  - [Repository structure](#repository-structure)
+  - [About tests](#about-tests)
+- [Interface generalities](#interface-generalities)
+  - [Target](#target)
+  - [Global options](#global-options)
+    - [Environment](#environment)
+    - [Environment Index](#environment-index)
+    - [Context](#context)
+    - [Coverage](#coverage)
+- [Standard repository vs. Monorepo](#standard-repository-vs-monorepo)
+- [Anatomy of a base command](#anatomy-of-a-base-command)
+- [Customization](#customization)
+  - [Create a new command](#create-a-new-command)
+  - [Extend the default Target enum](#extend-the-default-target-enum)
+  - [Target aliases](#target-aliases)
+  - [Extend a base command](#extend-a-base-command)
+    - [Extend the arguments of a base command](#extend-the-arguments-of-a-base-command)
+    - [Extend the subcommands of a base command](#extend-the-subcommands-of-a-base-command)
+- [Custom builds and tests](#custom-builds-and-tests)
+- [Enable and generate coverage information](#enable-and-generate-coverage-information)
+- [Special command `validate`](#special-command-validate)
+- [Base commands list](#base-commands-list)
+  - [Check and Fix](#check-and-fix)
+  - [Running Tests](#running-tests)
+  - [Documentation](#documentation)
+  - [Bumping Versions](#bumping-versions)
+  - [Publishing Crates](#publishing-crates)
+  - [Coverage](#coverage-1)
+  - [Containers](#containers)
+    - [Prerequisites](#prerequisites)
+    - [Shared Subcommands](#shared-subcommands)
+    - [Examples](#examples)
+  - [Images](#images)
+    - [Conceptual Model](#conceptual-model)
+      - [Deploy](#deploy)
+      - [Rollback](#rollback)
+    - [Prerequisites](#prerequisites-1)
+    - [Examples](#examples-1)
+  - [Secrets](#secrets)
+    - [Examples](#examples-2)
+  - [Docker Compose](#docker-compose)
+  - [Dependencies](#dependencies)
+  - [Vulnerabilities](#vulnerabilities)
+- [Utilities](#utilities)
+  - [Easy CTRL+c management](#easy-ctrlc-management)
+- [Benchmark](#benchmark)
+
 A collection of easy-to-use and extensible commands to be used in your [xtask CLI][1] based on [clap][2].
 
 We rely on these commands in each of our Tracel repositories. By centralizing our redundant commands we save a big amount
@@ -107,7 +166,8 @@ In the `xtask/Cargo.toml` file, add the following under `[dependencies]`:
 
 ```toml
 [dependencies]
-tracel-xtask = "3.0"
+strum = { version = "0.27.1", features = ["derive"] }
+tracel-xtask = { version = "5", features = ["build", "check", "fix", "test"] }
 ```
 
 5. **Build the workspace:**
@@ -116,22 +176,18 @@ tracel-xtask = "3.0"
 cargo build
 ```
 
-Your workspace is now set up with a `xtask` binary crate that depends on `tracel-xtask` version 3.0.x.
+Your workspace is now set up with a minimal `xtask` binary crate that depends on `tracel-xtask` version 5.x.
+Only the four selected base commands and the dependencies they need are compiled.
 
 ### Bootstrap main.rs
 
 1. In the `main.rs` file of the newly created `xtask` crate, import the `tracel_xtask` prelude module and then declare
-   a `Command` enum. Select the base commands you want to use by adding the `macros::base_commands` attribute:
+   a `Command` enum. The `macros::base_commands` attribute detects the base-command features enabled in `Cargo.toml`:
 
 ```rust
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Build,
-    Check,
-    Fix,
-    Test,
-)]
+#[macros::base_commands]
 pub enum Command {}
 ```
 
@@ -154,6 +210,75 @@ fn main() -> anyhow::Result<()> {
 ```sh
 xtask --help
 ```
+
+### Feature selection
+
+Version 5 selects base commands through Cargo features instead of arguments to `#[macros::base_commands]`.
+Default features enable no base commands, so choose only the commands the repository uses:
+
+| Feature           | Generated CLI command |
+|-------------------|-----------------------|
+| `aws-container`   | `aws-container`       |
+| `aws-secrets`     | `aws-secrets`         |
+| `build`           | `build`               |
+| `bump`            | `bump`                |
+| `check`           | `check`               |
+| `clean`           | `clean`               |
+| `compile`         | `compile`             |
+| `coverage`        | `coverage`            |
+| `dependencies`    | `dependencies`        |
+| `doc`             | `doc`                 |
+| `docker-compose`  | `docker-compose`      |
+| `fix`             | `fix`                 |
+| `gcp-container`   | `gcp-container`       |
+| `gcp-secrets`     | `gcp-secrets`         |
+| `host`            | `host`                |
+| `image`           | `image`               |
+| `infra`           | `infra`               |
+| `publish`         | `publish`             |
+| `test`            | `test`                |
+| `validate`        | `validate`            |
+| `vulnerabilities` | `vulnerabilities`     |
+
+The `all` feature enables all available base commands. It does not enable every utility. The separate `utils-all`
+feature exposes all modules from `tracel-xtask-utils` for custom commands. Individual utilities can be selected
+with `utils-<feature>` passthroughs, such as `utils-cleanup`, `utils-helpers`, or `utils-terraform`; the available
+utility features are `aws`, `cargo`, `cleanup`, `clap`, `environment`, `gcp`, `git`, `helpers`, `logging`,
+`process`, `prompt`, `rustup`, `spinner`, `terraform`, `time`, and `workspace`. Cloud utilities also have granular
+passthroughs: `utils-aws-cli`, `utils-aws-asg-instance-picker`, `utils-aws-ec2-tag-instance-picker`, `utils-aws-images`,
+`utils-aws-instance-logs`, `utils-aws-instance-system-log`, `utils-aws-naming`, `utils-aws-regions`,
+`utils-gcp-cli`, `utils-gcp-naming`, and `utils-gcp-regions`. The `utils-aws` and `utils-gcp` features remain
+convenient umbrellas for their provider-specific utilities.
+
+Command modules, argument types, and optional prelude exports are also feature-gated. Enable a command's feature
+when extending that base command or importing it directly. For example, extending `BuildCmdArgs` requires `build`.
+Custom-only command enums are supported without enabling any base command, and custom commands can opt into just the
+utilities they need through the `utils-*` features.
+
+### Migrating from v4 to v5
+
+Move the command list from the macro into the dependency's features and remove all arguments from the macro:
+
+```toml
+# Before (v4)
+tracel-xtask = "4"
+
+# After (v5)
+tracel-xtask = { version = "5", features = ["build", "check", "fix", "test"] }
+```
+
+```rust
+// Before (v4)
+#[macros::base_commands(Build, Check, Fix, Test)]
+enum Command {}
+
+// After (v5)
+#[macros::base_commands]
+enum Command {}
+```
+
+Passing commands to `#[macros::base_commands(...)]` is no longer supported. A featureless empty enum also has no
+command to parse; either add a custom variant or enable at least one command feature.
 
 ## Conventions
 
@@ -414,19 +539,15 @@ pub fn handle_command(_args: MyCommandCmdArgs, _env: Environment, _ctx: Context)
 pub(crate) mod my_command;
 ```
 
-4. We can now add a new variant to the `Command` enum in `main.rs`:
+4. We can now add a new variant to the `Command` enum in `main.rs`. In this example the dependency enables the
+   `bump`, `check`, `fix`, and `test` features; change that feature list in `Cargo.toml` to select different base commands:
 
 ```rust
 mod commands;
 
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Bump,
-    Check,
-    Fix,
-    Test,
-)]
+#[macros::base_commands]
 pub enum Command {
     MyCommand(commands::my_command::MyCommandCmdArgs),
 }
@@ -457,11 +578,12 @@ Let's implement a new command called `extended-target` to illustrate how to exte
 
 1. Create a `commands/extended_target.rs` file and update the `mod.rs` file as we saw in the previous section.
 
-2. We also need to add a new `strum` dependency to our `Cargo.toml` file:
+2. The macros use `strum` derives. Ensure the direct `strum` dependency from the bootstrap setup is present in
+   `Cargo.toml`:
 
 ```toml
 [dependencies]
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.27.1", features = ["derive"] }
 ```
 
 3. Then we can extend the `Target` enum with the `macros::extend_targets` attribute in our `extended_target.rs` file.
@@ -504,19 +626,14 @@ pub fn handle_command(args: ExtendedTargetCmdArgs, _env: Environment, _ctx: Cont
 ```
 
 6. Register our new command the usual way by adding it to our `Command` enum and dispatch it
-   in the `main` function:
+   in the `main` function. This example assumes the dependency enables `bump`, `check`, `fix`, and `test`:
 
 ```rust
 mod commands;
 
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Bump,
-    Check,
-    Fix,
-    Test,
-)]
+#[macros::base_commands]
 pub enum Command {
     ExtendedTarget(commands::extended_target::ExtendedTargetCmdArgs),
 }
@@ -576,7 +693,8 @@ We create a new command called `extended-build-args` which will have an addition
 
 1. Create the `commands/extended_build_args.rs` file and update the `mod.rs` file as we saw in the previous section.
 
-2. Extend the `BuildCmdArgs` struct using the attribute `macros::extend_command_args` and define the `handle_command` function.
+2. Enable the `build` feature on `tracel-xtask`, then extend the `BuildCmdArgs` struct using the attribute
+   `macros::extend_command_args` and define the `handle_command` function.
    Note that the macro automatically implements the `TryInto` trait which makes it easy to dispatch back to the base command
    own `handle_command` function. Also note that if the base command requires a target then you need to provide a target as well
    in your extension, i.e. the target parameter of the macro cannot be `None` if the base command has a `Target`.
@@ -600,19 +718,14 @@ pub fn handle_command(args: ExtendedBuildArgsCmdArgs, env: Environment, ctx: Con
 ```
 
 3. Register the new command the usual way by adding it to the `Command` enum and dispatch it
-   in the `main` function:
+   in the `main` function. Any other enabled base-command features are detected automatically:
 
 ```rust
 mod commands;
 
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Bump,
-    Check,
-    Fix,
-    Test,
-)]
+#[macros::base_commands]
 pub enum Command {
     ExtendedBuildArgs(commands::extended_build_args::ExtendedBuildArgsCmdArgs),
 }
@@ -639,7 +752,8 @@ For this one we create a new command called `extended-check-subcommands` which w
 
 1. Create a `commands/extended_check_subcommands.rs` file and update the `mod.rs` file as we saw in the previous section.
 
-2. Extend the `CheckCmdArgs` struct using the attribute `macros::extend_command_args`:
+2. Enable the `check` feature on `tracel-xtask`, then extend the `CheckCmdArgs` struct using the attribute
+   `macros::extend_command_args`:
 
 ```rust
 use tracel_xtask::prelude::*;
@@ -677,6 +791,10 @@ pub fn handle_command(args: ExtendedCheckedArgsCmdArgs, env: Environment, ctx: C
                             target: args.target.clone(),
                             exclude: args.exclude.clone(),
                             only: args.only.clone(),
+                            ignore_audit: args.ignore_audit,
+                            ignore_typos: args.ignore_typos,
+                            features: args.features.clone(),
+                            no_default_features: args.no_default_features,
                         },
                         env.clone(),
                         ctx.clone(),
@@ -694,19 +812,14 @@ fn run_my_subcommand(_args: ExtendedCheckedArgsCmdArgs) -> Result<(), anyhow::Er
 ```
 
 5. Register the new command the usual way by adding it to the `Command` enum and dispatch it
-   in the `main` function:
+   in the `main` function. Any other enabled base-command features are detected automatically:
 
 ```rust
 mod commands;
 
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Bump,
-    Check,
-    Fix,
-    Test,
-)]
+#[macros::base_commands]
 pub enum Command {
     ExtendedCheckSubcommand(commands::extended_check_subcommands::ExtendedCheckedArgsCmdArgs),
 }
@@ -730,6 +843,7 @@ xtask extended-check-subcommands my-check
 ## Custom builds and tests
 
 `tracel-xtask` provides helper functions to easily execute custom builds or tests with specific features or build targets.
+Enable `build` for the base command and `utils-helpers` when calling the helper functions directly as below.
 Do not confuse Rust build targets, which are an argument of the `cargo build` command, with the xtask target introduced previously.
 
 For instance we can extend the `build` command to build additional crates with custom features or build targets using the helper function:
@@ -740,9 +854,9 @@ pub fn handle_command(args: tracel_xtask::commands::build::BuildCmdArgs, env: En
     tracel_xtask::commands::build::handle_command(args, env, ctx)?;
 
     // additional crate builds
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"], None, None, "all features")?;
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"], None, None, "myfeature1,myfeature2")?;
-    tracel_xtask::utils::helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"], None, None, "thumbv7m-none-eabi target")?;
+    tracel_xtask::utils::build_helpers::custom_crates_build(vec!["my-crate"], vec!["--all-features"], None, None, "all features")?;
+    tracel_xtask::utils::build_helpers::custom_crates_build(vec!["my-crate"], vec!["--features", "myfeature1,myfeature2"], None, None, "myfeature1,myfeature2")?;
+    tracel_xtask::utils::build_helpers::custom_crates_build(vec!["my-crate"], vec!["--target", "thumbv7m-none-eabi"], None, None, "thumbv7m-none-eabi target")?;
 
     Ok(())
 }
@@ -796,7 +910,8 @@ jobs:
 By convention this command is responsible to run all the checks, builds, and/or tests that validate the code
 before opening a pull request or merge request.
 
-The command `Validate` can been added via the macro `tracel_xtask_macros::commands` like the other commands.
+Enable the `validate` Cargo feature to add this command. It internally compiles the check and test implementations,
+but it does not expose the standalone `check` and `test` commands unless their features are also enabled.
 
 By default all the checks from the `check` command are run as well as both unit and integration tests from
 the `test` command.
@@ -804,7 +919,9 @@ the `test` command.
 You can make your own `handle_command` function if you need to perform more validations. Ideally this function
 should only call the other commands `handle_command` functions.
 
-For quick reference here is a simple example to perform all checks and tests against the workspace:
+For quick reference here is a simple example to perform all checks and tests against the workspace. Because this
+custom implementation imports the public check and test argument types directly, enable `validate`, `check`, and
+`test` for this example:
 
 ```rust
 pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> anyhow::Result<()> {
@@ -827,6 +944,9 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
                 only: only.clone(),
                 command: Some(c.clone()),
                 ignore_audit: args.ignore_audit,
+                ignore_typos: args.ignore_typos,
+                features: args.features.clone(),
+                no_default_features: args.no_default_features,
             },
             env.clone(),
             ctx.clone(),
@@ -839,8 +959,15 @@ pub fn handle_command(args: ValidateCmdArgs, env: Environment, ctx: Context) -> 
             exclude: exclude.clone(),
             only: only.clone(),
             threads: None,
+            test: None,
             jobs: None,
             command: Some(TestSubCommand::All),
+            force: false,
+            features: Some(args.features.clone()),
+            no_default_features: args.no_default_features,
+            no_capture: false,
+            miri: None,
+            release: args.release,
         },
         env,
         ctx,
@@ -1354,7 +1481,7 @@ Example:
 Register cleanup functions in your commands, say you have a customized `test` command that spins up some container.
 
 ```rust
-pub(crate) async fn handle_command(
+pub(crate) fn handle_command(
     args: TestCmdArgs,
     env: Environment,
     ctx: Context,
@@ -1362,14 +1489,14 @@ pub(crate) async fn handle_command(
     match args.get_command() {
         TestSubCommand::Integration => {
             register_cleanup!("Integration tests: Docker compose stack", move || {
-                base_commands::docker::handle_command(
-                    DockerCmdArgs {
+                base_commands::docker_compose::handle_command(
+                    DockerComposeCmdArgs {
                         build: false,
                         project: super::DOCKER_COMPOSE_PROJECT_NAME.to_string(),
-                        command: Some(DockerSubCommand::Down),
+                        command: Some(DockerComposeSubCommand::Down),
                         services: vec![],
                     },
-                    Environment::Test,
+                    Environment::new(EnvironmentName::Test, 1),
                     ctx.clone(),
                 )
                 .expect("docker compose stack should stop");
@@ -1386,17 +1513,14 @@ pub(crate) async fn handle_command(
 }
 ```
 
-Then call the `handle_cleanup` macro at the end of your main function to force a cleanup:
+Then call the `handle_cleanup` macro at the end of your main function to force a cleanup. This example requires
+the `test` and `docker-compose` command features and the `utils-cleanup` utility passthrough, in addition to any other
+base commands the repository chooses to enable:
 
 ```rust
 use tracel_xtask::prelude::*;
 
-#[macros::base_commands(
-    Build,
-    Check,
-    Fix,
-    Test
-)]
+#[macros::base_commands]
 pub enum Command {}
 
 fn main() -> anyhow::Result<()> {
@@ -1413,6 +1537,29 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+## Benchmark
+
+The non-published [benchmark consumer](crates/benchmark-consumer) always contains one trivial custom command and can
+select no base commands, the common `build`/`check`/`fix`/`test` set, or all 21 commands. The v4 rows below use the
+same consumer source transplanted into the v4.19.7 tag, with base commands expressed as macro arguments; the v5 rows
+use dependency features.
+
+| Base commands | Version and selection | Effective dependencies | From scratch | Incremental | `target` folder | Release executable |
+|---------------|-----------------------|-----------------------:|-------------:|------------:|----------------:|-------------------:|
+| Custom only | v4.19.7 — no macro arguments | 193 | 25.02 s | 0.86 s | 348.1 MiB | 2.94 MiB |
+| | v5.0.0 — no command features | 40 | 7.73 s | 0.52 s | 76.2 MiB | 2.22 MiB |
+| `build`, `check`, `fix`, `test` | v4.19.7 — four macro arguments | 193 | 22.22 s | 0.76 s | 349.0 MiB | 3.41 MiB |
+| | v5.0.0 — fixture's `common` feature | 54 | 8.23 s | 0.56 s | 145.9 MiB | 3.37 MiB |
+| All 21 | v4.19.7 — all macro arguments | 193 | 23.75 s | 0.82 s | 358.5 MiB | 8.17 MiB |
+| | v5.0.0 — `all` feature | 176 | 22.36 s | 0.80 s | 339.1 MiB | 8.18 MiB |
+
+These are indicative single-run measurements on Apple Silicon (`aarch64-apple-darwin`) with macOS 26.5.2,
+Rust 1.97.1, and Cargo 1.97.1. Each from-scratch release build used an empty dedicated target directory and ran
+offline against the version's lockfile. The incremental measurement is a warm release rebuild after touching only
+the consumer's `main.rs`. Target size is the allocated size reported by `du`; executable size is the release binary's
+file size. Effective dependencies are unique resolved normal and build packages reported by `cargo tree`, excluding
+the consumer itself. Timings will vary by machine; the dependency counts are the stable comparison.
 
 [1]: https://github.com/matklad/cargo-xtask
 [2]: https://github.com/clap-rs/clap

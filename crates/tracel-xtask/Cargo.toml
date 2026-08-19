@@ -11,29 +11,215 @@ repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask"
 rust-version = "1.85"
 version.workspace = true
 
+[features]
+default = []
+all = [
+    "aws-container",
+    "aws-secrets",
+    "build",
+    "bump",
+    "check",
+    "clean",
+    "compile",
+    "coverage",
+    "dependencies",
+    "doc",
+    "docker-compose",
+    "fix",
+    "gcp-container",
+    "gcp-secrets",
+    "host",
+    "image",
+    "infra",
+    "publish",
+    "test",
+    "validate",
+    "vulnerabilities",
+]
+
+aws-container = [
+    "dep:serde",
+    "dep:serde_json",
+    "tracel-xtask-macros/aws-container",
+    "utils-aws-asg-instance-picker",
+    "utils-aws-cli",
+    "utils-aws-instance-logs",
+    "utils-aws-instance-system-log",
+    "utils-git",
+    "utils-process",
+    "utils-spinner",
+]
+aws-secrets = [
+    "dep:serde_json",
+    "tracel-xtask-macros/aws-secrets",
+    "utils-aws-cli",
+]
+build = ["tracel-xtask-macros/build", "utils-process", "utils-workspace"]
+bump = ["tracel-xtask-macros/bump", "utils-cargo"]
+check = ["tracel-xtask-macros/check", "utils-cargo", "utils-workspace"]
+clean = ["tracel-xtask-macros/clean", "utils-process", "utils-workspace"]
+compile = ["tracel-xtask-macros/compile", "utils-process", "utils-workspace"]
+coverage = ["tracel-xtask-macros/coverage", "utils-cargo", "utils-rustup"]
+dependencies = ["tracel-xtask-macros/dependencies", "utils-cargo"]
+doc = ["tracel-xtask-macros/doc", "utils-process", "utils-workspace"]
+docker-compose = ["tracel-xtask-macros/docker-compose", "utils-process"]
+fix = [
+    "tracel-xtask-macros/fix",
+    "utils-cargo",
+    "utils-prompt",
+    "utils-workspace",
+]
+gcp-container = [
+    "tracel-xtask-macros/gcp-container",
+    "utils-gcp-cli",
+    "utils-git",
+    "utils-process",
+    "utils-spinner",
+]
+gcp-secrets = [
+    "dep:serde_json",
+    "tracel-xtask-macros/gcp-secrets",
+    "utils-gcp-cli",
+]
+host = [
+    "tracel-xtask-macros/host",
+    "utils-aws-cli",
+    "utils-aws-instance-system-log",
+]
+image = [
+    "tracel-xtask-macros/image",
+    "utils-aws-cli",
+    "utils-aws-images",
+    "utils-aws-instance-system-log",
+    "utils-git",
+    "utils-process",
+    "utils-spinner",
+    "utils-time",
+]
+infra = ["dep:ureq", "tracel-xtask-macros/infra", "utils-terraform"]
+publish = [
+    "dep:regex",
+    "dep:ureq",
+    "tracel-xtask-macros/publish",
+    "utils-cargo",
+]
+test = [
+    "tracel-xtask-macros/test",
+    "utils-process",
+    "utils-rustup",
+    "utils-workspace",
+]
+validate = [
+    "tracel-xtask-macros/validate",
+    "utils-cargo",
+    "utils-rustup",
+    "utils-workspace",
+]
+vulnerabilities = [
+    "tracel-xtask-macros/vulnerabilities",
+    "utils-cargo",
+    "utils-rustup",
+]
+
+# Utility passthroughs for custom commands.
+utils-all = [
+    "utils-aws",
+    "utils-cargo",
+    "utils-cleanup",
+    "utils-clap",
+    "utils-environment",
+    "utils-gcp",
+    "utils-git",
+    "utils-helpers",
+    "utils-logging",
+    "utils-process",
+    "utils-prompt",
+    "utils-rustup",
+    "utils-spinner",
+    "utils-terraform",
+    "utils-time",
+    "utils-workspace",
+]
+utils-aws = [
+    "utils-aws-asg-instance-picker",
+    "utils-aws-cli",
+    "utils-aws-ec2-tag-instance-picker",
+    "utils-aws-images",
+    "utils-aws-instance-logs",
+    "utils-aws-instance-system-log",
+    "utils-aws-naming",
+    "utils-aws-regions",
+]
+utils-aws-asg-instance-picker = [
+    "tracel-xtask-utils/aws-asg-instance-picker",
+    "utils-aws-cli",
+]
+utils-aws-cli = ["tracel-xtask-utils/aws-cli", "utils-process"]
+utils-aws-ec2-tag-instance-picker = [
+    "tracel-xtask-utils/aws-ec2-tag-instance-picker",
+    "utils-process",
+]
+utils-aws-images = [
+    "tracel-xtask-utils/aws-images",
+    "utils-process",
+    "utils-spinner",
+]
+utils-aws-instance-logs = [
+    "tracel-xtask-utils/aws-instance-logs",
+    "utils-aws-cli",
+]
+utils-aws-instance-system-log = [
+    "tracel-xtask-utils/aws-instance-system-log",
+    "utils-aws-cli",
+]
+utils-aws-naming = [
+    "tracel-xtask-utils/aws-naming",
+    "utils-aws-regions",
+    "utils-environment",
+]
+utils-aws-regions = ["tracel-xtask-utils/aws-regions"]
+utils-cargo = ["tracel-xtask-utils/cargo", "utils-process"]
+utils-cleanup = ["tracel-xtask-utils/cleanup", "utils-logging"]
+utils-clap = ["tracel-xtask-utils/clap"]
+utils-environment = [
+    "tracel-xtask-utils/environment",
+    "utils-git",
+    "utils-logging",
+]
+utils-gcp = ["utils-gcp-cli", "utils-gcp-naming", "utils-gcp-regions"]
+utils-gcp-cli = ["tracel-xtask-utils/gcp-cli", "utils-clap", "utils-process"]
+utils-gcp-naming = [
+    "tracel-xtask-utils/gcp-naming",
+    "utils-environment",
+    "utils-gcp-regions",
+]
+utils-gcp-regions = ["tracel-xtask-utils/gcp-regions"]
+utils-git = ["tracel-xtask-utils/git"]
+utils-helpers = ["tracel-xtask-utils/helpers", "utils-process"]
+utils-logging = ["tracel-xtask-utils/logging"]
+utils-process = ["tracel-xtask-utils/process", "utils-logging"]
+utils-prompt = ["tracel-xtask-utils/prompt"]
+utils-rustup = ["tracel-xtask-utils/rustup", "utils-process"]
+utils-spinner = ["tracel-xtask-utils/spinner"]
+utils-terraform = [
+    "tracel-xtask-utils/terraform",
+    "utils-environment",
+    "utils-process",
+]
+utils-time = ["tracel-xtask-utils/time"]
+utils-workspace = ["tracel-xtask-utils/workspace"]
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-ctrlc = { workspace = true }
-derive_more = { workspace = true }
-dotenvy = { workspace = true }
-env_logger = { workspace = true }
-home = { workspace = true }
-humantime = { workspace = true }
-inquire = { workspace = true }
 log = { workspace = true }
-owo-colors = { workspace = true }
-rand = { workspace = true }
-regex = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+regex = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 strum = { workspace = true }
-time = { workspace = true }
-toml = { workspace = true }
-tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=4.19.7" }
-tracel-xtask-utils = { path = "../tracel-xtask-utils", version = "=4.19.7", features = ["all"] }
-ureq = { workspace = true }
-zip = { workspace = true }
+tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=5.0.0" }
+tracel-xtask-utils = { path = "../tracel-xtask-utils", version = "=5.0.0", default-features = false, features = ["clap", "environment"] }
+ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

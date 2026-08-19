@@ -1,23 +1,48 @@
+#[cfg(feature = "aws-container")]
 pub mod aws_container;
+#[cfg(feature = "aws-secrets")]
 pub mod aws_secrets;
+#[cfg(feature = "build")]
 pub mod build;
+#[cfg(feature = "bump")]
 pub mod bump;
+#[cfg(feature = "check")]
 pub mod check;
+#[cfg(all(not(feature = "check"), feature = "validate"))]
+mod check;
+#[cfg(feature = "clean")]
 pub mod clean;
+#[cfg(feature = "compile")]
 pub mod compile;
+#[cfg(feature = "coverage")]
 pub mod coverage;
+#[cfg(feature = "dependencies")]
 pub mod dependencies;
+#[cfg(feature = "doc")]
 pub mod doc;
+#[cfg(feature = "docker-compose")]
 pub mod docker_compose;
+#[cfg(feature = "fix")]
 pub mod fix;
+#[cfg(feature = "gcp-container")]
 pub mod gcp_container;
+#[cfg(feature = "gcp-secrets")]
 pub mod gcp_secrets;
+#[cfg(feature = "host")]
 pub mod host;
+#[cfg(feature = "image")]
 pub mod image;
+#[cfg(feature = "infra")]
 pub mod infra;
+#[cfg(feature = "publish")]
 pub mod publish;
+#[cfg(feature = "test")]
 pub mod test;
+#[cfg(all(not(feature = "test"), feature = "validate"))]
+mod test;
+#[cfg(feature = "validate")]
 pub mod validate;
+#[cfg(feature = "vulnerabilities")]
 pub mod vulnerabilities;
 
 // use crate::declare_target;

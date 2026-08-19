@@ -1,4 +1,14 @@
-#[cfg(feature = "aws")]
+#[cfg(any(
+    feature = "aws",
+    feature = "aws-asg-instance-picker",
+    feature = "aws-cli",
+    feature = "aws-ec2-tag-instance-picker",
+    feature = "aws-images",
+    feature = "aws-instance-logs",
+    feature = "aws-instance-system-log",
+    feature = "aws-naming",
+    feature = "aws-regions",
+))]
 pub mod aws;
 
 #[cfg(feature = "cargo")]
@@ -10,7 +20,12 @@ pub mod cleanup;
 #[cfg(feature = "environment")]
 pub mod environment;
 
-#[cfg(feature = "gcp")]
+#[cfg(any(
+    feature = "gcp",
+    feature = "gcp-cli",
+    feature = "gcp-naming",
+    feature = "gcp-regions",
+))]
 pub mod gcp;
 
 #[cfg(feature = "git")]

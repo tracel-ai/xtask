@@ -85,7 +85,7 @@ pub struct AwsContainerListSubCmdArgs {
     /// The tag reprensenting the latest tag (defaults to the environment name if omitted)
     #[arg(long)]
     pub latest_tag: Option<String>,
-    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if omitted)
+    /// Rollback tag applied by this command (defaults to `rollback_<environment>` if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }
@@ -167,7 +167,7 @@ pub struct AwsContainerPromoteSubCmdArgs {
     /// Promote tag applied by this command (defaults to the environment name if omitted)
     #[arg(long)]
     pub promote_tag: Option<String>,
-    /// Rollback tag applied by this command (defaults to 'rollback_<environment>' if omitted)
+    /// Rollback tag applied by this command (defaults to `rollback_<environment>` if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }
@@ -183,7 +183,7 @@ pub struct AwsContainerRollbackSubCmdArgs {
     /// Promote tag applied by this command (defaults to the environment name if omitted)
     #[arg(long)]
     pub promote_tag: Option<String>,
-    /// Rollback tag to promote to promote tag (defaults to 'rollback_<environment>' if omitted)
+    /// Rollback tag to promote to promote tag (defaults to `rollback_<environment>` if omitted)
     #[arg(long)]
     pub rollback_tag: Option<String>,
 }

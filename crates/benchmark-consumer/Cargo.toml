@@ -1,0 +1,19 @@
+[package]
+name = "benchmark-consumer"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[features]
+default = []
+common = [
+    "tracel-xtask/build",
+    "tracel-xtask/check",
+    "tracel-xtask/fix",
+    "tracel-xtask/test",
+]
+all = ["tracel-xtask/all"]
+
+[dependencies]
+strum = { workspace = true }
+tracel-xtask = { path = "../tracel-xtask", version = "=5.0.0", default-features = false }

@@ -1,13 +1,27 @@
 [package]
 name = "xtask-tests"
-version = "4.19.7"
+version = "5.0.0"
 edition = "2021"
 
 [dependencies]
 dotenvy = { workspace = true }
 log = { workspace = true }
 strum = { workspace = true }
-tracel-xtask = { path = "../tracel-xtask" }
+tracel-xtask = { path = "../tracel-xtask", version = "=5.0.0", features = [
+    "build",
+    "bump",
+    "check",
+    "compile",
+    "coverage",
+    "dependencies",
+    "doc",
+    "docker-compose",
+    "fix",
+    "publish",
+    "test",
+    "validate",
+    "vulnerabilities",
+] }
 
 [dev-dependencies]
 rstest = { workspace = true }

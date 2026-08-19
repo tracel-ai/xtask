@@ -1,0 +1,36 @@
+[package]
+name = "xtask-feature-tests"
+version = "5.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+all = ["tracel-xtask/all"]
+aws-container = ["tracel-xtask/aws-container"]
+aws-secrets = ["tracel-xtask/aws-secrets"]
+build = ["tracel-xtask/build"]
+bump = ["tracel-xtask/bump"]
+check = ["tracel-xtask/check"]
+clean = ["tracel-xtask/clean"]
+compile = ["tracel-xtask/compile"]
+coverage = ["tracel-xtask/coverage"]
+dependencies = ["tracel-xtask/dependencies"]
+doc = ["tracel-xtask/doc"]
+docker-compose = ["tracel-xtask/docker-compose"]
+fix = ["tracel-xtask/fix"]
+gcp-container = ["tracel-xtask/gcp-container"]
+gcp-secrets = ["tracel-xtask/gcp-secrets"]
+host = ["tracel-xtask/host"]
+image = ["tracel-xtask/image"]
+infra = ["tracel-xtask/infra"]
+publish = ["tracel-xtask/publish"]
+test = ["tracel-xtask/test"]
+validate = ["tracel-xtask/validate"]
+vulnerabilities = ["tracel-xtask/vulnerabilities"]
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+strum = { workspace = true }
+tracel-xtask = { path = "../tracel-xtask", version = "=5.0.0", default-features = false }

@@ -6,4 +6,25 @@ edition = "2024"
 [dependencies]
 log = "0.4.28"
 strum = "0.27.2"
-tracel-xtask = { path = "../crates/tracel-xtask" }
+tracel-xtask = { path = "../crates/tracel-xtask", version = "=5.0.0", features = [
+    "aws-container",
+    "aws-secrets",
+    "build",
+    "bump",
+    "check",
+    "clean",
+    "compile",
+    "coverage",
+    "dependencies",
+    "doc",
+    "docker-compose",
+    "fix",
+    "gcp-container",
+    "gcp-secrets",
+    "host",
+    "infra",
+    "publish",
+    "test",
+    "validate",
+    "vulnerabilities",
+] }

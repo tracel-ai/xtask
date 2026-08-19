@@ -2,21 +2,7 @@ mod commands;
 
 use tracel_xtask::{init_xtask, prelude::*};
 
-#[macros::base_commands(
-    Bump,
-    Build,
-    Check,
-    Compile,
-    Coverage,
-    Doc,
-    DockerCompose,
-    Dependencies,
-    Fix,
-    Publish,
-    Test,
-    Validate,
-    Vulnerabilities
-)]
+#[macros::base_commands]
 pub enum Command {
     /// Example of a new command which extends a base command arguments which has no subcommand.
     ExtendedBuildArgs(commands::extended_build_args::ExtendedBuildArgsCmdArgs),
