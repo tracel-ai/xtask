@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v6
       # --------------------------------------------------------------------------------
       - name: Install Rust
-        uses: tracel-ai/github-actions/install-rust@v9
+        uses: tracel-ai/github-actions/install-rust@v11
         with:
           rust-toolchain: stable
           cache-key: stable-linux
@@ -34,7 +34,7 @@ jobs:
         run: xtask check lint
       # --------------------------------------------------------------------------------
       - name: Typos
-        uses: tracel-ai/github-actions/check-typos@v8
+        uses: tracel-ai/github-actions/check-typos@v11
       # --------------------------------------------------------------------------------
       - name: Unit Tests
         run: xtask test unit
