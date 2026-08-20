@@ -14,7 +14,7 @@ on:
 
 jobs:
   tracel-xtask-utils:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
     with:
       crate: tracel-xtask-utils
       tag-validation: true
@@ -24,7 +24,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask-macros:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
     with:
       crate: tracel-xtask-macros
       tag-validation: true
@@ -34,7 +34,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
     with:
       crate: tracel-xtask
       tag-validation: true
@@ -47,7 +47,7 @@ jobs:
 
   # --------------------------------------------------------------------------------
   tracel-xtask-cli:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v10
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
     with:
       crate: tracel-xtask-cli
       tag-validation: false
@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v6
       # --------------------------------------------------------------------------------
       - name: Install Rust
-        uses: tracel-ai/github-actions/install-rust@v9
+        uses: tracel-ai/github-actions/install-rust@v11
         with:
           rust-toolchain: stable
           cache-key: stable-linux
