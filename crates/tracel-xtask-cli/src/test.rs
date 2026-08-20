@@ -576,6 +576,44 @@ fn shorthand_ignores_repeated_separators() {
 }
 
 #[test]
+fn resolved_shorthand_uses_the_shortest_unambiguous_selector() {
+    let subrepos = vec![
+        workspace("app"),
+        workspace("deploy"),
+        workspace("devstack"),
+        workspace("infra"),
+    ];
+
+    let shorthand = |name| {
+        let subrepo = subrepos
+            .iter()
+            .find(|subrepo| subrepo.dir_name == name)
+            .expect("subrepo should exist");
+
+        resolved_subrepo_shorthand(&subrepos, subrepo)
+    };
+
+    assert_eq!(shorthand("app").as_deref(), Some("a"));
+    assert_eq!(shorthand("deploy").as_deref(), Some("dep"));
+    assert_eq!(shorthand("devstack").as_deref(), Some("dev"));
+    assert_eq!(shorthand("infra").as_deref(), Some("i"));
+}
+
+#[test]
+fn resolved_shorthand_keeps_an_unambiguous_initialism() {
+    let subrepos = vec![workspace("product-backend"), workspace("product-frontend")];
+
+    assert_eq!(
+        resolved_subrepo_shorthand(&subrepos, &subrepos[0]).as_deref(),
+        Some("pb")
+    );
+    assert_eq!(
+        resolved_subrepo_shorthand(&subrepos, &subrepos[1]).as_deref(),
+        Some("pf")
+    );
+}
+
+#[test]
 fn exact_selector_matches_subrepo_name() {
     let subrepos = vec![workspace("product-backend"), workspace("frontend")];
 

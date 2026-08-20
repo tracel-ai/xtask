@@ -1115,6 +1115,24 @@ fn subrepo_shorthand(name: &str) -> Option<String> {
     }
 }
 
+fn resolved_subrepo_shorthand(subrepos: &[Workspace], subrepo: &Workspace) -> Option<String> {
+    let resolves_to_subrepo = |selector: &str| {
+        select_subrepo_workspace_from_list(subrepos, selector)
+            .is_ok_and(|resolved| resolved.dir_name == subrepo.dir_name)
+    };
+
+    match subrepo_shorthand(&subrepo.dir_name) {
+        Some(shorthand) if resolves_to_subrepo(&shorthand) => return Some(shorthand),
+        _ => {}
+    }
+
+    (1..=subrepo.dir_name.len())
+        .filter(|&end| subrepo.dir_name.is_char_boundary(end))
+        .map(|end| &subrepo.dir_name[..end])
+        .find(|prefix| resolves_to_subrepo(prefix))
+        .map(str::to_string)
+}
+
 fn show_all_help(
     git_root: &Path,
     args: &mut Vec<OsString>,
@@ -1516,7 +1534,7 @@ fn show_xtask_cli_help(
         println!("  (none found)");
     } else {
         for ws in &subrepos {
-            let shorthand = subrepo_shorthand(&ws.dir_name)
+            let shorthand = resolved_subrepo_shorthand(&subrepos, ws)
                 .map(|shorthand| format!(":{shorthand}"))
                 .unwrap_or_else(|| "-".to_string());
 
