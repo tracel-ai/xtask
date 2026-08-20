@@ -349,7 +349,7 @@ The available environments are listed below:
 |:------------|:------|:-------|:------------|
 | Development | d     | dev    | development |
 | Test        | t     | test   | test        |
-| Staging     | s     | stag   | staging     |
+| Staging     |s     | stag   | staging     |
 | Production  | p     | prod   | production  |
 
 It also automatically loads the following environment variables files if they exist in the working directory:
@@ -1540,26 +1540,23 @@ fn main() -> anyhow::Result<()> {
 
 ## Benchmark
 
-The non-published [benchmark consumer](crates/benchmark-consumer) always contains one trivial custom command and can
-select no base commands, the common `build`/`check`/`fix`/`test` set, or all 21 commands. The v4 rows below use the
-same consumer source transplanted into the v4.19.7 tag, with base commands expressed as macro arguments; the v5 rows
-use dependency features.
+The [benchmark app](crates/benchmark-consumer) always includes one custom command. It was tested with no base commands,
+the common four commands, and all 21 commands. Each cell compares **v4.19.7 → v5.0.0**; lower is better.
 
-| Base commands | Version and selection | Effective dependencies | From scratch | Incremental | `target` folder | Release executable |
-|---------------|-----------------------|-----------------------:|-------------:|------------:|----------------:|-------------------:|
-| Custom only | v4.19.7 — no macro arguments | 193 | 25.02 s | 0.86 s | 348.1 MiB | 2.94 MiB |
-| | v5.0.0 — no command features | 40 | 7.73 s | 0.52 s | 76.2 MiB | 2.22 MiB |
-| `build`, `check`, `fix`, `test` | v4.19.7 — four macro arguments | 193 | 22.22 s | 0.76 s | 349.0 MiB | 3.41 MiB |
-| | v5.0.0 — fixture's `common` feature | 54 | 8.23 s | 0.56 s | 145.9 MiB | 3.37 MiB |
-| All 21 | v4.19.7 — all macro arguments | 193 | 23.75 s | 0.82 s | 358.5 MiB | 8.17 MiB |
-| | v5.0.0 — `all` feature | 176 | 22.36 s | 0.80 s | 339.1 MiB | 8.18 MiB |
+| Commands                        | Dependencies  | Clean build         | Rebuild           | Build files             | Binary                |
+|---------------------------------|---------------|---------------------|-------------------|-------------------------|-----------------------|
+| Custom only                     | 193 → **40**  | 25.02s → **7.73s**  | 0.86s → **0.52s** | 348.1MiB → **76.2MiB**  | 2.94MiB → **2.22MiB** |
+| `build`, `check`, `fix`, `test` | 193 → **54**  | 22.22s → **8.23s**  | 0.76s → **0.56s** | 349.0MiB → **145.9MiB** | 3.41MiB → **3.37MiB** |
+| All 21                          | 193 → **176** | 23.75s → **22.36s** | 0.82s → **0.80s** | 358.5MiB → **339.1MiB** | 8.17MiB → **8.18MiB** |
 
-These are indicative single-run measurements on Apple Silicon (`aarch64-apple-darwin`) with macOS 26.5.2,
-Rust 1.97.1, and Cargo 1.97.1. Each from-scratch release build used an empty dedicated target directory and ran
-offline against the version's lockfile. The incremental measurement is a warm release rebuild after touching only
-the consumer's `main.rs`. Target size is the allocated size reported by `du`; executable size is the release binary's
-file size. Effective dependencies are unique resolved normal and build packages reported by `cargo tree`, excluding
-the consumer itself. Timings will vary by machine; the dependency counts are the stable comparison.
+The same source was built with both versions. For v4, the app selects commands with macro arguments. For v5, it uses
+Cargo features: none, `common`, or `all`.
+
+These results are from a single Apple Silicon run (`aarch64-apple-darwin`) with macOS 26.5.2, Rust 1.97.1, and
+Cargo 1.97.1. A clean build starts with an empty build directory and runs offline with that version's lockfile. A
+rebuild runs after changing only `main.rs`. "Build files" is the allocated space reported by `du`, while "Binary" is
+the final executable's file size. "Dependencies" counts unique normal and build packages from `cargo tree`, excluding
+the benchmark app. Build times vary by machine, but dependency counts are stable.
 
 [1]: https://github.com/matklad/cargo-xtask
 [2]: https://github.com/clap-rs/clap
