@@ -101,7 +101,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "benchmark-consumer"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "strum",
  "tracel-xtask",
@@ -1735,7 +1735,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tracel-xtask"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1754,7 +1754,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-cli"
-version = "1.1.10"
+version = "1.2.0"
 dependencies = [
  "home",
  "tempfile",
@@ -1763,7 +1763,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-macros"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1772,7 +1772,7 @@ dependencies = [
 
 [[package]]
 name = "tracel-xtask-utils"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2197,7 +2197,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask-core"
-version = "0.6.7"
+version = "0.7.0"
 dependencies = [
  "log",
  "strum",
@@ -2206,7 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "xtask-feature-tests"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2216,7 +2216,7 @@ dependencies = [
 
 [[package]]
 name = "xtask-tests"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "dotenvy",
  "log",

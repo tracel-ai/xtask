@@ -1,6 +1,6 @@
 [package]
 name = "xtask-feature-tests"
-version = "5.0.0"
+version = "5.1.0"
 edition = "2024"
 publish = false
 
@@ -33,4 +33,4 @@ vulnerabilities = ["tracel-xtask/vulnerabilities"]
 anyhow = { workspace = true }
 clap = { workspace = true }
 strum = { workspace = true }
-tracel-xtask = { path = "../tracel-xtask", version = "=5.0.0", default-features = false }
+tracel-xtask = { path = "../tracel-xtask", version = "=5.1.0", default-features = false }
