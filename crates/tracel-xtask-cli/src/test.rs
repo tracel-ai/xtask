@@ -100,6 +100,48 @@ fn select<'a>(subrepos: &'a [Workspace], selector: &str) -> Result<&'a str, Stri
     select_subrepo_workspace_from_list(subrepos, selector).map(|ws| ws.dir_name.as_str())
 }
 
+fn select_many<'a>(subrepos: &'a [Workspace], selectors: &[&str]) -> Result<Vec<&'a str>, String> {
+    let selectors = selectors
+        .iter()
+        .map(|selector| selector.to_string())
+        .collect::<Vec<_>>();
+    select_subrepo_workspaces_from_list(subrepos, &selectors).map(|workspaces| {
+        workspaces
+            .into_iter()
+            .map(|workspace| workspace.dir_name.as_str())
+            .collect()
+    })
+}
+
+#[test]
+fn takes_multiple_leading_subrepo_selectors() {
+    let mut args = vec![
+        OsString::from(":backend"),
+        OsString::from(":frontend"),
+        OsString::from("check"),
+        OsString::from("all"),
+    ];
+
+    let selectors = args::take_subrepo_selectors(&mut args);
+
+    assert_eq!(selectors, ["backend", "frontend"]);
+    assert_eq!(args, [OsString::from("check"), OsString::from("all")]);
+}
+
+#[test]
+fn stops_taking_subrepo_selectors_at_the_first_xtask_argument() {
+    let mut args = vec![
+        OsString::from(":backend"),
+        OsString::from("check"),
+        OsString::from(":frontend"),
+    ];
+
+    let selectors = args::take_subrepo_selectors(&mut args);
+
+    assert_eq!(selectors, ["backend"]);
+    assert_eq!(args, [OsString::from("check"), OsString::from(":frontend")]);
+}
+
 #[test]
 fn skill_invocation_is_detected_as_a_wrapper_special_command() {
     assert!(is_skill_invocation(&[OsString::from("+skill")]));
@@ -335,7 +377,7 @@ fn skill_text_contains_agent_operating_cues() {
     let text = skill::text();
 
     assert!(text.contains("Tracel xtask agent skill"));
-    assert!(text.contains("xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]"));
+    assert!(text.contains("xtask [+nightly|+n] [:<subrepo> ...|:all] [<xtask args...>]"));
     assert!(text.contains("xtask [+nightly|+n] +clean"));
     assert!(text.contains("Wrapper modifiers and special commands"));
     assert!(text.contains("`+clean` runs `cargo clean --target-dir <persistent-target>`"));
@@ -696,6 +738,55 @@ fn exact_selector_takes_precedence_over_prefix() {
     assert_eq!(
         select(&subrepos, "product").expect("selector should match exact subrepo"),
         "product"
+    );
+}
+
+#[test]
+fn multiple_selectors_resolve_in_argument_order() {
+    let subrepos = vec![
+        workspace("api-server"),
+        workspace("frontend"),
+        workspace("worker"),
+    ];
+
+    assert_eq!(
+        select_many(&subrepos, &["worker", "as"])
+            .expect("selectors should resolve to multiple subrepos"),
+        ["worker", "api-server"]
+    );
+}
+
+#[test]
+fn multiple_selectors_deduplicate_the_same_subrepo() {
+    let subrepos = vec![workspace("product-backend"), workspace("frontend")];
+
+    assert_eq!(
+        select_many(&subrepos, &["product-backend", "pb", "product"])
+            .expect("overlapping selectors should resolve"),
+        ["product-backend"]
+    );
+}
+
+#[test]
+fn all_selector_resolves_every_subrepo() {
+    let subrepos = vec![workspace("backend"), workspace("frontend")];
+
+    assert_eq!(
+        select_many(&subrepos, &["all"]).expect(":all should resolve every subrepo"),
+        ["backend", "frontend"]
+    );
+}
+
+#[test]
+fn all_selector_cannot_be_combined_with_named_selectors() {
+    let subrepos = vec![workspace("backend"), workspace("frontend")];
+
+    let err = select_many(&subrepos, &["backend", "all"])
+        .expect_err(":all should not combine with named selectors");
+
+    assert_eq!(
+        err,
+        "Subrepo selector ':all' cannot be combined with other selectors."
     );
 }
 

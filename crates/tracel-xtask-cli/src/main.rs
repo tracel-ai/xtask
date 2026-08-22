@@ -408,27 +408,16 @@ fn run(
     args: &mut Vec<OsString>,
     toolchain: Option<ToolchainOverride>,
 ) -> Result<ExitCode, String> {
-    let selector = args::take_subrepo_selector(args);
+    let selectors = args::take_subrepo_selectors(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
-    // Selector provided
-    if let Some(sel) = selector {
-        if sel == "all" {
-            // :all magic selector
-            let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
-            if subrepos.is_empty() {
-                return Err(format!(
-                    "xtask :all requires at least one subrepo workspace under git root.\n\
-                     Git root: {}",
-                    git_root.display()
-                ));
-            }
-            return exec_cargo_xtask_all(git_root, args, &subrepos);
-        } else {
-            // :<subrepo> selector
-            let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
-            return exec_cargo_xtask(git_root, &ws, args).map(ExitCode::from);
+    if !selectors.is_empty() {
+        let subrepos = select_subrepo_workspaces(git_root, &selectors, toolchain)?;
+        if subrepos.len() == 1 {
+            return exec_cargo_xtask(git_root, &subrepos[0], args).map(ExitCode::from);
         }
+
+        return exec_cargo_xtask_all(git_root, args, &subrepos);
     }
 
     // No selector provided
@@ -1005,21 +994,58 @@ fn list_subrepo_workspaces(
     Ok(subrepos)
 }
 
-fn select_subrepo_workspace(
+fn select_subrepo_workspaces(
     git_root: &Path,
-    selector: &str,
+    selectors: &[String],
     toolchain: Option<ToolchainOverride>,
-) -> Result<Workspace, String> {
+) -> Result<Vec<Workspace>, String> {
     let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
 
     if subrepos.is_empty() {
+        if selectors == ["all"] {
+            return Err(format!(
+                "xtask :all requires at least one subrepo workspace under git root.\n\
+                 Git root: {}",
+                git_root.display()
+            ));
+        }
+
         return Err(format!(
             "No xtask workspaces found under git root: {}",
             git_root.display()
         ));
     }
 
-    select_subrepo_workspace_from_list(&subrepos, selector).cloned()
+    select_subrepo_workspaces_from_list(&subrepos, selectors)
+        .map(|selected| selected.into_iter().cloned().collect())
+}
+
+fn select_subrepo_workspaces_from_list<'a>(
+    subrepos: &'a [Workspace],
+    selectors: &[String],
+) -> Result<Vec<&'a Workspace>, String> {
+    if selectors.iter().any(|selector| selector == "all") {
+        if selectors.len() != 1 {
+            return Err(
+                "Subrepo selector ':all' cannot be combined with other selectors.".to_string(),
+            );
+        }
+
+        return Ok(subrepos.iter().collect());
+    }
+
+    let mut selected = Vec::new();
+    for selector in selectors {
+        let workspace = select_subrepo_workspace_from_list(subrepos, selector)?;
+        if !selected
+            .iter()
+            .any(|selected: &&Workspace| selected.dir_name == workspace.dir_name)
+        {
+            selected.push(workspace);
+        }
+    }
+
+    Ok(selected)
 }
 
 fn select_subrepo_workspace_from_list<'a>(
@@ -1138,26 +1164,15 @@ fn show_all_help(
     args: &mut Vec<OsString>,
     toolchain: Option<ToolchainOverride>,
 ) -> Result<ExitCode, String> {
-    let selector = args::take_subrepo_selector(args);
+    let selectors = args::take_subrepo_selectors(args);
     let cwd = env::current_dir().map_err(|e| format!("failed to read current directory: {e}"))?;
 
-    // Selector
-    if let Some(sel) = selector {
-        if sel == "all" {
-            // :all magic selector
-            let subrepos = list_subrepo_workspaces(git_root, toolchain)?;
-            if subrepos.is_empty() {
-                return Err(format!(
-                    "xtask :all requires at least one subrepo workspace under git root.\n\
-                     Git root: {}",
-                    git_root.display()
-                ));
-            }
-            run_help_all(&subrepos)
+    if !selectors.is_empty() {
+        let subrepos = select_subrepo_workspaces(git_root, &selectors, toolchain)?;
+        if subrepos.len() == 1 {
+            run_help_one(&subrepos[0]).map(ExitCode::from)
         } else {
-            // :<subrepo> selector
-            let ws = select_subrepo_workspace(git_root, &sel, toolchain)?;
-            run_help_one(&ws).map(ExitCode::from)
+            run_help_all(&subrepos)
         }
     } else {
         // No selector, behavior depends on standard repo vs monorepo.
@@ -1388,7 +1403,7 @@ fn show_xtask_cli_help(
 
     println!("USAGE");
     println!("-----");
-    println!("  {cli_name} [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]");
+    println!("  {cli_name} [+nightly|+n] [:<subrepo> ...|:all] [<xtask args...>]");
     println!("  {cli_name} [+nightly|+n] +clean");
     println!("  {cli_name} +skill");
     println!("  {cli_name} +sync");
@@ -1398,7 +1413,7 @@ fn show_xtask_cli_help(
     println!("BEHAVIOR");
     println!("--------");
     println!("  - With a selector:");
-    println!("      :<subrepo>  Runs xtask in that subrepo workspace.");
+    println!("      :<subrepo>  Runs xtask in that subrepo workspace. Repeat to select multiple.");
     println!("      :all        Runs xtask in all subrepos.");
     println!("  - Without a selector:");
     println!("      Standard repo: runs xtask at the git root.");
@@ -1557,6 +1572,9 @@ fn show_xtask_cli_help(
     println!("  {cli_name} :{ex2} test all");
     println!("      Run both unit and integration tests scoped to the `{ex2}` subrepo only.");
     println!();
+    println!("  {cli_name} :{ex1} :{ex2} check all");
+    println!("      Run all checks in the `{ex1}` and `{ex2}` subrepos only.");
+    println!();
     println!("  {cli_name} +n :{ex1} test --miri");
     println!("      Run xtask in `{ex1}` through the nightly toolchain.");
     println!();
@@ -1591,6 +1609,7 @@ fn show_xtask_cli_help(
     println!("    underlying xtask binary in the selected workspace(s).");
     println!("  - Subrepo selectors also support unambiguous shorthands, for example");
     println!("    `product-backend` can be selected with `:pb`.");
+    println!("  - Repeat selectors to run the same command in multiple chosen subrepos.");
     println!();
 
     cli_help_fooder();

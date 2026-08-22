@@ -16,7 +16,7 @@ crate as the project-specific implementation.
 ## Invocation grammar
 
 ```text
-xtask [+nightly|+n] [:<subrepo>|:all] [<xtask args...>]
+xtask [+nightly|+n] [:<subrepo> ...|:all] [<xtask args...>]
 xtask [+nightly|+n] +clean
 xtask +skill
 xtask +sync
@@ -69,9 +69,11 @@ Monorepo:
 - From inside a subrepo, commands run in that subrepo.
 - From the monorepo root, commands prompt before running in every subrepo.
 - `:all` runs in every subrepo without prompting.
-- `:<subrepo>` selects one subrepo. Exact names, unambiguous prefixes, and
-  shorthands are accepted. A shorthand is built from the first letter of each
-  name segment, so `product-backend` can be selected as `:pb`.
+- One or more `:<subrepo>` arguments select those subrepos. Exact names,
+  unambiguous prefixes, and shorthands are accepted. A shorthand is built from
+  the first letter of each name segment, so `product-backend` can be selected
+  as `:pb`. For example, `xtask :api :frontend check all` runs in just those
+  two subrepos.
 
 ## Persistent xtask cache
 
@@ -128,8 +130,8 @@ discovered subrepo cache; they do not accept a `:<subrepo>` selector.
   dependency declarations into selected subrepo `Cargo.toml` files before
   executing commands. See "Dependency synchronization" below before assuming
   what it will edit.
-- Prints a summary after `:all` dispatch showing which subrepos succeeded or
-  failed.
+- Prints a summary after dispatch to multiple selected subrepos showing which
+  succeeded or failed.
 
 ## Repository-local xtask model
 
@@ -293,10 +295,12 @@ Important sync rules:
 2. Run `xtask` to understand wrapper context and subrepo discovery.
 3. Run `xtask +clean` only when the persistent default-toolchain xtask build
    should be discarded. Use `xtask +n +clean` for the nightly build.
-4. Run `xtask --help` or `xtask :<subrepo> --help` to see project commands.
+4. Run `xtask --help` or `xtask :<subrepo> [:<subrepo> ...] --help` to see
+   project commands.
 5. Prefer explicit selectors in monorepos:
    - `xtask :api check all`
    - `xtask :frontend test all`
+   - `xtask :api :frontend check all`
    - `xtask :all check all`
 6. Use `+n` for commands that require nightly:
    - `xtask +n test unit --miri`

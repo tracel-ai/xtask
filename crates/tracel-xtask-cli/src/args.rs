@@ -1,15 +1,17 @@
 use std::ffi::OsString;
 
-pub fn take_subrepo_selector(args: &mut Vec<OsString>) -> Option<String> {
-    let first = args.first()?.clone(); // own it; no borrow into args
-    let s = first.to_string_lossy();
-    if s.starts_with('-') {
-        return None;
+pub fn take_subrepo_selectors(args: &mut Vec<OsString>) -> Vec<String> {
+    let mut selectors = Vec::new();
+
+    while let Some(first) = args.first() {
+        let selector = first.to_string_lossy();
+        let Some(selector) = selector.strip_prefix(':').filter(|value| !value.is_empty()) else {
+            break;
+        };
+
+        selectors.push(selector.to_string());
+        args.remove(0);
     }
-    let rest = s.strip_prefix(':')?;
-    if rest.is_empty() {
-        return None;
-    }
-    args.remove(0);
-    Some(rest.to_string())
+
+    selectors
 }

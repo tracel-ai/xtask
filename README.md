@@ -427,6 +427,21 @@ Dependencies.toml
 `backend` and `frontend` are subrepos with separate Cargo workspaces with their own members. They all have an `xtask` member
 to manage them.
 
+Select one or more subrepos by putting their selectors before the repository-local xtask command. Selectors accept exact
+names, unambiguous prefixes, or shorthands built from the first letter of each name segment. Repeated selectors that resolve
+to the same subrepo run it only once. Use `:all` by itself to select every subrepo.
+
+```bash
+# Run in one subrepo
+xtask :backend check all
+
+# Run in two chosen subrepos
+xtask :backend :frontend check all
+
+# Run in every subrepo
+xtask :all check all
+```
+
 The root `Dependencies.toml` does not represent a real Cargo workspace, its only purpose is to centralize all the dependency
 versions and features. `xtask` CLI will push the dependency versions in `Dependencies.toml` to the subrepos `Cargo.toml`
 files whenever a dependency is used in the subrepo.
