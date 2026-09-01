@@ -30,6 +30,8 @@ pub mod gcp_container;
 pub mod gcp_secrets;
 #[cfg(feature = "host")]
 pub mod host;
+#[cfg(feature = "icons")]
+pub mod icons;
 #[cfg(feature = "image")]
 pub mod image;
 #[cfg(feature = "infra")]

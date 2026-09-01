@@ -116,6 +116,8 @@ pub mod prelude {
     pub use crate::commands::host::HostPrivateIpSubCmdArgs;
     #[cfg(feature = "host")]
     pub use crate::commands::host::HostSubCommand;
+    #[cfg(feature = "icons")]
+    pub use crate::commands::icons::IconsCmdArgs;
     #[cfg(feature = "image")]
     pub use crate::commands::image::ImageBuildSubCmdArgs;
     #[cfg(feature = "image")]

@@ -59,6 +59,7 @@
     - [Prerequisites](#prerequisites)
     - [Shared Subcommands](#shared-subcommands)
     - [Examples](#examples)
+  - [Icons](#icons)
   - [Images](#images)
     - [Conceptual Model](#conceptual-model)
       - [Deploy](#deploy)
@@ -233,6 +234,7 @@ Default features enable no base commands, so choose only the commands the reposi
 | `gcp-container`   | `gcp-container`       |
 | `gcp-secrets`     | `gcp-secrets`         |
 | `host`            | `host`                |
+| `icons`           | `icons`               |
 | `image`           | `image`               |
 | `infra`           | `infra`               |
 | `publish`         | `publish`             |
@@ -1242,6 +1244,24 @@ xtask -e stag gcp-container run \
   --env-file .env.stag \
   --name my-container
 ```
+
+### Icons
+
+The `icons` command renders an SVG directly into high-quality PNG and ICO application icons:
+
+```sh
+xtask icons assets/app-icon.svg --output-dir assets/icons
+```
+
+By default it creates PNGs at 16, 32, 48, 64, 128, 256, 512, and 1024 pixels, named
+`<stem>-<size>.png`, plus `<stem>.ico`. The ICO contains the requested sizes up to 256 pixels. Rendering preserves
+the SVG's aspect ratio and centers it on a transparent square canvas when padding is needed.
+
+Pass a comma-delimited list to `--sizes` to choose different dimensions. If `--output-dir` is omitted, files are
+written beside the source SVG; `--output` is a shorter alias for `--output-dir`.
+
+Pass `--decorated` to place the SVG on a rounded graphite application-icon tile with directional bevel lighting and
+a soft shadow. The SVG is centered at 76% of the canvas; the flag applies the treatment to every PNG and ICO size.
 
 ### Images
 

@@ -16,6 +16,7 @@ const COMMAND_FEATURES: &[&str] = &[
     "gcp-container",
     "gcp-secrets",
     "host",
+    "icons",
     "image",
     "infra",
     "publish",
@@ -192,9 +193,12 @@ fn representative_features_keep_unrelated_dependencies_out() {
     assert_dependencies_absent(
         None,
         &[
+            "ico",
+            "image",
             "inquire",
             "owo-colors",
             "rand",
+            "resvg",
             "serde",
             "serde_json",
             "time",
@@ -204,16 +208,53 @@ fn representative_features_keep_unrelated_dependencies_out() {
     );
     assert_dependencies_absent(
         Some("build"),
-        &["inquire", "owo-colors", "serde", "time", "ureq", "zip"],
+        &[
+            "ico",
+            "image",
+            "inquire",
+            "owo-colors",
+            "resvg",
+            "serde",
+            "time",
+            "ureq",
+            "zip",
+        ],
     );
     assert_dependencies_absent(
         Some("aws-secrets"),
-        &["inquire", "owo-colors", "serde", "time", "ureq", "zip"],
+        &[
+            "ico",
+            "image",
+            "inquire",
+            "owo-colors",
+            "resvg",
+            "serde",
+            "time",
+            "ureq",
+            "zip",
+        ],
     );
     for feature in ["host", "gcp-container"] {
         assert_dependencies_absent(
             Some(feature),
-            &["inquire", "owo-colors", "time", "ureq", "zip"],
+            &[
+                "ico",
+                "image",
+                "inquire",
+                "owo-colors",
+                "resvg",
+                "time",
+                "ureq",
+                "zip",
+            ],
+        );
+    }
+
+    let icons = dependency_names(Some("icons"));
+    for dependency in ["ico", "image", "resvg"] {
+        assert!(
+            icons.iter().any(|name| name == dependency),
+            "icons should compile `{dependency}`"
         );
     }
 
@@ -226,7 +267,15 @@ fn representative_features_keep_unrelated_dependencies_out() {
     }
 
     let all = dependency_names(Some("all"));
-    for dependency in ["inquire", "owo-colors", "ureq", "zip"] {
+    for dependency in [
+        "ico",
+        "image",
+        "inquire",
+        "owo-colors",
+        "resvg",
+        "ureq",
+        "zip",
+    ] {
         assert!(
             all.iter().any(|name| name == dependency),
             "all commands should compile `{dependency}`"

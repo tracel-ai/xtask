@@ -313,6 +313,15 @@ const COMMANDS: &[CommandMetadata] = &[
         "Commands related to an host like connecting, getting info, etc..."
     ),
     command!(
+        "icons",
+        "Icons",
+        "icons",
+        "IconsCmdArgs",
+        "Generate high-quality PNG and ICO icon files from an SVG.",
+        Some("icon"),
+        CommandHandler::Standard
+    ),
+    command!(
         "image",
         "Image",
         "image",
@@ -1416,7 +1425,7 @@ mod tests {
 
     #[test]
     fn command_metadata_is_complete_and_alphabetical() {
-        assert_eq!(COMMANDS.len(), 21);
+        assert_eq!(COMMANDS.len(), 22);
 
         let features = COMMANDS
             .iter()

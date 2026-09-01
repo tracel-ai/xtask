@@ -29,6 +29,7 @@ all = [
     "gcp-container",
     "gcp-secrets",
     "host",
+    "icons",
     "image",
     "infra",
     "publish",
@@ -85,6 +86,12 @@ host = [
     "tracel-xtask-macros/host",
     "utils-aws-cli",
     "utils-aws-instance-system-log",
+]
+icons = [
+    "dep:ico",
+    "dep:image-rs",
+    "dep:resvg",
+    "tracel-xtask-macros/icons",
 ]
 image = [
     "tracel-xtask-macros/image",
@@ -212,8 +219,11 @@ utils-workspace = ["tracel-xtask-utils/workspace"]
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+ico = { workspace = true, optional = true }
+image-rs = { workspace = true, optional = true }
 log = { workspace = true }
 regex = { workspace = true, optional = true }
+resvg = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 strum = { workspace = true }

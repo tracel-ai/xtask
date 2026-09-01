@@ -22,6 +22,7 @@ tracel-xtask = { path = "../crates/tracel-xtask", version = "=5.1.0", features =
     "gcp-container",
     "gcp-secrets",
     "host",
+    "icons",
     "infra",
     "publish",
     "test",

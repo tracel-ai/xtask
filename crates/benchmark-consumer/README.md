@@ -7,7 +7,7 @@ one trivial custom command and exposes three command selections:
 |----------|-----------------|-----------------------|
 | Custom only | `--no-default-features` | None |
 | Common four | `--no-default-features --features common` | `build`, `check`, `fix`, `test` |
-| All commands | `--no-default-features --features all` | All 21 base commands |
+| All commands | `--no-default-features --features all` | All available base commands |
 
 Build each v5 scenario from the workspace root with:
 

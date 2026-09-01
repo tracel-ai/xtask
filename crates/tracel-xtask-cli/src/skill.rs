@@ -179,6 +179,8 @@ Base commands vary by repository, but common ones include:
 - `doc`: build or test documentation.
 - `coverage`: install or generate coverage data.
 - `dependencies`: inspect dependency health, unused dependencies, or deny rules.
+- `icons`: render multi-size PNG and ICO files from an SVG source; add
+  `--decorated` for a rounded 3D application-icon tile.
 - `vulnerabilities`: run nightly sanitizer and cargo-careful checks.
 - deployment-oriented commands such as `aws-container`, `gcp-container`,
   `image`, `infra`, `aws-secrets`, and `gcp-secrets` when enabled.

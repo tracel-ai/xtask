@@ -18,6 +18,8 @@ ctrlc = "3.4.7"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
 home = "0.5.12"
+ico = "0.5.0"
+image-rs = { package = "image", version = "=0.25.9", default-features = false }
 inquire = "0.9.3"
 log = "0.4.27"
 owo-colors = "4.2.3"
@@ -25,6 +27,7 @@ proc-macro2 = "1.0.95"
 quote = "1.0.40"
 rand = "0.9.1"
 regex = "1.11.1"
+resvg = "0.48.1"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 strum = {version = "0.27.1", features = ["derive"]}
