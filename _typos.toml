@@ -6,6 +6,7 @@ extend-exclude = [
 [default.extend-words]
 OT = "OT"
 UE = "UE"
+PN = "PN"
 ue = "ue"
 # abbreviation of northamerica-northeast
 nane = "nane"
