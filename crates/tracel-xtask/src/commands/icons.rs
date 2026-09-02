@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context as _, ensure};
 use ico::{IconDir, IconDirEntry, IconImage, ResourceType};
-use image_rs::{Rgba, RgbaImage};
+use image_rs::{Rgba, RgbaImage, imageops::FilterType};
 use tracel_xtask_utils::environment::Environment;
 
 use crate::context::Context;
@@ -15,6 +15,8 @@ use crate::context::Context;
 const DEFAULT_SIZES: &str = "16,32,48,64,128,256,512,1024";
 const MAX_ICO_SIZE: u32 = 256;
 const MAX_PNG_SIZE: u32 = 4096;
+const MAX_ANTIALIAS_SCALE: u32 = 4;
+const MAX_ANTIALIAS_RENDER_SIZE: u32 = 2048;
 const SVG_NAMESPACE: &str = "http://www.w3.org/2000/svg";
 
 #[tracel_xtask_macros::declare_command_args(None, None)]
@@ -76,7 +78,7 @@ fn generate_outputs(args: &IconsCmdArgs) -> anyhow::Result<BTreeMap<PathBuf, Vec
         } else {
             size
         };
-        let foreground = render_svg(&tree, foreground_size)?;
+        let foreground = render_antialiased_svg(&tree, foreground_size)?;
         ensure!(
             foreground.data().chunks_exact(4).any(|pixel| pixel[3] != 0),
             "SVG rendered no visible pixels at {size}x{size}; check its artwork: {}",
@@ -213,6 +215,45 @@ fn render_svg(tree: &resvg::usvg::Tree, size: u32) -> anyhow::Result<resvg::tiny
         .with_context(|| format!("allocating {size}x{size} icon canvas"))?;
     resvg::render(tree, transform, &mut pixmap.as_mut());
     Ok(pixmap)
+}
+
+fn render_antialiased_svg(
+    tree: &resvg::usvg::Tree,
+    size: u32,
+) -> anyhow::Result<resvg::tiny_skia::Pixmap> {
+    let render_size = antialias_render_size(size);
+    let pixmap = render_svg(tree, render_size)?;
+    resize_premultiplied_pixmap(pixmap, size)
+}
+
+fn antialias_render_size(size: u32) -> u32 {
+    // Bound intermediate buffers; large targets already have ample native coverage.
+    let scale = (MAX_ANTIALIAS_RENDER_SIZE / size).clamp(1, MAX_ANTIALIAS_SCALE);
+    size * scale
+}
+
+fn resize_premultiplied_pixmap(
+    pixmap: resvg::tiny_skia::Pixmap,
+    size: u32,
+) -> anyhow::Result<resvg::tiny_skia::Pixmap> {
+    if (pixmap.width(), pixmap.height()) == (size, size) {
+        return Ok(pixmap);
+    }
+
+    // Both tiny-skia and image's resampler operate on premultiplied RGBA.
+    // Keeping the pixels premultiplied while filtering avoids dark fringes
+    // around translucent SVG edges.
+    let source = RgbaImage::from_raw(pixmap.width(), pixmap.height(), pixmap.take())
+        .context("converting supersampled SVG for downsampling")?;
+    let mut resized = image_rs::imageops::resize(&source, size, size, FilterType::Lanczos3);
+    for pixel in resized.pixels_mut() {
+        let alpha = pixel.0[3];
+        for channel in &mut pixel.0[..3] {
+            *channel = (*channel).min(alpha);
+        }
+    }
+
+    premultiplied_rgba_to_pixmap(resized)
 }
 
 fn decorated_foreground_size(size: u32) -> u32 {
@@ -370,6 +411,13 @@ fn rgba_image_to_pixmap(image: RgbaImage) -> anyhow::Result<resvg::tiny_skia::Pi
         )
         .premultiply();
     }
+    Ok(pixmap)
+}
+
+fn premultiplied_rgba_to_pixmap(image: RgbaImage) -> anyhow::Result<resvg::tiny_skia::Pixmap> {
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(image.width(), image.height())
+        .context("allocating antialiased icon canvas")?;
+    pixmap.data_mut().copy_from_slice(image.as_raw());
     Ok(pixmap)
 }
 

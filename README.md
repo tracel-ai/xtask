@@ -1255,7 +1255,8 @@ xtask icons assets/app-icon.svg --output-dir assets/icons
 
 By default it creates PNGs at 16, 32, 48, 64, 128, 256, 512, and 1024 pixels, named
 `<stem>-<size>.png`, plus `<stem>.ico`. The ICO contains the requested sizes up to 256 pixels. Rendering preserves
-the SVG's aspect ratio and centers it on a transparent square canvas when padding is needed.
+the SVG's aspect ratio and centers it on a transparent square canvas when padding is needed. SVG artwork is rendered
+at up to 4× resolution and downsampled with a Lanczos filter for smoother PNG and ICO edges.
 
 Pass a comma-delimited list to `--sizes` to choose different dimensions. If `--output-dir` is omitted, files are
 written beside the source SVG; `--output` is a shorter alias for `--output-dir`.
