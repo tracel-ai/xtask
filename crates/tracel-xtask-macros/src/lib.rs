@@ -403,6 +403,51 @@ fn generate_dispatch_function(
     }
 }
 
+fn generate_base_commands_expansion(
+    item: &ItemEnum,
+    enabled_commands: &[&CommandMetadata],
+) -> proc_macro2::TokenStream {
+    let mut emitted_variants = Vec::new();
+    let mut dispatched_commands = Vec::new();
+    let mut consumed_user_variants = vec![false; item.variants.len()];
+
+    // A matching user variant occupies the base command's canonical position, but its handler is
+    // consumer-owned and must not be included in the generated base dispatcher.
+    for command in enabled_commands {
+        let overridden_variant = item.variants.iter().enumerate().find(|(index, variant)| {
+            !consumed_user_variants[*index] && variant.ident == command.variant
+        });
+
+        if let Some((index, variant)) = overridden_variant {
+            consumed_user_variants[index] = true;
+            emitted_variants.push(quote! { #variant });
+        } else {
+            emitted_variants.push(generate_command_variant(command));
+            dispatched_commands.push(*command);
+        }
+    }
+
+    emitted_variants.extend(
+        item.variants
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !consumed_user_variants[*index])
+            .map(|(_, variant)| quote! { #variant }),
+    );
+
+    let enum_name = &item.ident;
+    let dispatch = generate_dispatch_function(enum_name, &dispatched_commands);
+
+    quote! {
+        #[derive(clap::Subcommand, strum::Display)]
+        pub enum #enum_name {
+            #(#emitted_variants,)*
+        }
+
+        #dispatch
+    }
+}
+
 #[proc_macro_attribute]
 pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
     if !args.is_empty() {
@@ -423,25 +468,7 @@ pub fn base_commands(args: TokenStream, input: TokenStream) -> TokenStream {
         });
     }
 
-    let variants = enabled_commands
-        .iter()
-        .map(|command| generate_command_variant(command));
-
-    // Generate the xtask commands enum
-    let enum_name = &item.ident;
-    let other_variants = &item.variants;
-    let mut output = TokenStream::from(quote! {
-        #[derive(clap::Subcommand, strum::Display)]
-        pub enum #enum_name {
-            #(#variants,)*
-            #other_variants
-        }
-    });
-    output.extend(TokenStream::from(generate_dispatch_function(
-        enum_name,
-        &enabled_commands,
-    )));
-    output
+    TokenStream::from(generate_base_commands_expansion(&item, &enabled_commands))
 }
 
 // Command arguments
@@ -1423,6 +1450,24 @@ fn parse_named_fields(tokens: proc_macro2::TokenStream) -> Result<Vec<syn::Field
 mod tests {
     use super::*;
 
+    fn command(feature: &str) -> &'static CommandMetadata {
+        COMMANDS
+            .iter()
+            .find(|command| command.feature == feature)
+            .unwrap()
+    }
+
+    fn generated_command_enum(output: proc_macro2::TokenStream) -> ItemEnum {
+        let file: syn::File = syn::parse2(output).unwrap();
+        file.items
+            .into_iter()
+            .find_map(|item| match item {
+                syn::Item::Enum(item) => Some(item),
+                _ => None,
+            })
+            .unwrap()
+    }
+
     #[test]
     fn command_metadata_is_complete_and_alphabetical() {
         assert_eq!(COMMANDS.len(), 22);
@@ -1441,10 +1486,7 @@ mod tests {
     #[test]
     fn dispatch_uses_the_input_enum_and_fix_signature() {
         let enum_ident = format_ident!("ProjectCommand");
-        let fix = COMMANDS
-            .iter()
-            .find(|command| command.feature == "fix")
-            .unwrap();
+        let fix = command("fix");
         let output = generate_dispatch_function(&enum_ident, &[fix]).to_string();
 
         assert!(output.contains("XtaskArgs < ProjectCommand >"));
@@ -1454,13 +1496,66 @@ mod tests {
 
     #[test]
     fn command_variants_retain_aliases_and_argument_types() {
-        let aws_container = COMMANDS
-            .iter()
-            .find(|command| command.feature == "aws-container")
-            .unwrap();
+        let aws_container = command("aws-container");
         let output = generate_command_variant(aws_container).to_string();
 
         assert!(output.contains("alias = \"container\""));
         assert!(output.contains("aws_container :: AwsContainerCmdArgs"));
+    }
+
+    #[test]
+    fn user_variant_overrides_generated_variant_and_dispatch() {
+        let item: ItemEnum = syn::parse_quote! {
+            enum Command {
+                Custom(CustomArgs),
+                Test(ProjectTestCmdArgs),
+            }
+        };
+        let output = generate_base_commands_expansion(&item, &[command("build"), command("test")]);
+        let output_string = output.to_string();
+        let generated_enum = generated_command_enum(output);
+        let variant_names = generated_enum
+            .variants
+            .iter()
+            .map(|variant| variant.ident.to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(variant_names, ["Build", "Test", "Custom"]);
+        assert_eq!(
+            generated_enum
+                .variants
+                .iter()
+                .filter(|variant| variant.ident == "Test")
+                .count(),
+            1
+        );
+        assert!(output_string.contains("Test (ProjectTestCmdArgs)"));
+        assert!(!output_string.contains("commands :: test :: TestCmdArgs"));
+        assert!(!output_string.contains("base_commands :: test :: handle_command"));
+        assert!(output_string.contains("commands :: build :: BuildCmdArgs"));
+        assert!(output_string.contains("base_commands :: build :: handle_command"));
+    }
+
+    #[test]
+    fn generated_variant_and_dispatch_are_unchanged_without_an_override() {
+        let item: ItemEnum = syn::parse_quote! {
+            enum Command {
+                Custom(CustomArgs),
+            }
+        };
+        let output =
+            generate_base_commands_expansion(&item, &[command("aws-container"), command("test")]);
+        let output_string = output.to_string();
+        let generated_enum = generated_command_enum(output);
+        let variant_names = generated_enum
+            .variants
+            .iter()
+            .map(|variant| variant.ident.to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(variant_names, ["AwsContainer", "Test", "Custom"]);
+        assert!(output_string.contains("alias = \"container\""));
+        assert!(output_string.contains("commands :: test :: TestCmdArgs"));
+        assert!(output_string.contains("base_commands :: test :: handle_command"));
     }
 }

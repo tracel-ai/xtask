@@ -43,6 +43,7 @@
   - [Extend the default Target enum](#extend-the-default-target-enum)
   - [Target aliases](#target-aliases)
   - [Extend a base command](#extend-a-base-command)
+    - [Override a generated command](#override-a-generated-command)
     - [Extend the arguments of a base command](#extend-the-arguments-of-a-base-command)
     - [Extend the subcommands of a base command](#extend-the-subcommands-of-a-base-command)
 - [Custom builds and tests](#custom-builds-and-tests)
@@ -703,6 +704,69 @@ a new `--debug` argument; and the second is a new command to extend the subcomma
 to add a new `my-check` subcommand.
 
 Note that you can find more examples in the `xtask` crate of this repository.
+
+#### Override a generated command
+
+An enabled base command can keep its canonical CLI name while using a consumer-defined argument type. Declare a variant
+whose Rust identifier exactly matches the base variant. That variant replaces the generated one and is omitted from
+`dispatch_base_commands`; all other enabled base commands remain generated and dispatched normally.
+
+For example, with the `test` feature enabled, extend both the test arguments and subcommands in `commands/test.rs`:
+
+```rust
+use tracel_xtask::prelude::*;
+
+#[macros::extend_command_args(TestCmdArgs, Target, ProjectTestSubCommand)]
+pub struct ProjectTestCmdArgs {
+    /// Print additional debug info when set.
+    #[arg(short, long)]
+    pub debug: bool,
+}
+
+#[macros::extend_subcommands(TestSubCommand)]
+pub enum ProjectTestSubCommand {
+    /// Run the project's custom test workflow.
+    Project,
+}
+
+pub fn handle_command(
+    args: ProjectTestCmdArgs,
+    env: Environment,
+    ctx: Context,
+) -> anyhow::Result<()> {
+    match args.get_command() {
+        ProjectTestSubCommand::Project => run_project_tests(args),
+        _ => base_commands::test::handle_command(args.try_into()?, env, ctx),
+    }
+}
+
+fn run_project_tests(_args: ProjectTestCmdArgs) -> anyhow::Result<()> {
+    // Run repository-specific tests here.
+    Ok(())
+}
+```
+
+Use `Test` itself in the top-level command enum and dispatch it explicitly:
+
+```rust
+#[macros::base_commands]
+pub enum Command {
+    Test(commands::test::ProjectTestCmdArgs),
+}
+
+fn main() -> anyhow::Result<()> {
+    let (args, environment) = init_xtask::<Command>(parse_args::<Command>()?)?;
+    match args.command {
+        Command::Test(cmd_args) => {
+            commands::test::handle_command(cmd_args, environment, args.context)
+        }
+        _ => dispatch_base_commands(args, environment),
+    }
+}
+```
+
+The custom workflow is now available as `xtask test project`, while `xtask test unit` and the other inherited test
+subcommands delegate to the base handler through the generated `TryInto<TestCmdArgs>` conversion.
 
 #### Extend the arguments of a base command
 

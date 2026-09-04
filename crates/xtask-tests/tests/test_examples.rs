@@ -17,8 +17,8 @@ use rstest::rstest;
 #[case::create_custom_command_with_extended_target_new_frontend_variant(&["extended-target", "--target", "frontend"], "You chose the target: frontend", true)]
 #[case::extend_base_command_with_additional_command_args_debug_1(&["extended-build-args"], "debug disabled", true)]
 #[case::extend_base_command_with_additional_command_args_debug_2(&["extended-build-args"], "debug disabled", true)]
-#[case::extend_base_command_with_additional_command_args_debug_3(&["extended-test-args"], "debug disabled", true)]
-#[case::extend_base_command_with_additional_command_args_debug_4(&["extended-test-args"], "debug disabled", true)]
+#[case::override_base_test_with_custom_subcommand(&["test", "project"], "project tests with debug disabled", true)]
+#[case::override_base_test_with_custom_argument(&["test", "--debug", "project"], "project tests with debug enabled", true)]
 #[case::extend_base_command_with_no_sub_commands_by_adding_sub_commands_default(&["extended-build-new-sub-commands"], "Executing build sub command 1", true)]
 #[case::extend_base_command_with_no_sub_commands_by_adding_sub_commands_variant_1(&["extended-build-new-sub-commands", "command1"], "Executing build sub command 1", true)]
 #[case::extend_base_command_with_no_sub_commands_by_adding_sub_commands_variant_2(&["extended-build-new-sub-commands", "command2"], "Executing build sub command 2", true)]
@@ -32,7 +32,7 @@ use rstest::rstest;
 #[case::extend_base_command_advanced_example(&["extended-fix", "--target", "ci", "new-sub-command"], "Executing new subcommand on CI.", true)]
 #[case::extend_base_command_advanced_example_default_target(&["extended-fix", "new-sub-command"], "Executing new subcommand on workspace.", true)]
 #[case::cannot_execute_tests_in_production(&["-e", "prod", "test"], "Abort tests to avoid running them in production!", false)]
-#[case::force_tests_execution_in_production(&["-e", "prod", "extended-test-args", "-f"], "Force running tests in production (--force argument is set)", true)]
+#[case::force_custom_tests_execution_in_production(&["-e", "prod", "test", "--force", "project"], "Force running tests in production (--force argument is set)", true)]
 fn test_xtask_example_status_success_and_returns_expected_output(
     #[case] cargo_args: &[&str],
     #[case] expected_output: String,
@@ -48,4 +48,25 @@ fn test_xtask_example_status_success_and_returns_expected_output(
     println!("{out}");
     assert_eq!(output.status.success(), success);
     assert!(out.contains(&expected_output));
+}
+
+#[test]
+fn overridden_test_appears_once_alongside_generated_base_commands() {
+    let output = Command::new("cargo")
+        .args(["xtask-tests", "--help"])
+        .output()
+        .expect("cargo process should start");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert_eq!(
+        stdout
+            .lines()
+            .filter(|line| line.trim_start().starts_with("test "))
+            .count(),
+        1
+    );
+    assert!(stdout
+        .lines()
+        .any(|line| line.trim_start().starts_with("build ")));
 }
