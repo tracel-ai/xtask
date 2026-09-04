@@ -1,12 +1,12 @@
 [package]
 name = "xtask-core"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 
 [dependencies]
 log = "0.4.28"
 strum = "0.27.2"
-tracel-xtask = { path = "../crates/tracel-xtask", version = "=5.2.0", features = [
+tracel-xtask = { path = "../crates/tracel-xtask", version = "=5.3.0", features = [
     "aws-container",
     "aws-secrets",
     "build",

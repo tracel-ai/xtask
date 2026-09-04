@@ -227,8 +227,8 @@ resvg = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 strum = { workspace = true }
-tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=5.2.0" }
-tracel-xtask-utils = { path = "../tracel-xtask-utils", version = "=5.2.0", default-features = false, features = ["clap", "environment"] }
+tracel-xtask-macros = { path = "../tracel-xtask-macros", version = "=5.3.0" }
+tracel-xtask-utils = { path = "../tracel-xtask-utils", version = "=5.3.0", default-features = false, features = ["clap", "environment"] }
 ureq = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -1,6 +1,6 @@
 [package]
 name = "benchmark-consumer"
-version = "0.2.0"
+version = "0.3.0"
 edition.workspace = true
 publish = false
 
@@ -16,4 +16,4 @@ all = ["tracel-xtask/all"]
 
 [dependencies]
 strum = { workspace = true }
-tracel-xtask = { path = "../tracel-xtask", version = "=5.2.0", default-features = false }
+tracel-xtask = { path = "../tracel-xtask", version = "=5.3.0", default-features = false }
