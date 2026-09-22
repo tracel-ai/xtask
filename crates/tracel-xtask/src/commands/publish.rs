@@ -19,6 +19,9 @@ pub struct PublishCmdArgs {
     /// When set, only perform a dry-run and does not publish the crate
     #[arg(long)]
     dry_run_only: bool,
+    /// Comma-separated features to enable for both dry-run and publish verification
+    #[arg(short = 'f', long, value_name = "FEATURES", value_delimiter = ',')]
+    features: Vec<String>,
     /// Optional path to the Cargo.toml to validate the version against the tag
     #[arg(long)]
     cargo_toml: Option<std::path::PathBuf>,
@@ -69,7 +72,7 @@ pub fn handle_command(
         info!("This is the first version to be published on crates.io!");
     }
 
-    publish(crate_name, args.dry_run_only)?;
+    publish(&crate_name, args.dry_run_only, &args.features)?;
     endgroup!();
 
     Ok(())
@@ -222,10 +225,18 @@ fn remote_has_version(crate_name: &str, version: &str) -> bool {
     resp.is_ok()
 }
 
-fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
+fn publish(crate_name: &str, dry_run_only: bool, features: &[String]) -> anyhow::Result<()> {
+    let features = features.join(",");
+    let mut cargo_args = vec!["publish", "-p", crate_name];
+    if !features.is_empty() {
+        cargo_args.extend(["--features", &features]);
+    }
+    let mut dry_run_args = cargo_args.clone();
+    dry_run_args.push("--dry-run");
+
     run_process(
         "cargo",
-        &["publish", "-p", &crate_name, "--dry-run"],
+        &dry_run_args,
         None,
         None,
         &format!("Publish dry run should succeed for crate '{}'.", crate_name),
@@ -238,7 +249,8 @@ fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
     let crates_io_token = env::var(CRATES_IO_API_TOKEN).expect("CRATES_IO_API_TOKEN should be set");
     let status = Command::new("cargo")
         .env("CRATES_IO_API_TOKEN", crates_io_token.clone())
-        .args(["publish", "-p", &crate_name, "--token", &crates_io_token])
+        .args(&cargo_args)
+        .args(["--token", &crates_io_token])
         .status()
         .map_err(|e| anyhow!("Executing `cargo publish` should succeed: {}", e))?;
     if !status.success() {
@@ -255,9 +267,26 @@ fn publish(crate_name: String, dry_run_only: bool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
     use rstest::rstest;
     use std::fs::File;
     use std::io::Write as _;
+
+    #[derive(Parser)]
+    struct PublishCli {
+        #[command(flatten)]
+        args: PublishCmdArgs,
+    }
+
+    #[rstest]
+    #[case(&[], &[])]
+    #[case(&["--features", "cubecl/wgpu,std"], &["cubecl/wgpu", "std"])]
+    #[case(&["-f", "cubecl/wgpu", "--features", "std"], &["cubecl/wgpu", "std"])]
+    fn parse_publish_features(#[case] flags: &[&str], #[case] expected: &[&str]) {
+        let cli = PublishCli::try_parse_from(["xtask-publish", "publish-test"].iter().chain(flags))
+            .expect("publish arguments should parse");
+        assert_eq!(cli.args.features, expected);
+    }
 
     #[rstest]
     #[case("v1.2.3", "1.2.3")]
