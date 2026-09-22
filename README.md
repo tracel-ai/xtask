@@ -1135,6 +1135,18 @@ Usage:
 xtask publish <NAME>
 ```
 
+Use `--features` (or `-f`) to enable features for package verification:
+
+```sh
+xtask publish burn-cubecl-fusion --features cubecl/wgpu --dry-run-only
+xtask publish burn-cubecl-fusion --features cubecl/wgpu
+```
+
+Features may be comma-separated or supplied by repeating `--features`. They are
+passed to both `cargo publish --dry-run` and the actual `cargo publish`, since both
+commands verify the package. This does not change the published crate's default
+features. Omitting `--features` preserves the default Cargo feature selection.
+
 As mentioned, this command is often used in a GitHub workflow.
 We provide Tracel's reusable [publish-crate][8] workflow that makes use of this command.
 Here is a simple example with a workflow that publishes two crates A and B with A depending on B.
