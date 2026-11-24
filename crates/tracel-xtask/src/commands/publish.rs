@@ -208,10 +208,10 @@ fn remote_version(crate_name: &str) -> anyhow::Result<Option<String>> {
         .map_err(|e| anyhow!("Executing `cargo search` should succeed: {}", e))?;
     if !cargo_search_output.stdout.is_empty() {
         let output_str = str::from_utf8(&cargo_search_output.stdout).unwrap();
-        if let Some((name, version)) = parse_cargo_search_output(output_str) {
-            if name == crate_name {
-                return Ok(Some(version.to_string()));
-            }
+        if let Some((name, version)) = parse_cargo_search_output(output_str)
+            && name == crate_name
+        {
+            return Ok(Some(version.to_string()));
         }
     }
     Ok(None)

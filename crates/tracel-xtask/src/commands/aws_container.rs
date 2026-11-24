@@ -82,7 +82,7 @@ pub struct AwsContainerListSubCmdArgs {
     /// Container repository name
     #[arg(long)]
     pub repository: String,
-    /// The tag reprensenting the latest tag (defaults to the environment name if omitted)
+    /// The tag representing the latest tag (defaults to the environment name if omitted)
     #[arg(long)]
     pub latest_tag: Option<String>,
     /// Rollback tag applied by this command (defaults to `rollback_<environment>` if omitted)
@@ -738,14 +738,14 @@ fn promote(promote_args: AwsContainerPromoteSubCmdArgs, env: &Environment) -> an
     );
 
     // If 'latest' tag is already the target manifest then do nothing
-    if let Some(ref current) = current_latest_manifest {
-        if current == &to_promote_manifest {
-            eprintln!(
-                "ℹ️  Tag '{}' is already promoted as '{promote_tag}' in registry '{}', no changes needed.",
-                promote_args.build_tag, promote_args.repository
-            );
-            return Ok(());
-        }
+    if let Some(ref current) = current_latest_manifest
+        && current == &to_promote_manifest
+    {
+        eprintln!(
+            "ℹ️  Tag '{}' is already promoted as '{promote_tag}' in registry '{}', no changes needed.",
+            promote_args.build_tag, promote_args.repository
+        );
+        return Ok(());
     }
 
     // If there was a previous 'latest', move it to 'rollback'.

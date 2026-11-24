@@ -11,10 +11,10 @@ use serde::Deserialize;
 use crate::{group_info, process::run_process_capture_stdout};
 
 fn gcloud_program() -> OsString {
-    if let Some(program) = std::env::var_os("GCLOUD") {
-        if !program.is_empty() {
-            return program;
-        }
+    if let Some(program) = std::env::var_os("GCLOUD")
+        && !program.is_empty()
+    {
+        return program;
     }
 
     if let Some(program) = default_sdk_gcloud_path() {

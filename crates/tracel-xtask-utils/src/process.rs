@@ -204,14 +204,14 @@ pub fn run_process_for_workspace<'a>(
             }
         }
 
-        if let Some(log) = ignore_log {
-            if line.contains(log) {
-                if let Some(msg) = ignore_msg {
-                    log::warn!("{msg}");
-                }
-                ignore_error = true;
-                skip_line = true;
+        if let Some(log) = ignore_log
+            && line.contains(log)
+        {
+            if let Some(msg) = ignore_msg {
+                log::warn!("{msg}");
             }
+            ignore_error = true;
+            skip_line = true;
         }
 
         if line.contains("(signal:") {
@@ -311,12 +311,12 @@ pub fn run_process_for_package(
                 // skip the lines until a non stderr line is encountered
                 skip_line = false;
             }
-            if line.contains(log) {
-                if let Some(msg) = ignore_msg {
-                    log::warn!("{msg}");
-                    ignore_error = true;
-                    skip_line = true;
-                }
+            if line.contains(log)
+                && let Some(msg) = ignore_msg
+            {
+                log::warn!("{msg}");
+                ignore_error = true;
+                skip_line = true;
             }
         }
         if line.contains("(signal:") {
