@@ -1,4 +1,3 @@
-use anyhow::Ok;
 use strum::IntoEnumIterator;
 use tracel_xtask_utils::{
     endgroup,

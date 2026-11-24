@@ -334,7 +334,7 @@ mod tests {
     #[rstest]
     #[case::dev(TestEnv::new(EnvironmentName::Development, 1))]
     #[case::stag(TestEnv::new(EnvironmentName::Staging, 1))]
-    #[case::test(TestEnv::new(EnvironmentName::Test, 1))]
+    #[case::test_environment(TestEnv::new(EnvironmentName::Test, 1))]
     #[case::prod(TestEnv::new(EnvironmentName::Production, 1))]
     #[serial]
     fn test_environment_load(#[case] env: TestEnv) {
@@ -363,7 +363,7 @@ mod tests {
     #[rstest]
     #[case::dev(TestEnv::new(EnvironmentName::Development, 1))]
     #[case::stag(TestEnv::new(EnvironmentName::Staging, 1))]
-    #[case::test(TestEnv::new(EnvironmentName::Test, 1))]
+    #[case::test_environment(TestEnv::new(EnvironmentName::Test, 1))]
     #[case::prod(TestEnv::new(EnvironmentName::Production, 1))]
     #[serial]
     fn test_environment_merge_env_files(#[case] env: TestEnv) {

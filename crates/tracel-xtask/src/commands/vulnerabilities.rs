@@ -1,4 +1,4 @@
-use anyhow::{Ok, anyhow};
+use anyhow::anyhow;
 use log::info;
 use std::process::Command as StdCommand;
 

@@ -4,8 +4,8 @@ version = "0.9.0"
 edition = "2024"
 
 [dependencies]
-log = "0.4.28"
-strum = "0.27.2"
+log = "0.4.35"
+strum = "0.28.0"
 tracel-xtask = { path = "../crates/tracel-xtask", version = "=5.3.0", features = [
     "aws-container",
     "aws-secrets",

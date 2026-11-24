@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{self, Context};
-use rand::Rng;
+use rand::RngExt;
 use regex::Regex;
 
 use crate::group_info;

@@ -8,7 +8,7 @@ license.workspace = true
 name = "tracel-xtask"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/xtask/tree/main/crates/tracel-xtask"
-rust-version = "1.85"
+rust-version = "1.89"
 version.workspace = true
 
 [features]
