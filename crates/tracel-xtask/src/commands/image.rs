@@ -553,11 +553,11 @@ fn rollback(args: ImageRollbackSubCmdArgs, env: &Environment<ExplicitIndex>) -> 
     eprintln!("  Promote tag:  {promote_tag}=true");
     eprintln!("  Rollback tag: {rollback_tag}=true");
 
-    if let Some(current_latest) = current_latest {
-        if current_latest.image_id != current_rollback.image_id {
-            delete_tag(&args.region, &current_latest.image_id, &promote_tag)
-                .context("current promoted tag should be removed")?;
-        }
+    if let Some(current_latest) = current_latest
+        && current_latest.image_id != current_rollback.image_id
+    {
+        delete_tag(&args.region, &current_latest.image_id, &promote_tag)
+            .context("current promoted tag should be removed")?;
     }
 
     create_true_tag(&args.region, &current_rollback.image_id, &promote_tag)

@@ -1,4 +1,3 @@
-use anyhow::Ok;
 use strum::IntoEnumIterator;
 use tracel_xtask_utils::{
     cargo::ensure_cargo_crate_is_installed, endgroup, environment::Environment, group,

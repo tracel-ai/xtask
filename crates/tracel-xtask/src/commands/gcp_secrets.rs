@@ -360,17 +360,17 @@ pub fn env_file(args: GcpSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
             continue;
         }
 
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(s) {
-            if let Some(obj) = value.as_object() {
-                for (k, v) in obj {
-                    let v_str = v
-                        .as_str()
-                        .map(|x| x.to_string())
-                        .unwrap_or_else(|| v.to_string());
-                    merged.insert(k.clone(), v_str);
-                }
-                continue;
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(s)
+            && let Some(obj) = value.as_object()
+        {
+            for (k, v) in obj {
+                let v_str = v
+                    .as_str()
+                    .map(|x| x.to_string())
+                    .unwrap_or_else(|| v.to_string());
+                merged.insert(k.clone(), v_str);
             }
+            continue;
         }
 
         for line in s.lines() {
@@ -565,10 +565,11 @@ pub fn push(args: GcpSecretsPushSubCmdArgs) -> anyhow::Result<()> {
 
         let existing = obj.get(key);
 
-        if let Some(existing_val) = existing {
-            if existing_val.is_string() && existing_val.as_str() == Some(val) {
-                continue;
-            }
+        if let Some(existing_val) = existing
+            && existing_val.is_string()
+            && existing_val.as_str() == Some(val)
+        {
+            continue;
         }
 
         obj.insert(key.to_string(), serde_json::Value::String(val.to_string()));

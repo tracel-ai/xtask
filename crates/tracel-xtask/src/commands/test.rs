@@ -118,10 +118,10 @@ fn push_cargo_optional_args(cmd_args: &mut Vec<String>, args: &TestCmdArgs) {
         cmd_args.extend(["--jobs".to_string(), jobs.to_string()]);
     }
 
-    if let Some(features) = &args.features {
-        if !features.is_empty() {
-            cmd_args.extend(["--features".to_string(), features.join(",")]);
-        }
+    if let Some(features) = &args.features
+        && !features.is_empty()
+    {
+        cmd_args.extend(["--features".to_string(), features.join(",")]);
     }
 
     if args.release {

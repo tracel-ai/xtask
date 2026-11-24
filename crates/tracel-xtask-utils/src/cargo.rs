@@ -18,10 +18,10 @@ pub fn ensure_cargo_crate_is_installed(
         if locked {
             args.push("--locked");
         }
-        if let Some(features) = features {
-            if !features.is_empty() {
-                args.extend(vec!["--features", features]);
-            }
+        if let Some(features) = features
+            && !features.is_empty()
+        {
+            args.extend(vec!["--features", features]);
         }
         if let Some(version) = version {
             args.extend(vec!["--version", version]);
@@ -62,10 +62,10 @@ pub fn parse_cargo_search_output(output: &str) -> Option<(String, String)> {
         r#"(?P<name>[a-zA-Z0-9_-]+)\s*=\s*"(?P<version>\d+\.\d+\.\d+(?:-(?:\d+|pre\.\d+))?)""#,
     )
     .expect("should compile regex");
-    if let Some(captures) = re.captures(&cleaned_output) {
-        if let (Some(name), Some(version)) = (captures.name("name"), captures.name("version")) {
-            return Some((name.as_str().to_owned(), version.as_str().to_owned()));
-        }
+    if let Some(captures) = re.captures(&cleaned_output)
+        && let (Some(name), Some(version)) = (captures.name("name"), captures.name("version"))
+    {
+        return Some((name.as_str().to_owned(), version.as_str().to_owned()));
     }
     None
 }

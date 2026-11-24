@@ -303,17 +303,17 @@ pub fn env_file(args: AwsSecretsEnvFileSubCmdArgs) -> anyhow::Result<()> {
             continue;
         }
         // 1) try JSON object
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(s) {
-            if let Some(obj) = value.as_object() {
-                for (k, v) in obj {
-                    let v_str = v
-                        .as_str()
-                        .map(|x| x.to_string())
-                        .unwrap_or_else(|| v.to_string());
-                    merged.insert(k.clone(), v_str);
-                }
-                continue;
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(s)
+            && let Some(obj) = value.as_object()
+        {
+            for (k, v) in obj {
+                let v_str = v
+                    .as_str()
+                    .map(|x| x.to_string())
+                    .unwrap_or_else(|| v.to_string());
+                merged.insert(k.clone(), v_str);
             }
+            continue;
         }
         // 2) fallback to .env style format
         for line in s.lines() {
@@ -505,11 +505,12 @@ pub fn push(args: AwsSecretsPushSubCmdArgs) -> anyhow::Result<()> {
         }
         let existing = obj.get(key);
         // If existing value is the same string, skip
-        if let Some(existing_val) = existing {
-            if existing_val.is_string() && existing_val.as_str() == Some(val) {
-                // skip value if it has not changed
-                continue;
-            }
+        if let Some(existing_val) = existing
+            && existing_val.is_string()
+            && existing_val.as_str() == Some(val)
+        {
+            // skip value if it has not changed
+            continue;
         }
         obj.insert(key.to_string(), serde_json::Value::String(val.to_string()));
         changed = true;

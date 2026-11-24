@@ -12,35 +12,35 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [workspace.dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.39", features = ["derive"] }
-ctrlc = "3.4.7"
+anyhow = "1.0.105"
+clap = { version = "4.6.9", features = ["derive"] }
+ctrlc = "3.5.3"
 dotenvy = "0.15.7"
-env_logger = "0.11.8"
+env_logger = "0.11.12"
 home = "0.5.12"
-ico = "0.5.0"
+ico = "0.6.0"
 image-rs = { package = "image", version = "=0.25.9", default-features = false }
-inquire = "0.9.3"
-log = "0.4.27"
-owo-colors = "4.2.3"
-proc-macro2 = "1.0.95"
-quote = "1.0.40"
-rand = "0.9.1"
-regex = "1.11.1"
-resvg = "0.48.1"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-strum = {version = "0.27.1", features = ["derive"]}
-syn = {version = "~2.0" , features = ["full"]}
-time = { version = "0.3.47", features = ["parsing", "formatting"] }
-toml = { version = "0.9.8", default-features = false, features = ["display", "parse", "serde"] }
-ureq = { version = "3.2", features = ["_tls", "json"] }
-zip = "6.0.0"
+inquire = "0.9.5"
+log = "0.4.35"
+owo-colors = "4.4.0"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+rand = "0.10.4"
+regex = "1.13.2"
+resvg = "0.50.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+strum = {version = "0.28.0", features = ["derive"]}
+syn = {version = "~3.0" , features = ["full"]}
+time = { version = "0.3.55", features = ["parsing", "formatting"] }
+toml = { version = "1.2.2", default-features = false, features = ["display", "parse", "serde"] }
+ureq = { version = "3.5", features = ["_tls", "json"] }
+zip = "9.8.2"
 
 # for tests
-rstest = "0.25.0"
-serial_test = "3.2.0"
-tempfile = "3.23.0"
+rstest = "0.29.0"
+serial_test = "3.5.0"
+tempfile = "3.27.0"
 
 [profile.dev]
 debug = 0 # Speed up compilation time and not necessary.

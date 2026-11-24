@@ -625,14 +625,13 @@ pub fn ecr_compute_next_numeric_tag(repository: &str, region: &str) -> anyhow::R
     let mut max_seen: u64 = 0;
     if let serde_json::Value::Array(tags) = v {
         for t in tags {
-            if let Some(s) = t.as_str() {
-                if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) {
-                    if let Ok(n) = s.parse::<u64>() {
-                        if n > max_seen {
-                            max_seen = n;
-                        }
-                    }
-                }
+            if let Some(s) = t.as_str()
+                && !s.is_empty()
+                && s.chars().all(|c| c.is_ascii_digit())
+                && let Ok(n) = s.parse::<u64>()
+                && n > max_seen
+            {
+                max_seen = n;
             }
         }
     }

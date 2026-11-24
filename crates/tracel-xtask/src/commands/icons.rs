@@ -80,7 +80,7 @@ fn generate_outputs(args: &IconsCmdArgs) -> anyhow::Result<BTreeMap<PathBuf, Vec
         };
         let foreground = render_antialiased_svg(&tree, foreground_size)?;
         ensure!(
-            foreground.data().chunks_exact(4).any(|pixel| pixel[3] != 0),
+            foreground.pixels().iter().any(|pixel| pixel.alpha() != 0),
             "SVG rendered no visible pixels at {size}x{size}; check its artwork: {}",
             args.source.display()
         );
@@ -537,13 +537,13 @@ mod tests {
             let path = output.join(format!("app-icon-{size}.png"));
             let image = resvg::tiny_skia::Pixmap::decode_png(&generated[&path]).unwrap();
             assert_eq!((image.width(), image.height()), (size, size));
-            assert!(image.data().chunks_exact(4).any(|pixel| pixel[3] == 0));
-            assert!(image.data().chunks_exact(4).any(|pixel| pixel[3] == 255));
+            assert!(image.pixels().iter().any(|pixel| pixel.alpha() == 0));
+            assert!(image.pixels().iter().any(|pixel| pixel.alpha() == 255));
             assert!(
                 image
-                    .data()
-                    .chunks_exact(4)
-                    .any(|pixel| (1..=254).contains(&pixel[3]))
+                    .pixels()
+                    .iter()
+                    .any(|pixel| (1..=254).contains(&pixel.alpha()))
             );
         }
 
@@ -598,7 +598,7 @@ mod tests {
             let image =
                 resvg::tiny_skia::Pixmap::decode_png(&generated[&output.join("text-64.png")])
                     .unwrap();
-            assert!(image.data().chunks_exact(4).any(|pixel| pixel[3] != 0));
+            assert!(image.pixels().iter().any(|pixel| pixel.alpha() != 0));
         } else {
             assert!(
                 generated
@@ -648,16 +648,16 @@ mod tests {
         assert!(
             render_svg(&tree, 1)
                 .unwrap()
-                .data()
-                .chunks_exact(4)
-                .all(|pixel| pixel[3] == 0)
+                .pixels()
+                .iter()
+                .all(|pixel| pixel.alpha() == 0)
         );
         assert!(
             render_svg(&tree, 64)
                 .unwrap()
-                .data()
-                .chunks_exact(4)
-                .any(|pixel| pixel[3] != 0)
+                .pixels()
+                .iter()
+                .any(|pixel| pixel.alpha() != 0)
         );
 
         let error = generate_outputs(&args(
